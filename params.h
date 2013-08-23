@@ -41,17 +41,24 @@
 // writing, the most current API version is 26
 #define FUSE_USE_VERSION 26
 
+
 // need this to get pwrite().  I have to use setvbuf() instead of
 // setlinebuf() later in consequence.
 #define _XOPEN_SOURCE 500
 
+// Needed to get utimensat and AT_FDCWD
+// Backtrace: fcntl.h, sys/stat.h <- features.h 
+#define _ATFILE_SOURCE 1
+
 // maintain bbfs state in here
 #include <limits.h>
 #include <stdio.h>
-struct bb_state {
+struct esfs_state {
     FILE *logfile;
     char *rootdir;
 };
-#define BB_DATA ((struct bb_state *) fuse_get_context()->private_data)
+
+// Retrieve and cast
+#define ESFS_DATA ((struct esfs_state *) fuse_get_context()->private_data)
 
 #endif
