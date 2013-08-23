@@ -2,6 +2,8 @@ esfs
 
 *~
 *.bak
+*_c.c
+*_c.h
 
 # Object files
 *.o

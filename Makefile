@@ -1,12 +1,27 @@
 esfs : esfs.o log.o
 	gcc -g -o esfs esfs.o log.o `pkg-config fuse --libs`
 
-esfs.o : esfs.c log.h params.h
-	gcc -g -Wall `pkg-config fuse --cflags` -c esfs.c
+esfs.o : esfs_c.c log_c.h params_c.h snapshot_c.c
+	gcc -g -Wall `pkg-config fuse --cflags` -c esfs_c.c
 
-log.o : log.c log.h params.h
-	gcc -g -Wall `pkg-config fuse --cflags` -c log.c
+log.o : log_c.c log_c.h params_c.h
+	gcc -g -Wall `pkg-config fuse --cflags` -c log_c.c
 
+esfs_c.c : esfs.c
+	./compile.pl < esfs.c > esfs_c.c
+
+params_c.h : params.h
+	./compile.pl < params.h > params_c.h
+
+log_c.c : log.c
+	./compile.pl < log.c > log_c.c
+
+log_c.h : log.h
+	./compile.pl < log.h > log_c.h
+
+snapshot_c.c : snapshot.c
+	./compile.pl < snapshot.c > snapshot_c.c
+	
 clean:
 	rm -f esfs *.o
 

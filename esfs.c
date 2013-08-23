@@ -29,7 +29,12 @@
   with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "params.h"
+/*
+ * NOTE: A Perl script is used to replace $ with esfs_ and $$ with ESFS_
+ * in this file. To write $, use \$.
+ */
+
+#include "params_c.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -48,11 +53,12 @@
 // sys/stat.h -- utimens
 #include <sys/stat.h>
 
-#include "log.h"
+#include "log_c.h"
+#include "snapshot_c.c"
 
 // Report errors to logfile and give -errno to caller
 // TODO Turn into inline function
-static int esfs_error(char *str)
+static int $error(char *str)
 {
    int ret = -errno;
    
@@ -68,9 +74,9 @@ static int esfs_error(char *str)
 //  have the mountpoint.  I'll save it away early on in main(), and then
 //  whenever I need a path for something I'll call this to construct
 //  it.
-static void esfs_fullpath(char fpath[PATH_MAX], const char *path)
+static void $fullpath(char fpath[PATH_MAX], const char *path)
 {
-   strcpy(fpath, ESFS_DATA->rootdir);
+   strcpy(fpath, $$DATA->rootdir);
    strncat(fpath, path, PATH_MAX); // ridiculously long paths will
                            // break here
 }
@@ -87,16 +93,16 @@ static void esfs_fullpath(char fpath[PATH_MAX], const char *path)
    * mount option is given.
    */
 //   int (*getattr) (const char *, struct stat *);
-int esfs_getattr(const char *path, struct stat *statbuf)
+int $getattr(const char *path, struct stat *statbuf)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
 
    log_msg("\ngetattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
 
    retstat = lstat(fpath, statbuf);
-   if (retstat != 0) retstat = esfs_error("getattr lstat");
+   if (retstat != 0) retstat = $error("getattr lstat");
    
    log_stat(statbuf);
    
@@ -116,17 +122,17 @@ int esfs_getattr(const char *path, struct stat *statbuf)
 // null.  So, the size passed to to the system readlink() must be one
 // less than the size passed to bb_readlink()
 // bb_readlink() code by Bernardo F Costa (thanks!)
-int esfs_readlink(const char *path, char *link, size_t size)
+int $readlink(const char *path, char *link, size_t size)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
 
    log_msg("readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
 
    retstat = readlink(fpath, link, size - 1);
    if (retstat < 0){
-     retstat = esfs_error("readlink readlink");
+     retstat = $error("readlink readlink");
    }else{
      link[retstat] = '\0';
      retstat = 0;
@@ -143,16 +149,16 @@ int esfs_readlink(const char *path, char *link, size_t size)
     */
    // Regular files - for example, not a FIFO
 //   int (*mknod) (const char *, mode_t, dev_t);
-int esfs_mknod(const char *path, mode_t mode, dev_t dev)
+int $mknod(const char *path, mode_t mode, dev_t dev)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("mknod(path=\"%s\", mode=0%3o, dev=%lld)\n", path, mode, dev);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = mknod(fpath, mode, dev);
-   if (retstat < 0) retstat = esfs_error("mknod mknod");
+   if (retstat < 0) retstat = $error("mknod mknod");
 
    
    // On Linux this could just be 'mknod(path, mode, rdev)' but this
@@ -161,18 +167,18 @@ int esfs_mknod(const char *path, mode_t mode, dev_t dev)
    if (S_ISREG(mode)) {
       retstat = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
       if (retstat < 0){
-         retstat = esfs_error("mknod open");
+         retstat = $error("mknod open");
       }else{
          retstat = close(retstat);
-         if (retstat < 0) retstat = esfs_error("mknod close");
+         if (retstat < 0) retstat = $error("mknod close");
       }
    }else{
       if (S_ISFIFO(mode)) {
          retstat = mkfifo(fpath, mode);
-         if (retstat < 0) retstat = esfs_error("mknod mkfifo");
+         if (retstat < 0) retstat = $error("mknod mkfifo");
       } else {
          retstat = mknod(fpath, mode, dev);
-         if (retstat < 0) retstat = esfs_error("mknod mknod");
+         if (retstat < 0) retstat = $error("mknod mknod");
       }
    }
    */
@@ -187,48 +193,48 @@ int esfs_mknod(const char *path, mode_t mode, dev_t dev)
     * correct directory type bits use  mode|S_IFDIR
     * */
 //   int (*mkdir) (const char *, mode_t);
-int esfs_mkdir(const char *path, mode_t mode)
+int $mkdir(const char *path, mode_t mode)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nmkdir(path=\"%s\", mode=0%3o)\n", path, mode);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = mkdir(fpath, mode);
-   if (retstat < 0) retstat = esfs_error("mkdir mkdir");
+   if (retstat < 0) retstat = $error("mkdir mkdir");
    
    return retstat;
 }
 
    /** Remove a file */
 //   int (*unlink) (const char *);
-int esfs_unlink(const char *path)
+int $unlink(const char *path)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("unlink(path=\"%s\")\n", path);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = unlink(fpath);
-   if (retstat < 0) retstat = esfs_error("unlink unlink");
+   if (retstat < 0) retstat = $error("unlink unlink");
    
    return retstat;
 }
 
    /** Remove a directory */
 //   int (*rmdir) (const char *);
-int esfs_rmdir(const char *path)
+int $rmdir(const char *path)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("rmdir(path=\"%s\")\n", path);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = rmdir(fpath);
-   if (retstat < 0) retstat = esfs_error("rmdir rmdir");
+   if (retstat < 0) retstat = $error("rmdir rmdir");
    
    return retstat;
 }
@@ -239,41 +245,41 @@ int esfs_rmdir(const char *path)
 // to the symlink() system call.  The 'path' is where the link points,
 // while the 'link' is the link itself.  So we need to leave the path
 // unaltered, but insert the link into the mounted directory.
-int esfs_symlink(const char *path, const char *link)
+int $symlink(const char *path, const char *link)
 {
    int retstat = 0;
    char flink[PATH_MAX]; // TODO
    
    log_msg("\nsymlink(path=\"%s\", link=\"%s\")\n", path, link);
-   esfs_fullpath(flink, link);
+   $fullpath(flink, link);
    
    retstat = symlink(path, flink);
-   if (retstat < 0) retstat = esfs_error("symlink symlink");
+   if (retstat < 0) retstat = $error("symlink symlink");
    
    return retstat;
 }
 
    /** Rename a file */
 //   int (*rename) (const char *, const char *);
-int esfs_rename(const char *path, const char *newpath)
+int $rename(const char *path, const char *newpath)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    char fnewpath[PATH_MAX]; // TODO
    
    log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
-   esfs_fullpath(fpath, path);
-   esfs_fullpath(fnewpath, newpath);
+   $fullpath(fpath, path);
+   $fullpath(fnewpath, newpath);
    
    retstat = rename(fpath, fnewpath);
-   if (retstat < 0) retstat = esfs_error("rename rename");
+   if (retstat < 0) retstat = $error("rename rename");
    
    return retstat;
 }
 
    /** Create a hard link to a file */
 //   int (*link) (const char *, const char *);
-int esfs_link(const char *path, const char *newpath)
+int $link(const char *path, const char *newpath)
 {
    // This is not allowed in ESFS.
    return -EPERM;
@@ -283,48 +289,48 @@ int esfs_link(const char *path, const char *newpath)
 
    /** Change the permission bits of a file */
 //   int (*chmod) (const char *, mode_t);
-int esfs_chmod(const char *path, mode_t mode)
+int $chmod(const char *path, mode_t mode)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nchmod(fpath=\"%s\", mode=0%03o)\n", path, mode);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = chmod(fpath, mode);
-   if (retstat < 0) retstat = esfs_error("chmod chmod");
+   if (retstat < 0) retstat = $error("chmod chmod");
    
    return retstat;
 }
 
    /** Change the owner and group of a file */
 //   int (*chown) (const char *, uid_t, gid_t);
-int esfs_chown(const char *path, uid_t uid, gid_t gid)
+int $chown(const char *path, uid_t uid, gid_t gid)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
 
    log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = chown(fpath, uid, gid);
-   if (retstat < 0) retstat = esfs_error("chown chown");
+   if (retstat < 0) retstat = $error("chown chown");
    
    return retstat;
 }
 
    /** Change the size of a file */
 //   int (*truncate) (const char *, off_t);
-int esfs_truncate(const char *path, off_t newsize)
+int $truncate(const char *path, off_t newsize)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\ntruncate(path=\"%s\", newsize=%lld)\n", path, newsize);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = truncate(fpath, newsize);
-   if (retstat < 0) retstat = esfs_error("truncate truncate");
+   if (retstat < 0) retstat = $error("truncate truncate");
    
    return retstat;
 }
@@ -335,7 +341,7 @@ int esfs_truncate(const char *path, off_t newsize)
     */
 //   int (*utime) (const char *, struct utimbuf *);
 /*
-int esfs_utime(const char *path, struct utimbuf *ubuf)
+int $utime(const char *path, struct utimbuf *ubuf)
 {
    ...
    retstat = utime(fpath, ubuf);
@@ -362,17 +368,17 @@ int esfs_utime(const char *path, struct utimbuf *ubuf)
     * Changed in version 2.2
     */
 //   int (*open) (const char *, struct fuse_file_info *);
-int esfs_open(const char *path, struct fuse_file_info *fi)
+int $open(const char *path, struct fuse_file_info *fi)
 {
    int retstat = 0;
    int fd;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nopen(path\"%s\", fi=0x%08x)\n", path, fi);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    fd = open(fpath, fi->flags);
-   if (fd < 0) retstat = esfs_error("open open");
+   if (fd < 0) retstat = $error("open open");
    
    fi->fh = fd;
    
@@ -398,14 +404,14 @@ int esfs_open(const char *path, struct fuse_file_info *fi)
 // can return with anything up to the amount of data requested. nor
 // with the fusexmp code which returns the amount of data also
 // returned by read.
-int esfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
    log_msg("\nread(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n", path, buf, size, offset, fi);
    
    retstat = pread(fi->fh, buf, size, offset);
-   if (retstat < 0) retstat = esfs_error("read read");
+   if (retstat < 0) retstat = $error("read read");
    
    return retstat;
 }
@@ -423,7 +429,7 @@ int esfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 //            struct fuse_file_info *);
 // As  with read(), the documentation above is inconsistent with the
 // documentation for the write() system call.
-int esfs_write(const char *path, const char *buf, size_t size, off_t offset,
+int $write(const char *path, const char *buf, size_t size, off_t offset,
           struct fuse_file_info *fi)
 {
    int retstat = 0;
@@ -431,7 +437,7 @@ int esfs_write(const char *path, const char *buf, size_t size, off_t offset,
    log_msg("\nwrite(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n", path, buf, size, offset, fi);
 
    retstat = pwrite(fi->fh, buf, size, offset);
-   if (retstat < 0) retstat = esfs_error("write pwrite");
+   if (retstat < 0) retstat = $error("write pwrite");
 
    return retstat;
 }
@@ -444,17 +450,17 @@ int esfs_write(const char *path, const char *buf, size_t size, off_t offset,
     * version 2.5
     */
 //   int (*statfs) (const char *, struct statvfs *);
-int esfs_statfs(const char *path, struct statvfs *statv)
+int $statfs(const char *path, struct statvfs *statv)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nstatfs(path=\"%s\", statv=0x%08x)\n", path, statv);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    // get stats for underlying filesystem
    retstat = statvfs(fpath, statv);
-   if (retstat < 0) retstat = esfs_error("statfs statvfs");
+   if (retstat < 0) retstat = $error("statfs statvfs");
    
    log_statvfs(statv);
    
@@ -486,7 +492,7 @@ int esfs_statfs(const char *path, struct statvfs *statv)
     * Changed in version 2.2
     */
 //   int (*flush) (const char *, struct fuse_file_info *);
-int esfs_flush(const char *path, struct fuse_file_info *fi)
+int $flush(const char *path, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
@@ -513,7 +519,7 @@ int esfs_flush(const char *path, struct fuse_file_info *fi)
     * Changed in version 2.2
     */
 //   int (*release) (const char *, struct fuse_file_info *);
-int esfs_release(const char *path, struct fuse_file_info *fi)
+int $release(const char *path, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
@@ -522,7 +528,7 @@ int esfs_release(const char *path, struct fuse_file_info *fi)
    // We need to close the file.  Had we allocated any resources
    // (buffers etc) we'd need to free them here as well.
    retstat = close(fi->fh);
-   // TODO no esfs_error?
+   // TODO no $error?
    
    return retstat;
 }
@@ -535,7 +541,7 @@ int esfs_release(const char *path, struct fuse_file_info *fi)
     * Changed in version 2.2
     */
 //   int (*fsync) (const char *, int, struct fuse_file_info *);
-int esfs_fsync(const char *path, int datasync, struct fuse_file_info *fi)
+int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
@@ -550,7 +556,7 @@ int esfs_fsync(const char *path, int datasync, struct fuse_file_info *fi)
       // the file referred to by the file descriptor fd to the disk device
    }
    
-   if (retstat < 0) esfs_error("fsync");
+   if (retstat < 0) $error("fsync");
    
    return retstat;
 }
@@ -558,13 +564,13 @@ int esfs_fsync(const char *path, int datasync, struct fuse_file_info *fi)
 
    /** Set extended attributes */
 //   int (*setxattr) (const char *, const char *, const char *, size_t, int);
-int esfs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
+int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = lsetxattr(fpath, name, value, size, flags);
    /*
@@ -578,39 +584,39 @@ int esfs_setxattr(const char *path, const char *name, const char *value, size_t 
    By default (no flags), the extended attribute will be created if need be, 
    or will simply replace the value if the attribute exists.
    */
-   if (retstat < 0) retstat = esfs_error("setxattr lsetxattr");
+   if (retstat < 0) retstat = $error("setxattr lsetxattr");
    
    return retstat;
 }
 
    /** Get extended attributes */
 //   int (*getxattr) (const char *, const char *, char *, size_t);
-int esfs_getxattr(const char *path, const char *name, char *value, size_t size)
+int $getxattr(const char *path, const char *name, char *value, size_t size)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = lgetxattr(fpath, name, value, size);
-   if (retstat < 0) retstat = esfs_error("getxattr lgetxattr");
+   if (retstat < 0) retstat = $error("getxattr lgetxattr");
    
    return retstat;
 }
 
    /** List extended attributes */
 //   int (*listxattr) (const char *, char *, size_t);
-int esfs_listxattr(const char *path, char *list, size_t size)
+int $listxattr(const char *path, char *list, size_t size)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = llistxattr(fpath, list, size);
-   if (retstat < 0) retstat = esfs_error("listxattr llistxattr");
+   if (retstat < 0) retstat = $error("listxattr llistxattr");
    
    return retstat;
 }
@@ -618,16 +624,16 @@ int esfs_listxattr(const char *path, char *list, size_t size)
 
    /** Remove extended attributes */
 //   int (*removexattr) (const char *, const char *);
-int esfs_removexattr(const char *path, const char *name)
+int $removexattr(const char *path, const char *name)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = lremovexattr(fpath, name);
-   if (retstat < 0) retstat = esfs_error("removexattr lrmovexattr");
+   if (retstat < 0) retstat = $error("removexattr lrmovexattr");
    
    return retstat;
 }
@@ -644,17 +650,17 @@ int esfs_removexattr(const char *path, const char *name)
     * Introduced in version 2.3
     */
 //   int (*opendir) (const char *, struct fuse_file_info *);
-int esfs_opendir(const char *path, struct fuse_file_info *fi)
+int $opendir(const char *path, struct fuse_file_info *fi)
 {
    DIR *dp;
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nopendir(path=\"%s\", fi=0x%08x)\n", path, fi);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    dp = opendir(fpath);
-   if (dp == NULL) retstat = esfs_error("opendir opendir");
+   if (dp == NULL) retstat = $error("opendir opendir");
    
    fi->fh = (intptr_t) dp;
    
@@ -684,7 +690,7 @@ int esfs_opendir(const char *path, struct fuse_file_info *fi)
     */
 //   int (*readdir) (const char *, void *, fuse_fill_dir_t, off_t,
 //         struct fuse_file_info *);
-int esfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
+int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
             struct fuse_file_info *fi)
 {
    int retstat = 0;
@@ -701,7 +707,7 @@ int esfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
    // which I can get an error from readdir()
    de = readdir(dp);
    if (de == 0) {
-      retstat = esfs_error("readdir readdir");
+      retstat = $error("readdir readdir");
       return retstat;
    }
 
@@ -723,7 +729,7 @@ int esfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
     * Introduced in version 2.3
     */
 //   int (*releasedir) (const char *, struct fuse_file_info *);
-int esfs_releasedir(const char *path, struct fuse_file_info *fi)
+int $releasedir(const char *path, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
@@ -744,7 +750,7 @@ int esfs_releasedir(const char *path, struct fuse_file_info *fi)
 //   int (*fsyncdir) (const char *, int, struct fuse_file_info *);
 // when exactly is this called?  when a user calls fsync and it
 // happens to be a directory? ???
-int esfs_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
+int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
@@ -773,9 +779,9 @@ int esfs_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 // parameter coming in here, or else the fact should be documented
 // (and this might as well return void, as it did in older versions of
 // FUSE).
-void *esfs_init(struct fuse_conn_info *conn)
+void *$init(struct fuse_conn_info *conn)
 {
-   return ESFS_DATA; // TODO -- We put user_data into fuse_context
+   return $$DATA; // TODO -- We put user_data into fuse_context
 }
 
    /**
@@ -786,7 +792,7 @@ void *esfs_init(struct fuse_conn_info *conn)
     * Introduced in version 2.3
     */
 //   void (*destroy) (void *);
-void esfs_destroy(void *userdata)
+void $destroy(void *userdata)
 {
    log_msg("\ndestroy(userdata=0x%08x)\n", userdata);
 }
@@ -803,17 +809,17 @@ void esfs_destroy(void *userdata)
     * Introduced in version 2.5
     */
 //   int (*access) (const char *, int);
-int esfs_access(const char *path, int mask)
+int $access(const char *path, int mask)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\naccess(path=\"%s\", mask=0%o)\n", path, mask);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    retstat = access(fpath, mask);
    
-   if (retstat < 0) retstat = esfs_error("access access");
+   if (retstat < 0) retstat = $error("access access");
    
    return retstat;
 }
@@ -831,17 +837,17 @@ int esfs_access(const char *path, int mask)
     * Introduced in version 2.5
     */
 //   int (*create) (const char *, mode_t, struct fuse_file_info *);
-int esfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    int fd;
    
    log_msg("\ncreate(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    fd = creat(fpath, mode);
-   if (fd < 0) retstat = esfs_error("create creat");
+   if (fd < 0) retstat = $error("create creat");
    
    fi->fh = fd;
    
@@ -861,14 +867,14 @@ int esfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     * Introduced in version 2.5
     */
 //   int (*ftruncate) (const char *, off_t, struct fuse_file_info *);
-int esfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
+int $ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
    log_msg("\nftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n", path, offset, fi);
    
    retstat = ftruncate(fi->fh, offset);
-   if (retstat < 0) retstat = esfs_error("ftruncate ftruncate");
+   if (retstat < 0) retstat = $error("ftruncate ftruncate");
    
    return retstat;
 }
@@ -889,14 +895,14 @@ int esfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 // Since it's currently only called after bb_create(), and bb_create()
 // opens the file, I ought to be able to just use the fd and ignore
 // the path...
-int esfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
+int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
    int retstat = 0;
    
    log_msg("\nfgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
    
    retstat = fstat(fi->fh, statbuf);
-   if (retstat < 0) retstat = esfs_error("fgetattr fstat");
+   if (retstat < 0) retstat = $error("fgetattr fstat");
    
    return retstat;
 }
@@ -950,13 +956,13 @@ int esfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info 
     * Introduced in version 2.6
     */
 //   int (*utimens) (const char *, const struct timespec tv[2]);
-int esfs_utimens(const char *path, const struct timespec tv[2])
+int $utimens(const char *path, const struct timespec tv[2])
 {
    int retstat = 0;
    char fpath[PATH_MAX]; // TODO
    
    log_msg("\nutimens\n");
-   esfs_fullpath(fpath, path);
+   $fullpath(fpath, path);
    
    /*
     int utimensat(int dirfd, const char *pathname,
@@ -984,7 +990,7 @@ int esfs_utimens(const char *path, const struct timespec tv[2])
    */
    
    retstat = utimensat(AT_FDCWD, fpath, tv, 0); // TODO For now, we fall back to AT_FDCWD
-   if (retstat < 0) retstat = esfs_error("utimens utimensat");
+   if (retstat < 0) retstat = $error("utimens utimensat");
    
    return retstat;
 }
@@ -1124,44 +1130,44 @@ int esfs_utimens(const char *path, const struct timespec tv[2])
 //   int (*flock) (const char *, struct fuse_file_info *, int op);
 
 
-struct fuse_operations esfs_oper = {
-  .getattr = esfs_getattr,
-  .readlink = esfs_readlink,
-  .mknod   = esfs_mknod,
-  .mkdir   = esfs_mkdir,
-  .unlink  = esfs_unlink,
-  .rmdir   = esfs_rmdir,
-  .symlink = esfs_symlink,
-  .rename  = esfs_rename,
-  .link    = esfs_link,
-  .chmod   = esfs_chmod,
-  .chown   = esfs_chown,
-  .truncate = esfs_truncate,
-  .open    = esfs_open,
-  .read    = esfs_read,
-  .write   = esfs_write,
-  .statfs  = esfs_statfs,
-  .flush   = esfs_flush,
-  .release = esfs_release,
-  .fsync     = esfs_fsync,
-  .setxattr  = esfs_setxattr,
-  .getxattr  = esfs_getxattr,
-  .listxattr = esfs_listxattr,
-  .removexattr = esfs_removexattr,
-  .opendir    = esfs_opendir,
-  .readdir    = esfs_readdir,
-  .releasedir = esfs_releasedir,
-  .fsyncdir   = esfs_fsyncdir,
-  .init    = esfs_init,
-  .destroy = esfs_destroy,
-  .access  = esfs_access,
-  .create  = esfs_create,
-  .ftruncate = esfs_ftruncate,
-  .fgetattr  = esfs_fgetattr,
-  .utimens   = esfs_utimens
+struct fuse_operations $oper = {
+  .getattr = $getattr,
+  .readlink = $readlink,
+  .mknod   = $mknod,
+  .mkdir   = $mkdir,
+  .unlink  = $unlink,
+  .rmdir   = $rmdir,
+  .symlink = $symlink,
+  .rename  = $rename,
+  .link    = $link,
+  .chmod   = $chmod,
+  .chown   = $chown,
+  .truncate = $truncate,
+  .open    = $open,
+  .read    = $read,
+  .write   = $write,
+  .statfs  = $statfs,
+  .flush   = $flush,
+  .release = $release,
+  .fsync     = $fsync,
+  .setxattr  = $setxattr,
+  .getxattr  = $getxattr,
+  .listxattr = $listxattr,
+  .removexattr = $removexattr,
+  .opendir    = $opendir,
+  .readdir    = $readdir,
+  .releasedir = $releasedir,
+  .fsyncdir   = $fsyncdir,
+  .init    = $init,
+  .destroy = $destroy,
+  .access  = $access,
+  .create  = $create,
+  .ftruncate = $ftruncate,
+  .fgetattr  = $fgetattr,
+  .utimens   = $utimens
 };
 
-void esfs_usage()
+void $usage()
 {
    fprintf(stderr, "usage:  esfs [FUSE and mount options] rootDir mountPoint\n");
    abort();
@@ -1169,7 +1175,7 @@ void esfs_usage()
 
 int main(int argc, char *argv[])
 {
-   struct esfs_state *esfs_data;
+   struct $state *$data;
 
    // ESFS doesn't do any access checking on its own (the comment
    // blocks in fuse.h mention some of the functions that need
@@ -1184,30 +1190,30 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Running ESFS as root opens unnacceptable security holes\n");
       return 1;
    }
-   
+
    // Perform some sanity checking on the command line:  make sure
    // there are enough arguments, and that neither of the last two
    // start with a hyphen (this will break if you actually have a
    // rootpoint or mountpoint whose name starts with a hyphen, but so
    // will a zillion other programs)
    if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
-      esfs_usage();
+      $usage();
 
-   esfs_data = malloc(sizeof(struct esfs_state));
-   if (esfs_data == NULL) {
+   $data = malloc(sizeof(struct $state));
+   if ($data == NULL) {
       perror("main calloc");
       abort();
    }
 
    // Pull the rootdir out of the argument list and save it in my
    // internal data
-   esfs_data->rootdir = realpath(argv[argc-2], NULL);
+   $data->rootdir = realpath(argv[argc-2], NULL);
    argv[argc-2] = argv[argc-1];
    argv[argc-1] = NULL;
    argc--;
    
-   esfs_data->logfile = log_open();
+   $data->logfile = log_open();
    
    // turn over control to fuse
-   return fuse_main(argc, argv, &esfs_oper, esfs_data);
+   return fuse_main(argc, argv, &$oper, $data);
 }

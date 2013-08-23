@@ -28,6 +28,12 @@
   You should have received a copy of the GNU General Public License along
   with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/*
+ * NOTE: A Perl script is used to replace $ with esfs_ and $$ with ESFS_
+ * in this file. To write $, use \$.
+ */
+
 /*
   There are a couple of symbols that need to be #defined before
   #including all the headers.
@@ -53,12 +59,12 @@
 // maintain bbfs state in here
 #include <limits.h>
 #include <stdio.h>
-struct esfs_state {
+struct $state {
     FILE *logfile;
     char *rootdir;
 };
 
 // Retrieve and cast
-#define ESFS_DATA ((struct esfs_state *) fuse_get_context()->private_data)
+#define $$DATA ((struct $state *) fuse_get_context()->private_data)
 
 #endif

@@ -28,6 +28,12 @@
   You should have received a copy of the GNU General Public License along
   with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/*
+ * NOTE: A Perl script is used to replace $ with esfs_ and $$ with ESFS_
+ * in this file. To write $, use \$.
+ */
+
 /*
   Since the point of this filesystem is to learn FUSE and its
   datastructures, I want to see *everything* that happens related to
@@ -35,7 +41,7 @@
   accomplish this.
 */
 
-#include "params.h"
+#include "params_c.h"
 
 #include <fuse.h>
 #include <stdarg.h>
@@ -46,7 +52,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "log.h"
+#include "log_c.h"
 
 FILE *log_open()
 {
@@ -54,7 +60,7 @@ FILE *log_open()
     
     // very first thing, open up the logfile and mark that we got in
     // here.  If we can't open the logfile, we're dead.
-    logfile = fopen("bbfs.log", "w");
+    logfile = fopen("esfs.log", "w");
     if (logfile == NULL) {
 	perror("logfile");
 	exit(EXIT_FAILURE);
@@ -71,9 +77,9 @@ void log_msg(const char *format, ...)
     va_list ap;
     va_start(ap, format);
 
-    vfprintf(ESFS_DATA->logfile, format, ap);
+    vfprintf($$DATA->logfile, format, ap);
 }
-    
+
 // struct fuse_file_info keeps information about files (surprise!).
 // This dumps all the information in a struct fuse_file_info.  The struct
 // definition, and comments, come from /usr/include/fuse/fuse_common.h
