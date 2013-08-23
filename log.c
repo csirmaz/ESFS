@@ -77,7 +77,7 @@ void log_msg(const char *format, ...)
     va_list ap;
     va_start(ap, format);
 
-    vfprintf($$DATA->logfile, format, ap);
+    vfprintf($$FSDATA->logfile, format, ap);
 }
 
 // struct fuse_file_info keeps information about files (surprise!).

@@ -54,6 +54,8 @@
 #include <sys/stat.h>
 
 #include "log_c.h"
+
+#include "util_c.c"
 #include "snapshot_c.c"
 
 // Report errors to logfile and give -errno to caller
@@ -67,25 +69,14 @@ static int $error(char *str)
    return ret;
 }
 
-// Check whether the given user is permitted to perform the given operation on the given 
 
-//  All the paths I see are relative to the root of the mounted
-//  filesystem.  In order to get to the underlying filesystem, I need to
-//  have the mountpoint.  I'll save it away early on in main(), and then
-//  whenever I need a path for something I'll call this to construct
-//  it.
-static void $fullpath(char fpath[PATH_MAX], const char *path)
-{
-   strcpy(fpath, $$DATA->rootdir);
-   strncat(fpath, path, PATH_MAX); // ridiculously long paths will
-                           // break here
-}
 
 ///////////////////////////////////////////////////////////
 //
 // Prototypes for all these functions, and the C-style comments,
-// come indirectly from /usr/include/fuse.h
-//
+// come from /usr/include/fuse.h
+
+
    /** Get file attributes.
    *
    * Similar to stat().  The 'st_dev' and 'st_blksize' fields are
@@ -781,7 +772,7 @@ int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 // FUSE).
 void *$init(struct fuse_conn_info *conn)
 {
-   return $$DATA; // TODO -- We put user_data into fuse_context
+   return $$FSDATA; // TODO -- We put user_data into fuse_context
 }
 
    /**
@@ -1175,7 +1166,7 @@ void $usage()
 
 int main(int argc, char *argv[])
 {
-   struct $state *$data;
+   struct $fsdata *$myfsdata;
 
    // ESFS doesn't do any access checking on its own (the comment
    // blocks in fuse.h mention some of the functions that need
@@ -1199,21 +1190,21 @@ int main(int argc, char *argv[])
    if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
       $usage();
 
-   $data = malloc(sizeof(struct $state));
-   if ($data == NULL) {
+   $myfsdata = malloc(sizeof(struct $fsdata));
+   if ($myfsdata == NULL) {
       perror("main calloc");
       abort();
    }
 
    // Pull the rootdir out of the argument list and save it in my
    // internal data
-   $data->rootdir = realpath(argv[argc-2], NULL);
+   $myfsdata->rootdir = realpath(argv[argc-2], NULL);
    argv[argc-2] = argv[argc-1];
    argv[argc-1] = NULL;
    argc--;
    
-   $data->logfile = log_open();
+   $myfsdata->logfile = log_open();
    
    // turn over control to fuse
-   return fuse_main(argc, argv, &$oper, $data);
+   return fuse_main(argc, argv, &$oper, $myfsdata);
 }

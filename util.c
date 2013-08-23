@@ -34,18 +34,16 @@
  * in this file. To write $, use \$.
  */
 
-// This file contains functions related to saving things in a snapshot
-// and retrieving things from snapshots.
+// This file contains low-level tools.
 
-/* Save information about a file that usually goes into the directory
- * entry, like flags, permissions, and, most importantly, size.
- */
-// $push_dentry
-
-// $push_whole_file
-
-// $pull_directory
-
-// $push_blocks
-
-// $pull_blocks
+//  All the paths I see are relative to the root of the mounted
+//  filesystem.  In order to get to the underlying filesystem, I need to
+//  have the mountpoint.  I'll save it away early on in main(), and then
+//  whenever I need a path for something I'll call this to construct
+//  it.
+static void $fullpath(char fpath[PATH_MAX], const char *path)
+{
+   strcpy(fpath, $$FSDATA->rootdir);
+   strncat(fpath, path, PATH_MAX); // ridiculously long paths will
+                           // break here
+}

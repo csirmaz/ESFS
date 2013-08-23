@@ -56,15 +56,23 @@
 // Backtrace: fcntl.h, sys/stat.h <- features.h 
 #define _ATFILE_SOURCE 1
 
-// maintain bbfs state in here
+// Constants
+// ---------
+#define $$PATH_MAX PATH_MAX
+#define $$SNDIR snapshots/
+
+// Global FS private data
+// ----------------------
+
 #include <limits.h>
 #include <stdio.h>
-struct $state {
+
+struct $fsdata {
     FILE *logfile;
     char *rootdir;
 };
 
 // Retrieve and cast
-#define $$DATA ((struct $state *) fuse_get_context()->private_data)
+#define $$FSDATA ((struct $fsdata *) fuse_get_context()->private_data )
 
 #endif
