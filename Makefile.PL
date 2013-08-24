@@ -1,33 +1,37 @@
+use strict;
+
+my $m = <<THEEND
 esfs : esfs_c.o log_c.o
 	gcc -O3 -o esfs esfs_c.o log_c.o `pkg-config fuse --libs`
 
-esfs_c.o : esfs_c.c log_c.h params_c.h snapshot_c.c util_c.c
+esfs_c.o : esfs_c.c log_c.h params_c.h snapshot_c.c util_c.c fuse_fd_close_c.c fuse_fd_read_c.c fuse_fd_write_c.c fuse_path_open_c.c fuse_path_read_c.c fuse_path_write_c.c
 	gcc -O3 -Wall `pkg-config fuse --cflags` -c esfs_c.c
 
 log_c.o : log_c.c log_c.h params_c.h
 	gcc -O3 -Wall `pkg-config fuse --cflags` -c log_c.c
 
-esfs_c.c : esfs.c
-	./compile.pl < esfs.c > esfs_c.c
+THEEND
+;
 
-params_c.h : params.h
-	./compile.pl < params.h > params_c.h
 
-log_c.c : log.c
-	./compile.pl < log.c > log_c.c
+foreach my $f (qw( esfs.c params.h log.c log.h snapshot.c util.c fuse_fd_close.c fuse_fd_read.c fuse_fd_write.c fuse_path_open.c fuse_path_read.c fuse_path_write.c )){
+my $fdest = $f;
+$fdest =~ s/\./_c./;
+$m .= <<THEEND
+$fdest : $f
+	./compile.pl < $f > $fdest
 
-log_c.h : log.h
-	./compile.pl < log.h > log_c.h
+THEEND
+;
+}
 
-snapshot_c.c : snapshot.c
-	./compile.pl < snapshot.c > snapshot_c.c
-
-util_c.c : util.c
-	./compile.pl < util.c > util_c.c
-	
+$m .= <<THEEND
 clean:
-	rm -f esfs *.o *_c.c *_c.h
+	rm -f esfs *.o *_c.c *_c.h Makefile
+THEEND
+;
 
+my $old = <<THEEND
 dist:
 	rm -rf fuse-tutorial/
 	mkdir fuse-tutorial/
@@ -40,3 +44,9 @@ dist:
 	cp Makefile COPYING COPYING.LIB *.c *.h fuse-tutorial/src/
 	tar cvzf ../../fuse-tutorial.tgz fuse-tutorial/
 	rm -rf fuse-tutorial/
+THEEND
+;
+
+open (OUTFILE, '>Makefile');
+print OUTFILE $m;
+close (OUTFILE);

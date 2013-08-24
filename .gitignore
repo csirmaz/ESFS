@@ -4,6 +4,7 @@ esfs
 *.bak
 *_c.c
 *_c.h
+Makefile
 
 # Object files
 *.o
