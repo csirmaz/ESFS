@@ -82,6 +82,11 @@
 #define $$SNDIR    "/snapshots"
 #define $$SNDIR_LEN 10 // Without null character
 
+#define $$XA_TEST "$test"
+#define $$XA_LATEST_SN "$latest_snapshot"
+#define $$XA_PREV_SN "$prev_snapshot"
+#define $$XA_NO_FILE "$no_file"
+
 // Global FS private data
 // ----------------------
 
@@ -90,8 +95,9 @@
 
 struct $fsdata_t {
     FILE *logfile;
-    char *rootdir;
+    char *rootdir; // the underlying root acting as the source of the FS
     size_t rootdir_len; // length of rootdir string, without terminating NULL
+    char snapshotdir[$$PATH_MAX]; // the path to the snapshot directory
 };
 
 // Retrieve and cast

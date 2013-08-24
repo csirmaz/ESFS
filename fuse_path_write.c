@@ -37,44 +37,6 @@
 /* This file contains FS operations that modify dentries based on a path
  */
 
-   /** Create a file node
-    *
-    * This is called for creation of all non-directory, non-symlink
-    * nodes.  If the filesystem defines a create() method, then for
-    * regular files that will be called instead.
-    */
-   // Regular files - for example, not a FIFO
-//   int (*mknod) (const char *, mode_t, dev_t);
-int $mknod(const char *path, mode_t mode, dev_t dev)
-{
-   // Special files are not allowed in ESFS.
-   // As create() is defined, we can return here.
-   return -EPERM;
-
-   // Original code from BBFS:
-   // On Linux this could just be 'mknod(path, mode, rdev)' but this
-   //  is more portable
-   /*
-   if (S_ISREG(mode)) {
-      retstat = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
-      if (retstat < 0){
-         retstat = $error("mknod open");
-      }else{
-         retstat = close(retstat);
-         if (retstat < 0) retstat = $error("mknod close");
-      }
-   }else{
-      if (S_ISFIFO(mode)) {
-         retstat = mkfifo(fpath, mode);
-         if (retstat < 0) retstat = $error("mknod mkfifo");
-      } else {
-         retstat = mknod(fpath, mode, dev);
-         if (retstat < 0) retstat = $error("mknod mknod");
-      }
-   }
-   */
-}
-
 
    /** Create a directory
     *
@@ -153,7 +115,7 @@ int $rename(const char *path, const char *newpath)
 int $link(const char *path, const char *newpath)
 {
    // This is not allowed in ESFS.
-   return -EPERM;
+   return -EOPNOTSUPP;
 
    // To pass the request on, call link(fpath, fnewpath);
 }
@@ -194,55 +156,6 @@ int $truncate(const char *path, off_t newsize)
    return -errno;
 }
 
-
-   /** Change the access and/or modification times of a file
-    *
-    * Deprecated, use utimens() instead.
-    */
-//   int (*utime) (const char *, struct utimbuf *);
-/*
-int $utime(const char *path, struct utimbuf *ubuf)
-{
-   ...
-   retstat = utime(fpath, ubuf);
-   ...
-}
-*/
-
-
-   /** Set extended attributes */
-//   int (*setxattr) (const char *, const char *, const char *, size_t, int);
-int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
-{
-   // log_msg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
-   $$IF_PATH_MAIN_ONLY
-
-   if(lsetxattr(fpath, name, value, size, flags) == 0){ return 0; }
-   return -errno;
-   /*
-   setxattr() sets the value of the extended attribute identified by name and associated with
-   the given path in the file system. The size of the value must be specified.
-   lsetxattr() is identical to setxattr(), except in the case of a symbolic link,
-   where the extended attribute is set on the link itself, not the file that it refers to.
-   The flags argument can be used to refine the semantics of the operation.
-   XATTR_CREATE specifies a pure create, which fails if the named attribute exists already.
-   XATTR_REPLACE specifies a pure replace operation, which fails if the named attribute does not already exist.
-   By default (no flags), the extended attribute will be created if need be,
-   or will simply replace the value if the attribute exists.
-   */
-}
-
-
-   /** Remove extended attributes */
-//   int (*removexattr) (const char *, const char *);
-int $removexattr(const char *path, const char *name)
-{
-   // log_msg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
-   $$IF_PATH_MAIN_ONLY
-
-   if(lremovexattr(fpath, name) == 0){ return 0; }
-   return -errno;
-}
 
 
 
@@ -323,3 +236,90 @@ int $utimens(const char *path, const struct timespec tv[2])
    }
    return -errno;
 }
+
+
+/* Unsupported operations
+ ***********************************************/
+
+
+   /** Create a file node
+    *
+    * This is called for creation of all non-directory, non-symlink
+    * nodes.  If the filesystem defines a create() method, then for
+    * regular files that will be called instead.
+    */
+   // Regular files - for example, not a FIFO
+//   int (*mknod) (const char *, mode_t, dev_t);
+int $mknod(const char *path, mode_t mode, dev_t dev)
+{
+   // Special files are not allowed in ESFS.
+   // As create() is defined, we can return here with an error.
+   return -EOPNOTSUPP;
+
+   // Original code from BBFS:
+   // On Linux this could just be 'mknod(path, mode, rdev)' but this
+   //  is more portable
+   /*
+   if (S_ISREG(mode)) {
+      retstat = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
+      if (retstat < 0){
+         retstat = $error("mknod open");
+      }else{
+         retstat = close(retstat);
+         if (retstat < 0) retstat = $error("mknod close");
+      }
+   }else{
+      if (S_ISFIFO(mode)) {
+         retstat = mkfifo(fpath, mode);
+         if (retstat < 0) retstat = $error("mknod mkfifo");
+      } else {
+         retstat = mknod(fpath, mode, dev);
+         if (retstat < 0) retstat = $error("mknod mknod");
+      }
+   }
+   */
+}
+
+
+   /** Set extended attributes */
+//   int (*setxattr) (const char *, const char *, const char *, size_t, int);
+int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
+{
+   // Xattr is not supported by ext4; for now, we disable it.
+   return -EOPNOTSUPP;
+
+   /*
+   $$IF_PATH_MAIN_ONLY
+   log_msg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
+   if(lsetxattr(fpath, name, value, size, flags) == 0){ return 0; }
+   return -errno;
+   */
+   /*
+   setxattr() sets the value of the extended attribute identified by name and associated with
+   the given path in the file system. The size of the value must be specified.
+   lsetxattr() is identical to setxattr(), except in the case of a symbolic link,
+   where the extended attribute is set on the link itself, not the file that it refers to.
+   The flags argument can be used to refine the semantics of the operation.
+   XATTR_CREATE specifies a pure create, which fails if the named attribute exists already.
+   XATTR_REPLACE specifies a pure replace operation, which fails if the named attribute does not already exist.
+   By default (no flags), the extended attribute will be created if need be,
+   or will simply replace the value if the attribute exists.
+   */
+}
+
+
+   /** Remove extended attributes */
+//   int (*removexattr) (const char *, const char *);
+int $removexattr(const char *path, const char *name)
+{
+   // Xattr is not supported by ext4; for now, we disable it.
+   return -EOPNOTSUPP;
+
+   /*
+   $$IF_PATH_MAIN_ONLY
+   log_msg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
+   if(lremovexattr(fpath, name) == 0){ return 0; }
+   return -errno;
+   */
+}
+

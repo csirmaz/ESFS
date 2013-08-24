@@ -82,30 +82,6 @@ int $readlink(const char *path, char *link, size_t size)
 }
 
 
-   /** Get extended attributes */
-//   int (*getxattr) (const char *, const char *, char *, size_t);
-int $getxattr(const char *path, const char *name, char *value, size_t size)
-{
-   // log_msg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
-   $$IF_PATH_MAIN_ONLY
-
-   if(lgetxattr(fpath, name, value, size) == 0){ return 0; }
-   return -errno;
-}
-
-
-   /** List extended attributes */
-//   int (*listxattr) (const char *, char *, size_t);
-int $listxattr(const char *path, char *list, size_t size)
-{
-   // log_msg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
-   $$IF_PATH_MAIN_ONLY
-
-   if( llistxattr(fpath, list, size) == 0){ return 0; }
-   return -errno;
-}
-
-
    /**
     * Check file access permissions
     *
@@ -128,4 +104,39 @@ int $access(const char *path, int mask)
    return -errno;
 }
 
+
+/* Unsupported operations
+ ***********************************************/
+
+
+   /** Get extended attributes */
+//   int (*getxattr) (const char *, const char *, char *, size_t);
+int $getxattr(const char *path, const char *name, char *value, size_t size)
+{
+   // Xattr is not supported by ext4; for now, we disable it.
+   return -EOPNOTSUPP;
+
+   /*
+   $$IF_PATH_MAIN_ONLY
+   log_msg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
+   if(lgetxattr(fpath, name, value, size) == 0){ return 0; }
+   return -errno;
+   */
+}
+
+
+   /** List extended attributes */
+//   int (*listxattr) (const char *, char *, size_t);
+int $listxattr(const char *path, char *list, size_t size)
+{
+   // Xattr is not supported by ext4; for now, we disable it.
+   return -EOPNOTSUPP;
+
+   /*
+   $$IF_PATH_MAIN_ONLY
+   log_msg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
+   if( llistxattr(fpath, list, size) == 0){ return 0; }
+   return -errno;
+   */
+}
 

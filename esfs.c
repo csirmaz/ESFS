@@ -222,12 +222,18 @@ int main(int argc, char *argv[])
    
    fsdata->logfile = log_open();
 
-   // Initialise the snapshots in the FS
-   if($sn_init(fsdata) != 0){
-      fprintf(stderr, "snapshot initialisation failed, please check logs\n");
+   // Initial things to do
+   if($cmpath(fsdata->snapshotdir, $$SNDIR, fsdata) == -ENAMETOOLONG){
+      fprintf(stderr, "Snapshot dir path is too long. Aborting.\n");
       return 1;
    }
-   
+
+   if($sn_check_dir(fsdata) != 0){
+      fprintf(stderr, "Snapshot dir check failed, please check logs. Aborting.\n");
+      return 1;
+   }
+
+
    // turn over control to fuse
    return fuse_main(argc, argv, &$oper, fsdata);
 }

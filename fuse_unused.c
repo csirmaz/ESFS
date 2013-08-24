@@ -38,6 +38,21 @@
  */
 
 
+   /** Change the access and/or modification times of a file
+    *
+    * Deprecated, use utimens() instead.
+    */
+//   int (*utime) (const char *, struct utimbuf *);
+/*
+int $utime(const char *path, struct utimbuf *ubuf)
+{
+   ...
+   retstat = utime(fpath, ubuf);
+   ...
+}
+*/
+
+
    /**
     * Perform POSIX file locking operation
     *

@@ -40,40 +40,78 @@
 // Create the snapshot dir if necessary.
 // Returns
 // 0 - on success
-// -ENAMETOOLONG - if fpath would be too long
 // -errno - if lstat or mkdir fails
 // 1 - if the node exists but is not a directory
-int $sn_init(struct $fsdata_t *fsdata)
+int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
 {
    struct stat mystat;
-   char fpath[$$PATH_MAX];
    int ret;
 
    $dlogi("Init: checking the snapshots dir\n");
-
-   if($cmpath(fpath, $$SNDIR, fsdata) == -ENAMETOOLONG){
-      $dlogi("Init error: path too long\n");
-      return -ENAMETOOLONG;
-   }
    
-   if(lstat(fpath, &mystat) == 0){
+   if(lstat(fsdata->snapshotdir, &mystat) == 0){
       // Check if it is a directory
       if(S_ISDIR(mystat.st_mode)){ return 0; }
-      $dlogi("Init error: found something else than a directory at %s\n", fpath);
+      $dlogi("Init error: found something else than a directory at %s\n", fsdata->snapshotdir);
       return 1;
    } else {
       ret = errno;
       if(ret == ENOENT){
          $dlogi("Init: creating the snapshots dir\n");
-         if(mkdir(fpath, 0700) == 0){ return 0; }
+         if(mkdir(fsdata->snapshotdir, 0700) == 0){ return 0; }
          ret = errno;
-         $dlog("Init error: mkdir on %s failed with %s\n", fpath, strerror(ret));
+         $dlog("Init error: mkdir on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
          return -ret;
       }
-      $dlogi("Init error: lstat on %s failed with %s\n", fpath, strerror(ret));
+      $dlogi("Init error: lstat on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
       return -ret;
    }
 
+   return 0;
+}
+
+// Check if xattrs are suppored by the underlying filesystem
+// They are not supported by ext4
+// Returns
+// 0 on success
+// -errno on any failure
+// 1 on unexpected value
+int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
+{
+   int ret;
+   char value[2];
+
+   $dlogi("Init: checking xattr support\n");
+
+   ret = lremovexattr(fsdata->snapshotdir, $$XA_TEST);
+   if(ret != 0){
+      ret = errno;
+      if(ret != ENODATA){
+         $dlogi("Init: removing xattr on %s failed with %d = %s\n", fsdata->snapshotdir, ret, strerror(ret));
+         return -ret;
+      }
+   }
+   ret = lsetxattr(fsdata->snapshotdir, $$XA_TEST, "A", 2, 0);
+   if(ret != 0){
+      ret = errno;
+      $dlogi("Init: setting xattr on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      return -ret;
+   }
+   ret = lgetxattr(fsdata->snapshotdir, $$XA_TEST, value, 2);
+   if(ret != 0){
+      $dlogi("Init: getting xattr on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      return -ret;
+   }
+   if(strcmp(value, "A") != 0){
+      $dlogi("Init: got unexpected value from xattr on %s\n", fsdata->snapshotdir);
+      return 1;
+   }
+   ret = lremovexattr(fsdata->snapshotdir, $$XA_TEST);
+   if(ret != 0){
+      ret = errno;
+      $dlogi("Init: removing xattr on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      return -ret;
+   }
    return 0;
 }
 
