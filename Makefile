@@ -1,10 +1,10 @@
-esfs : esfs.o log.o
-	gcc -O3 -o esfs esfs.o log.o `pkg-config fuse --libs`
+esfs : esfs_c.o log_c.o
+	gcc -O3 -o esfs esfs_c.o log_c.o `pkg-config fuse --libs`
 
-esfs.o : esfs_c.c log_c.h params_c.h snapshot_c.c util_c.c
+esfs_c.o : esfs_c.c log_c.h params_c.h snapshot_c.c util_c.c
 	gcc -O3 -Wall `pkg-config fuse --cflags` -c esfs_c.c
 
-log.o : log_c.c log_c.h params_c.h
+log_c.o : log_c.c log_c.h params_c.h
 	gcc -O3 -Wall `pkg-config fuse --cflags` -c log_c.c
 
 esfs_c.c : esfs.c
@@ -26,7 +26,7 @@ util_c.c : util.c
 	./compile.pl < util.c > util_c.c
 	
 clean:
-	rm -f esfs *.o
+	rm -f esfs *.o *_c.c *_c.h
 
 dist:
 	rm -rf fuse-tutorial/
