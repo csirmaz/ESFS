@@ -49,23 +49,124 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
 
    $dlogi("Init: checking the snapshots dir\n");
    
-   if(lstat(fsdata->snapshotdir, &mystat) == 0){
+   if(lstat(fsdata->sn_dir, &mystat) == 0){
       // Check if it is a directory
       if(S_ISDIR(mystat.st_mode)){ return 0; }
-      $dlogi("Init error: found something else than a directory at %s\n", fsdata->snapshotdir);
+      $dlogi("Init error: found something else than a directory at %s\n", fsdata->sn_dir);
       return 1;
    } else {
       ret = errno;
       if(ret == ENOENT){
          $dlogi("Init: creating the snapshots dir\n");
-         if(mkdir(fsdata->snapshotdir, 0700) == 0){ return 0; }
+         if(mkdir(fsdata->sn_dir, 0700) == 0){ return 0; }
          ret = errno;
-         $dlog("Init error: mkdir on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+         $dlog("Init error: mkdir on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
          return -ret;
       }
-      $dlogi("Init error: lstat on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      $dlogi("Init error: lstat on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
+
+   return 0;
+}
+
+
+/* Snapshot meta-information
+ *
+ * There's a pointer to the latest snapshot in /snapshots/.hid
+ *   if there is at least one snapshot
+ * There's a pointer from each snapshot to the earlier one in /snapshots/ID.hid
+ * All these pointers contain the real paths to the snapshot roots: ..../snapshots/ID
+ */
+
+// Gets the path to the root of the latest snapshot, and sets:
+//   fsdata->sn_is_any
+//   fsdata->sn_lat_dir
+// Returns:
+// 0 - on success
+// -errno - on failure
+int $sn_get_latest(struct $fsdata_t *fsdata){
+   int fd;
+   int ret;
+   char path[$$PATH_MAX];
+
+   // We could store the path to the pointer instead of recreating it here and in $sn_set_latest
+   if(unlikely(strlen(fsdata->sn_dir) >= $$PATH_MAX - $$EXT_LEN - 1)){
+      return -ENAMETOOLONG;
+   }
+   strcpy(path, fsdata->sn_dir);
+   strncat(path, $$DIRSEP, 1);
+   strncat(path, $$EXT_HID, $$EXT_LEN);
+
+   fd = open(path, O_RDONLY);
+   if(fd == -1){
+      fd = errno;
+      if(fd == ENOENT){
+         fsdata->sn_is_any = 0;
+         $dlogi("Get latest sn: %s not found, so there must be no snapshots\n", path);
+         return 0;
+      }
+      $dlogi("Get latest sn: opening %s failed with %d = %s\n", path, fd, strerror(fd));
+      return -fd;
+   }
+
+   ret = pread(fd, fsdata->sn_lat_dir, $$PATH_MAX, 0);
+   if(ret == -1){
+      ret = errno;
+      $dlogi("Get latest sn: reading from %s failed with %d = %s\n", path, ret, strerror(ret));
+      return -ret;
+   }
+   if(ret != $$PATH_MAX){
+      $dlogi("Get latest sn: reading from %s returned %d bytes instead of %d\n", path, ret, $$PATH_MAX);
+      return -EIO;
+   }
+
+   close(fd);
+   return 0;
+}
+
+
+// Sets the path to the root of the latest snapshot, and sets
+//   fsdata->sn_is_any
+//   fsdata->sn_lat_dir
+// Returns:
+//   0 - on success
+//   -errno - on failure
+int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
+{
+   int fd;
+   int ret;
+   char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
+
+   if(unlikely(strlen(fsdata->sn_dir) >= $$PATH_MAX - $$EXT_LEN - 1)){
+      return -ENAMETOOLONG;
+   }
+   strcpy(path, fsdata->sn_dir);
+   strncat(path, $$DIRSEP, 1);
+   strncat(path, $$EXT_HID, $$EXT_LEN);
+
+   fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+   if(fd == -1){
+      fd = errno;
+      $dlogi("Set latest sn: opening %s failed with %d = %s\n", path, fd, strerror(fd));
+      return -fd;
+   }
+
+   ret = pwrite(fd, newpath, $$PATH_MAX, 0);
+   if(ret == -1){
+      ret = errno;
+      $dlogi("Set latest sn: writing to %s failed with %d = %s\n", path, ret, strerror(ret));
+      return -ret;
+   }
+   if(ret != $$PATH_MAX){
+      $dlogi("Set latest sn: writing to %s returned %d bytes instead of %d\n", path, ret, $$PATH_MAX);
+      return -EIO;
+   }
+
+   close(fd);
+
+   strcpy(fsdata->sn_lat_dir, newpath);
+   fsdata->sn_is_any = 1;
 
    return 0;
 }
@@ -81,41 +182,42 @@ int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to locate the
    int ret;
    char value[2];
 
+#define $$XA_TEST "$test"
+
    $dlogi("Init: checking xattr support\n");
 
-   ret = lremovexattr(fsdata->snapshotdir, $$XA_TEST);
+   ret = lremovexattr(fsdata->sn_dir, $$XA_TEST);
    if(ret != 0){
       ret = errno;
       if(ret != ENODATA){
-         $dlogi("Init: removing xattr on %s failed with %d = %s\n", fsdata->snapshotdir, ret, strerror(ret));
+         $dlogi("Init: removing xattr on %s failed with %d = %s\n", fsdata->sn_dir, ret, strerror(ret));
          return -ret;
       }
    }
-   ret = lsetxattr(fsdata->snapshotdir, $$XA_TEST, "A", 2, 0);
+   ret = lsetxattr(fsdata->sn_dir, $$XA_TEST, "A", 2, 0);
    if(ret != 0){
       ret = errno;
-      $dlogi("Init: setting xattr on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      $dlogi("Init: setting xattr on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
-   ret = lgetxattr(fsdata->snapshotdir, $$XA_TEST, value, 2);
+   ret = lgetxattr(fsdata->sn_dir, $$XA_TEST, value, 2);
    if(ret != 0){
-      $dlogi("Init: getting xattr on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      $dlogi("Init: getting xattr on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
    if(strcmp(value, "A") != 0){
-      $dlogi("Init: got unexpected value from xattr on %s\n", fsdata->snapshotdir);
+      $dlogi("Init: got unexpected value from xattr on %s\n", fsdata->sn_dir);
       return 1;
    }
-   ret = lremovexattr(fsdata->snapshotdir, $$XA_TEST);
+   ret = lremovexattr(fsdata->sn_dir, $$XA_TEST);
    if(ret != 0){
       ret = errno;
-      $dlogi("Init: removing xattr on %s failed with %s\n", fsdata->snapshotdir, strerror(ret));
+      $dlogi("Init: removing xattr on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
    return 0;
 }
 
-// TODO Get the path prefix of the latest snapshot, and possibly a list of snapshots
 
 /* Save information about a file that usually goes into the directory
  * entry, like flags, permissions, and, most importantly, size.

@@ -61,7 +61,7 @@ int $open(const char *path, struct fuse_file_info *fi)
    log_msg("open(path\"%s\", fi=0x%08x)\n", path, fi);
 
    fd = open(fpath, fi->flags);
-   if(fd < 0){ return -errno; }
+   if(fd == -1){ return -errno; }
 
    log_msg("open success fd=%d\n", fd);
 

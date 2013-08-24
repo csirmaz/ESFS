@@ -223,7 +223,9 @@ int main(int argc, char *argv[])
    fsdata->logfile = log_open();
 
    // Initial things to do
-   if($cmpath(fsdata->snapshotdir, $$SNDIR, fsdata) == -ENAMETOOLONG){
+
+   // Get the main snapshot dir path
+   if($cmpath(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG){
       fprintf(stderr, "Snapshot dir path is too long. Aborting.\n");
       return 1;
    }
@@ -233,6 +235,10 @@ int main(int argc, char *argv[])
       return 1;
    }
 
+   if($sn_get_latest(fsdata) != 0){
+      fprintf(stderr, "Getting latest snapshot failed, please check logs. Aborting.\n");
+      return 1;
+   }
 
    // turn over control to fuse
    return fuse_main(argc, argv, &$oper, fsdata);

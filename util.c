@@ -41,7 +41,6 @@
  */
 
 
-// Define, Check, Map Path in variable path
 // Use this when the command writes - we don't allow that in the snapshot dir, only in the main space.
 #define $$IF_PATH_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
@@ -68,7 +67,7 @@
    }
 
 
-// Check and map path (path into fpath)
+// Checks and map path (path into fpath)
 // Puts the mapped path in fpath and returns
 // 0 - if the path is in the main space
 // -EACCES - if the path is in the snapshot space
@@ -89,4 +88,33 @@ static int $cmpath(char *fpath, const char *path, struct $fsdata_t *fsdata)
    return -ENAMETOOLONG;
 
 }
-   
+
+
+// Adds data suffix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+static int $get_data_path(char *newpath, const char *oldpath)
+{
+   if(unlikely(strlen(oldpath) >= $$PATH_MAX - $$EXT_LEN)){
+      return -ENAMETOOLONG;
+   }
+   strcpy(newpath, oldpath);
+   strncat(newpath, $$EXT_DATA, $$EXT_LEN);
+   return 0;
+}
+
+
+// Adds "hidden" suffix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+static int $get_hid_path(char *newpath, const char *oldpath)
+{
+   if(unlikely(strlen(oldpath) >= $$PATH_MAX - $$EXT_LEN)){
+      return -ENAMETOOLONG;
+   }
+   strcpy(newpath, oldpath);
+   strncat(newpath, $$EXT_HID, $$EXT_LEN);
+   return 0;
+}
