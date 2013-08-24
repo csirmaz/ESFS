@@ -58,19 +58,6 @@
 #include "util_c.c"
 #include "snapshot_c.c"
 
-// Report errors to logfile and give -errno to caller
-// TODO Turn into inline function
-static int $error(char *str)
-{
-   int ret = -errno;
-   
-   log_msg("   ERROR %s: %s\n", str, strerror(errno));
-   
-   return ret;
-}
-
-
-
 ///////////////////////////////////////////////////////////
 //
 // Prototypes for all these functions, and the C-style comments,
@@ -86,18 +73,11 @@ static int $error(char *str)
 //   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
+   // log_msg("\ngetattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
+   $$IF_PATH_MAIN_ONLY
 
-   log_msg("\ngetattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
-   $fullpath(fpath, path);
-
-   retstat = lstat(fpath, statbuf);
-   if (retstat != 0) retstat = $error("getattr lstat");
-   
-   log_stat(statbuf);
-   
-   return retstat;
+   if(lstat(fpath, statbuf) == 0){ return 0; }
+   return -errno;
 }
 
    /** Read the target of a symbolic link
@@ -115,21 +95,17 @@ int $getattr(const char *path, struct stat *statbuf)
 // bb_readlink() code by Bernardo F Costa (thanks!)
 int $readlink(const char *path, char *link, size_t size)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
+   int ret;
+   $$IF_PATH_MAIN_ONLY
 
    log_msg("readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
-   $fullpath(fpath, path);
 
-   retstat = readlink(fpath, link, size - 1);
-   if (retstat < 0){
-     retstat = $error("readlink readlink");
-   }else{
-     link[retstat] = '\0';
-     retstat = 0;
+   ret = readlink(fpath, link, size - 1);
+   if(unlikely(ret == -1)){
+      return -errno;
    }
-
-   return retstat;
+   link[ret] = '\0';
+   return 0;
 }
 
    /** Create a file node
@@ -142,18 +118,14 @@ int $readlink(const char *path, char *link, size_t size)
 //   int (*mknod) (const char *, mode_t, dev_t);
 int $mknod(const char *path, mode_t mode, dev_t dev)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("mknod(path=\"%s\", mode=0%3o, dev=%lld)\n", path, mode, dev);
-   $fullpath(fpath, path);
-   
-   retstat = mknod(fpath, mode, dev);
-   if (retstat < 0) retstat = $error("mknod mknod");
+   // Special files are not allowed in ESFS.
+   // As create() is defined, we can return here.
+   return -EPERM;
 
-   
+   // retstat = mknod(fpath, mode, dev);
+
    // On Linux this could just be 'mknod(path, mode, rdev)' but this
-   //  is more portable -- Done; see above
+   //  is more portable
    /*
    if (S_ISREG(mode)) {
       retstat = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
@@ -173,8 +145,6 @@ int $mknod(const char *path, mode_t mode, dev_t dev)
       }
    }
    */
-
-   return retstat;
 }
 
    /** Create a directory 
@@ -186,86 +156,62 @@ int $mknod(const char *path, mode_t mode, dev_t dev)
 //   int (*mkdir) (const char *, mode_t);
 int $mkdir(const char *path, mode_t mode)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nmkdir(path=\"%s\", mode=0%3o)\n", path, mode);
-   $fullpath(fpath, path);
-   
-   retstat = mkdir(fpath, mode);
-   if (retstat < 0) retstat = $error("mkdir mkdir");
-   
-   return retstat;
+   $$IF_PATH_MAIN_ONLY
+
+   log_msg("mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+
+   if(mkdir(fpath, mode) == 0){ return 0; }
+   return -errno;
 }
 
    /** Remove a file */
 //   int (*unlink) (const char *);
 int $unlink(const char *path)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
+   // log_msg("unlink(path=\"%s\")\n", path);
+   $$IF_PATH_MAIN_ONLY
    
-   log_msg("unlink(path=\"%s\")\n", path);
-   $fullpath(fpath, path);
-   
-   retstat = unlink(fpath);
-   if (retstat < 0) retstat = $error("unlink unlink");
-   
-   return retstat;
+   if(unlink(fpath) == 0){ return 0; }
+   return -errno;
 }
 
    /** Remove a directory */
 //   int (*rmdir) (const char *);
 int $rmdir(const char *path)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
+   // log_msg("rmdir(path=\"%s\")\n", path);
+   $$IF_PATH_MAIN_ONLY
    
-   log_msg("rmdir(path=\"%s\")\n", path);
-   $fullpath(fpath, path);
-   
-   retstat = rmdir(fpath);
-   if (retstat < 0) retstat = $error("rmdir rmdir");
-   
-   return retstat;
+   if(rmdir(fpath) == 0){ return 0; }
+   return -errno;
 }
 
    /** Create a symbolic link */
 //   int (*symlink) (const char *, const char *);
 // The parameters here are a little bit confusing, but do correspond
-// to the symlink() system call.  The 'path' is where the link points,
-// while the 'link' is the link itself.  So we need to leave the path
+// to the symlink() system call.  (1) is where the link points,
+// while (2) is the link itself.  So we need to leave (1)
 // unaltered, but insert the link into the mounted directory.
-int $symlink(const char *path, const char *link)
+int $symlink(const char *dest, const char *path)
 {
-   int retstat = 0;
-   char flink[PATH_MAX]; // TODO
-   
-   log_msg("\nsymlink(path=\"%s\", link=\"%s\")\n", path, link);
-   $fullpath(flink, link);
-   
-   retstat = symlink(path, flink);
-   if (retstat < 0) retstat = $error("symlink symlink");
-   
-   return retstat;
+   $$IF_PATH_MAIN_ONLY
+
+   log_msg("\nsymlink(dest=\"%s\", path=\"%s\")\n", dest, path);
+
+   if(symlink(dest, fpath) == 0){ return 0; }
+   return -errno;
 }
 
    /** Rename a file */
 //   int (*rename) (const char *, const char *);
 int $rename(const char *path, const char *newpath)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   char fnewpath[PATH_MAX]; // TODO
-   
+   $$IF_MULTI_PATHS_MAIN_ONLY
+
    log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
-   $fullpath(fpath, path);
-   $fullpath(fnewpath, newpath);
-   
-   retstat = rename(fpath, fnewpath);
-   if (retstat < 0) retstat = $error("rename rename");
-   
-   return retstat;
+
+   if(rename(fpath, fnewpath) == 0){ return 0; }
+   return -errno;
 }
 
    /** Create a hard link to a file */
@@ -274,7 +220,7 @@ int $link(const char *path, const char *newpath)
 {
    // This is not allowed in ESFS.
    return -EPERM;
-   
+
    // To pass the request on, call link(fpath, fnewpath);
 }
 
@@ -282,48 +228,33 @@ int $link(const char *path, const char *newpath)
 //   int (*chmod) (const char *, mode_t);
 int $chmod(const char *path, mode_t mode)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nchmod(fpath=\"%s\", mode=0%03o)\n", path, mode);
-   $fullpath(fpath, path);
-   
-   retstat = chmod(fpath, mode);
-   if (retstat < 0) retstat = $error("chmod chmod");
-   
-   return retstat;
+   // log_msg("\nchmod(fpath=\"%s\", mode=0%03o)\n", path, mode);
+   $$IF_PATH_MAIN_ONLY
+
+   if(chmod(fpath, mode) == 0){ return 0; }
+   return -errno;
 }
 
    /** Change the owner and group of a file */
 //   int (*chown) (const char *, uid_t, gid_t);
 int $chown(const char *path, uid_t uid, gid_t gid)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
+   // log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
+   $$IF_PATH_MAIN_ONLY
 
-   log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
-   $fullpath(fpath, path);
-   
-   retstat = chown(fpath, uid, gid);
-   if (retstat < 0) retstat = $error("chown chown");
-   
-   return retstat;
+   if(chown(fpath, uid, gid) == 0){ return 0; }
+   return -errno;
 }
 
    /** Change the size of a file */
 //   int (*truncate) (const char *, off_t);
 int $truncate(const char *path, off_t newsize)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\ntruncate(path=\"%s\", newsize=%lld)\n", path, newsize);
-   $fullpath(fpath, path);
-   
-   retstat = truncate(fpath, newsize);
-   if (retstat < 0) retstat = $error("truncate truncate");
-   
-   return retstat;
+   // log_msg("\ntruncate(path=\"%s\", newsize=%lld)\n", path, newsize);
+   $$IF_PATH_MAIN_ONLY
+
+   if(truncate(fpath, newsize) == 0){ return 0; }
+   return -errno;
 }
 
    /** Change the access and/or modification times of a file
@@ -361,19 +292,19 @@ int $utime(const char *path, struct utimbuf *ubuf)
 //   int (*open) (const char *, struct fuse_file_info *);
 int $open(const char *path, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    int fd;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nopen(path\"%s\", fi=0x%08x)\n", path, fi);
-   $fullpath(fpath, path);
-   
+   $$IF_PATH_MAIN_ONLY
+
+   log_msg("open(path\"%s\", fi=0x%08x)\n", path, fi);
+
    fd = open(fpath, fi->flags);
-   if (fd < 0) retstat = $error("open open");
+   if(fd < 0){ return -errno; }
+
+   log_msg("open success fd=%d\n", fd);
    
    fi->fh = fd;
    
-   return retstat;
+   return 0;
 }
 
 
@@ -397,14 +328,14 @@ int $open(const char *path, struct fuse_file_info *fi)
 // returned by read.
 int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-   int retstat = 0;
+   int ret;
    
-   log_msg("\nread(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n", path, buf, size, offset, fi);
-   
-   retstat = pread(fi->fh, buf, size, offset);
-   if (retstat < 0) retstat = $error("read read");
-   
-   return retstat;
+   log_msg("read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x, fd=%d)\n", path, buf, size, offset, fi, fi->fh);
+   // TODO Check if path is null, as expected
+
+   ret = pread(fi->fh, buf, size, offset);
+   if(ret >= 0){ return ret; }
+   return -errno;
 }
 
 
@@ -423,14 +354,13 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 int $write(const char *path, const char *buf, size_t size, off_t offset,
           struct fuse_file_info *fi)
 {
-   int retstat = 0;
-
+   int ret;
+   
    log_msg("\nwrite(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n", path, buf, size, offset, fi);
 
-   retstat = pwrite(fi->fh, buf, size, offset);
-   if (retstat < 0) retstat = $error("write pwrite");
-
-   return retstat;
+   ret = pwrite(fi->fh, buf, size, offset);
+   if(ret >= 0){ return ret; }
+   return -errno;
 }
 
    /** Get file system statistics
@@ -443,19 +373,14 @@ int $write(const char *path, const char *buf, size_t size, off_t offset,
 //   int (*statfs) (const char *, struct statvfs *);
 int $statfs(const char *path, struct statvfs *statv)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nstatfs(path=\"%s\", statv=0x%08x)\n", path, statv);
-   $fullpath(fpath, path);
-   
+   // log_msg("\nstatfs(path=\"%s\", statv=0x%08x)\n", path, statv);
+   $$IF_PATH_MAIN_ONLY
+
    // get stats for underlying filesystem
-   retstat = statvfs(fpath, statv);
-   if (retstat < 0) retstat = $error("statfs statvfs");
+   if( statvfs(fpath, statv) == 0){ return 0; }
+   return -errno;
    
-   log_statvfs(statv);
-   
-   return retstat;
+   // log_statvfs(statv);
 }
 
 
@@ -485,13 +410,12 @@ int $statfs(const char *path, struct statvfs *statv)
 //   int (*flush) (const char *, struct fuse_file_info *);
 int $flush(const char *path, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    
-   log_msg("\nflush(path=\"%s\", fi=0x%08x)\n", path, fi);
+   log_msg("flush(path=\"%s\", fi=0x%08x)\n", path, fi);
 
    // TODO THIS IS IGNORED
    
-   return retstat;
+   return 0;
 }
 
 
@@ -512,16 +436,13 @@ int $flush(const char *path, struct fuse_file_info *fi)
 //   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
 {
-   int retstat = 0;
-   
-   log_msg("\nrelease(path=\"%s\", fi=0x%08x)\n", path, fi);
+
+   log_msg("release(path=\"%s\", fi=0x%08x, fd=%d)\n", path, fi, fi->fh);
 
    // We need to close the file.  Had we allocated any resources
    // (buffers etc) we'd need to free them here as well.
-   retstat = close(fi->fh);
-   // TODO no $error?
-   
-   return retstat;
+   if(close(fi->fh) == 0){ return 0; }
+   return -errno;
 }
 
    /** Synchronize file contents
@@ -534,22 +455,20 @@ int $release(const char *path, struct fuse_file_info *fi)
 //   int (*fsync) (const char *, int, struct fuse_file_info *);
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    
    log_msg("\nfsync(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
    
-   if (datasync){
-      retstat = fdatasync(fi->fh);
+   if(datasync){
+      if(fdatasync(fi->fh) == 0){ return 0; }
+      return -errno;
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed
-   }else{
-      retstat = fsync(fi->fh);
-      // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for) 
-      // the file referred to by the file descriptor fd to the disk device
    }
    
-   if (retstat < 0) $error("fsync");
-   
-   return retstat;
+   if(fsync(fi->fh) == 0){ return 0; }
+   return -errno;
+      // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for) 
+      // the file referred to by the file descriptor fd to the disk device
+
 }
 
 
@@ -557,13 +476,11 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 //   int (*setxattr) (const char *, const char *, const char *, size_t, int);
 int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
-   $fullpath(fpath, path);
-   
-   retstat = lsetxattr(fpath, name, value, size, flags);
+   // log_msg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
+   $$IF_PATH_MAIN_ONLY
+
+   if(lsetxattr(fpath, name, value, size, flags) == 0){ return 0; }
+   return -errno;
    /*
    setxattr() sets the value of the extended attribute identified by name and associated with 
    the given path in the file system. The size of the value must be specified.
@@ -575,41 +492,28 @@ int $setxattr(const char *path, const char *name, const char *value, size_t size
    By default (no flags), the extended attribute will be created if need be, 
    or will simply replace the value if the attribute exists.
    */
-   if (retstat < 0) retstat = $error("setxattr lsetxattr");
-   
-   return retstat;
 }
 
    /** Get extended attributes */
 //   int (*getxattr) (const char *, const char *, char *, size_t);
 int $getxattr(const char *path, const char *name, char *value, size_t size)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
-   $fullpath(fpath, path);
-   
-   retstat = lgetxattr(fpath, name, value, size);
-   if (retstat < 0) retstat = $error("getxattr lgetxattr");
-   
-   return retstat;
+   // log_msg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
+   $$IF_PATH_MAIN_ONLY
+
+   if(lgetxattr(fpath, name, value, size) == 0){ return 0; }
+   return -errno;
 }
 
    /** List extended attributes */
 //   int (*listxattr) (const char *, char *, size_t);
 int $listxattr(const char *path, char *list, size_t size)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
-   $fullpath(fpath, path);
-   
-   retstat = llistxattr(fpath, list, size);
-   if (retstat < 0) retstat = $error("listxattr llistxattr");
-   
-   return retstat;
+   // log_msg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
+   $$IF_PATH_MAIN_ONLY
+
+   if( llistxattr(fpath, list, size) == 0){ return 0; }
+   return -errno;
 }
 
 
@@ -617,16 +521,11 @@ int $listxattr(const char *path, char *list, size_t size)
 //   int (*removexattr) (const char *, const char *);
 int $removexattr(const char *path, const char *name)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
-   $fullpath(fpath, path);
-   
-   retstat = lremovexattr(fpath, name);
-   if (retstat < 0) retstat = $error("removexattr lrmovexattr");
-   
-   return retstat;
+   // log_msg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
+   $$IF_PATH_MAIN_ONLY
+
+   if(lremovexattr(fpath, name) == 0){ return 0; }
+   return -errno;
 }
 
 
@@ -643,19 +542,16 @@ int $removexattr(const char *path, const char *name)
 //   int (*opendir) (const char *, struct fuse_file_info *);
 int $opendir(const char *path, struct fuse_file_info *fi)
 {
+   // log_msg("\nopendir(path=\"%s\", fi=0x%08x)\n", path, fi);
    DIR *dp;
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nopendir(path=\"%s\", fi=0x%08x)\n", path, fi);
-   $fullpath(fpath, path);
-   
+   $$IF_PATH_MAIN_ONLY
+
    dp = opendir(fpath);
-   if (dp == NULL) retstat = $error("opendir opendir");
+   if(unlikely(dp == NULL)){ return -errno; }
    
    fi->fh = (intptr_t) dp;
    
-   return retstat;
+   return 0;
 }
 
    /** Read directory
@@ -684,22 +580,27 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
             struct fuse_file_info *fi)
 {
-   int retstat = 0;
    DIR *dp;
    struct dirent *de;
    
-   log_msg("\nreaddir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n", path, buf, filler, offset, fi);
+   log_msg("readdir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n", path, buf, filler, offset, fi);
    // note that I need to cast fi->fh
    dp = (DIR *) (uintptr_t) fi->fh;
 
+   /* TODO
+    * If
+       the  end  of  the  directory stream is reached, NULL is returned and errno is not changed.
+       If an error occurs, NULL is returned and errno is set
+       appropriately.
+   */
+   
    // Every directory contains at least two entries: . and ..  If my
    // first call to the system readdir() returns NULL I've got an
    // error; near as I can tell, that's the only condition under
    // which I can get an error from readdir()
    de = readdir(dp);
-   if (de == 0) {
-      retstat = $error("readdir readdir");
-      return retstat;
+   if (de == NULL) {
+      return -errno;
    }
 
    // This will copy the entire directory into the buffer.  The loop exits
@@ -712,7 +613,7 @@ int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
       }
    } while ((de = readdir(dp)) != NULL);
    
-   return retstat;
+   return 0;
 }
 
    /** Release directory
@@ -722,13 +623,11 @@ int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
 //   int (*releasedir) (const char *, struct fuse_file_info *);
 int $releasedir(const char *path, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    
    log_msg("\nreleasedir(path=\"%s\", fi=0x%08x)\n", path, fi);
    
-   closedir((DIR *) (uintptr_t) fi->fh);
-   
-   return retstat;
+   if(closedir((DIR *) (uintptr_t) fi->fh) == 0){ return 0; }
+   return -errno;
 }
 
    /** Synchronize directory contents
@@ -743,13 +642,12 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 // happens to be a directory? ???
 int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    
    log_msg("\nfsyncdir(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
    
    // TODO This is ignored
    
-   return retstat;
+   return 0;
 }
 
    /**
@@ -802,17 +700,12 @@ void $destroy(void *userdata)
 //   int (*access) (const char *, int);
 int $access(const char *path, int mask)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
+   $$IF_PATH_MAIN_ONLY
+
    log_msg("\naccess(path=\"%s\", mask=0%o)\n", path, mask);
-   $fullpath(fpath, path);
    
-   retstat = access(fpath, mask);
-   
-   if (retstat < 0) retstat = $error("access access");
-   
-   return retstat;
+   if(access(fpath, mask) == 0){ return 0; }
+   return -errno;
 }
 
    /**
@@ -830,19 +723,17 @@ int $access(const char *path, int mask)
 //   int (*create) (const char *, mode_t, struct fuse_file_info *);
 int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
    int fd;
-   
+   $$IF_PATH_MAIN_ONLY
+
    log_msg("\ncreate(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
-   $fullpath(fpath, path);
-   
+
    fd = creat(fpath, mode);
-   if (fd < 0) retstat = $error("create creat");
+   if(fd < 0){ return -errno; }
    
    fi->fh = fd;
    
-   return retstat;
+   return 0;
 }
 
    /**
@@ -860,14 +751,11 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 //   int (*ftruncate) (const char *, off_t, struct fuse_file_info *);
 int $ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    
    log_msg("\nftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n", path, offset, fi);
    
-   retstat = ftruncate(fi->fh, offset);
-   if (retstat < 0) retstat = $error("ftruncate ftruncate");
-   
-   return retstat;
+   if(ftruncate(fi->fh, offset) == 0){ return 0; }
+   return -errno;
 }
 
    /**
@@ -888,14 +776,11 @@ int $ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 // the path...
 int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
-   int retstat = 0;
    
    log_msg("\nfgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
    
-   retstat = fstat(fi->fh, statbuf);
-   if (retstat < 0) retstat = $error("fgetattr fstat");
-   
-   return retstat;
+   if(fstat(fi->fh, statbuf) == 0){ return 0; }
+   return -errno;
 }
 
    /**
@@ -949,12 +834,8 @@ int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 //   int (*utimens) (const char *, const struct timespec tv[2]);
 int $utimens(const char *path, const struct timespec tv[2])
 {
-   int retstat = 0;
-   char fpath[PATH_MAX]; // TODO
-   
-   log_msg("\nutimens\n");
-   $fullpath(fpath, path);
-   
+   $$IF_PATH_MAIN_ONLY
+
    /*
     int utimensat(int dirfd, const char *pathname,
                      const struct timespec times[2], int flags);
@@ -980,10 +861,10 @@ int $utimens(const char *path, const struct timespec tv[2])
               refers.
    */
    
-   retstat = utimensat(AT_FDCWD, fpath, tv, 0); // TODO For now, we fall back to AT_FDCWD
-   if (retstat < 0) retstat = $error("utimens utimensat");
-   
-   return retstat;
+   if(utimensat(AT_FDCWD, fpath, tv, 0) == 0){ // TODO For now, we fall back to AT_FDCWD
+      return 0;
+   }
+   return -errno;
 }
 
    /**
@@ -1166,7 +1047,7 @@ void $usage()
 
 int main(int argc, char *argv[])
 {
-   struct $fsdata *$myfsdata;
+   struct $fsdata_t *$fsdata;
 
    // ESFS doesn't do any access checking on its own (the comment
    // blocks in fuse.h mention some of the functions that need
@@ -1190,21 +1071,48 @@ int main(int argc, char *argv[])
    if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
       $usage();
 
-   $myfsdata = malloc(sizeof(struct $fsdata));
-   if ($myfsdata == NULL) {
+   $fsdata = malloc(sizeof(struct $fsdata_t));
+   if ($fsdata == NULL) {
       perror("main calloc");
       abort();
    }
 
    // Pull the rootdir out of the argument list and save it in my
    // internal data
-   $myfsdata->rootdir = realpath(argv[argc-2], NULL);
+   $fsdata->rootdir = realpath(argv[argc-2], NULL);
+   $fsdata->rootdir_len = strlen($fsdata->rootdir);
    argv[argc-2] = argv[argc-1];
    argv[argc-1] = NULL;
    argc--;
    
-   $myfsdata->logfile = log_open();
+   $fsdata->logfile = log_open();
    
    // turn over control to fuse
-   return fuse_main(argc, argv, &$oper, $myfsdata);
+   return fuse_main(argc, argv, &$oper, $fsdata);
 }
+
+/*
+FUSE options:
+-d -o debug    enable debug output (implies -f)
+-f    foreground operation
+-s    disable multi-threaded operation
+-o allow_other    allow access to other users
+-o allow_root   allow access to root
+-o nonempty    allow mounts over non-empty file/dir
+-o default_permissions  enable permission checking by kernel
+-o fsname=NAME    set file system name
+-o large_read  issue large read requests (2.4 only)
+-o max_read=N  set maximum size of read requests
+-o hard_remove    immediate removal (don't hide files)
+-o use_ino     let file system set inode numbers
+-o readdir_ino    try to fill in d_ino in readdir
+-o direct_io   use direct I/O
+-o kernel_cache   cache files in kernel
+-o umask=M  set file permissions (octal)
+-o uid=N    set file owner
+-o gid=N    set file group
+-o entry_timeout=T   cache timeout for names (1.0s)
+-o negative_timeout=T    cache timeout for deleted names (0.0s)
+-o attr_timeout=T    cache timeout for attributes (1.0s)
+http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
+*/

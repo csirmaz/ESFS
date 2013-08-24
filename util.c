@@ -36,14 +36,55 @@
 
 // This file contains low-level tools.
 
-//  All the paths I see are relative to the root of the mounted
-//  filesystem.  In order to get to the underlying filesystem, I need to
-//  have the mountpoint.  I'll save it away early on in main(), and then
-//  whenever I need a path for something I'll call this to construct
-//  it.
-static void $fullpath(char fpath[PATH_MAX], const char *path)
+/* About $$PATH_MAX
+ * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
+ * suggests that operations need to be thread-safe, although pkg-config does
+ * not return -D_REENTRANT on my system. // TODO
+ * Using a constant-length string to store the mapped path appears to be the
+ * simplest solution under these circumstances, even though incoming paths
+ * can be of any length.
+ */
+
+// Define, Check, Map Path in variable path
+// Use this when the command writes - we don't allow that in the snapshot dir, only in the main space.
+#define $$IF_PATH_MAIN_ONLY \
+   char fpath[$$PATH_MAX]; \
+   switch($cmpath(fpath, path)){ \
+      case -EINVAL : return -EINVAL; \
+      case -EACCES : return -EACCES; \
+   }
+
+// Use this when there are two paths, path and newpath, and the command writes.
+#define $$IF_MULTI_PATHS_MAIN_ONLY \
+   char fpath[$$PATH_MAX]; \
+   char fnewpath[$$PATH_MAX]; \
+   switch($cmpath(fpath, path)){ \
+      case -EINVAL : return -EINVAL; \
+      case -EACCES : return -EACCES; \
+   } \
+   switch($cmpath(fnewpath, newpath)){ \
+      case -EINVAL : return -EINVAL; \
+      case -EACCES : return -EACCES; \
+   }
+
+// Check and map path (path into fpath)
+// Returns
+// 0 - if the path is in the main space, and is mapped
+// -EACCES - if the path is in the snapshot space
+// -EINVAL - if the mapped path is too long
+static int $cmpath(char *fpath, const char *path)
 {
-   strcpy(fpath, $$FSDATA->rootdir);
-   strncat(fpath, path, PATH_MAX); // ridiculously long paths will
-                           // break here
+   $$DFSDATA
+   
+   // If path starts with the snapshot folder
+   if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == '/' || path[$$SNDIR_LEN] == '\0'))){
+      return -EACCES;
+   }else{
+      // Add prefix of root folder to map to underlying file
+      strcpy(fpath, $fsdata->rootdir);
+      strncat(fpath, path, $$PATH_MAX - $fsdata->rootdir_len);
+      if(likely(strlen(fpath) < $$PATH_MAX)){ return 0; } // success
+      return -EINVAL;
+   }
 }
+   

@@ -47,6 +47,8 @@
 // writing, the most current API version is 26
 #define FUSE_USE_VERSION 26
 
+// For libraries
+// -------------
 
 // need this to get pwrite().  I have to use setvbuf() instead of
 // setlinebuf() later in consequence.
@@ -59,7 +61,11 @@
 // Constants
 // ---------
 #define $$PATH_MAX PATH_MAX
-#define $$SNDIR snapshots/
+
+// The snapshots directory
+//                  1234567890
+#define $$SNDIR    "/snapshots"
+#define $$SNDIR_LEN 10 // Without null character
 
 // Global FS private data
 // ----------------------
@@ -67,12 +73,22 @@
 #include <limits.h>
 #include <stdio.h>
 
-struct $fsdata {
+struct $fsdata_t {
     FILE *logfile;
     char *rootdir;
+    size_t rootdir_len; // length of rootdir string, without terminating NULL
 };
 
 // Retrieve and cast
-#define $$FSDATA ((struct $fsdata *) fuse_get_context()->private_data )
+#define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
 
+// Retrieve and store in $fsdata
+#define $$DFSDATA struct $fsdata_t *$fsdata; \
+   $fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data );
+
+// In case it matters
+// ------------------
+#define likely(x) (__builtin_expect((x), 1))
+#define unlikely(x) (__builtin_expect((x), 0))
+   
 #endif
