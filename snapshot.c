@@ -79,16 +79,18 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
  * All these pointers contain the real paths to the snapshot roots: ..../snapshots/ID
  */
 
-// Gets the path to the root of the latest snapshot, and sets:
-//   fsdata->sn_is_any
-//   fsdata->sn_lat_dir
+
+// Gets the path to the root of the latest snapshot:
+//   reads .../snapshots/.hid
+//   sets fsdata->sn_is_any
+//   sets fsdata->sn_lat_dir
 // Returns:
 // 0 - on success
 // -errno - on failure
 int $sn_get_latest(struct $fsdata_t *fsdata){
    int fd;
    int ret;
-   char path[$$PATH_MAX];
+   char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
    // We could store the path to the pointer instead of recreating it here and in $sn_set_latest
    if(unlikely(strlen(fsdata->sn_dir) >= $$PATH_MAX - $$EXT_LEN - 1)){
@@ -126,9 +128,10 @@ int $sn_get_latest(struct $fsdata_t *fsdata){
 }
 
 
-// Sets the path to the root of the latest snapshot, and sets
-//   fsdata->sn_is_any
-//   fsdata->sn_lat_dir
+// Sets the path to the root of the latest snapshot:
+//   writes .../snapshots/.hid
+//   sets fsdata->sn_is_any
+//   sets fsdata->sn_lat_dir
 // Returns:
 //   0 - on success
 //   -errno - on failure
@@ -170,6 +173,87 @@ int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 
    return 0;
 }
+
+
+// Initialises a new snapshot
+//   path is a real path of the form .../snapshots/ID
+// Returns:
+// 0 - on success
+// -1 - on failure
+int $sn_create(struct $fsdata_t *fsdata, char *path)
+{
+   int fd;
+   int ret;
+   int waserror = 0;
+   char hid[$$PATH_MAX];
+
+   $dlogi("Creating new snapshot at %s\n", path);
+
+   // Create root of snapshot
+   if(unlikely(mkdir(path, S_IRWXU) != 0)){
+      ret = errno;
+      $dlogi("Creating sn: creating %s failed with %d = %s\n", path, ret, strerror(ret));
+      return -1;
+   }
+
+   do{
+      // Set up pointer file
+      ret = $get_hid_path(hid, path);
+      if(ret < 0){
+         $dlogi("Creating sn: creating %s failed when getting hid path\n", path);
+         waserror = 1;
+         break;
+
+         fd = open(hid, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+         if(fd == -1){
+            fd = errno;
+            $dlogi("Creating sn: opening %s failed with %d = %s\n", hid, fd, strerror(fd));
+            waserror = 1;
+            break;
+         }
+
+         do{
+            // Write into pointer file
+            ret = pwrite(fd, fsdata->sn_lat_dir, $$PATH_MAX, 0);
+            if(ret == -1){
+               ret = errno;
+               $dlogi("Creating sn: writing to %s failed with %d = %s\n", hid, ret, strerror(ret));
+               waserror = 1;
+               break;
+            }
+            if(ret != $$PATH_MAX){
+               $dlogi("Creating sn: writing to %s returned %d bytes instead of %d\n", hid, ret, $$PATH_MAX);
+               waserror = 1;
+               break;
+            }
+
+            // Save latest sn
+            if($sn_set_latest(fsdata, path) < 0){
+               waserror = 1;
+               break;
+            }
+
+         }while(0);
+
+         close(fd);
+
+         if(unlikely(waserror == 1)){
+            $dlogi("Creating sn: Cleanup: removing %s\n", hid);
+            unlink(hid);
+         }
+
+      }
+   }while(0);
+
+   if(unlikely(waserror == 1)){
+      $dlogi("Creating sn: Cleanup: removing %s\n", path);
+      rmdir(path);
+      return -1;
+   }
+
+   return 0;
+}
+
 
 // Check if xattrs are suppored by the underlying filesystem
 // They are not supported by ext4
