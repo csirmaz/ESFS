@@ -127,6 +127,11 @@ void *$init(struct fuse_conn_info *conn)
 //   void (*destroy) (void *);
 void $destroy(void *userdata)
 {
+   // TODO free all memory -- search for malloc
+   /*
+    * fsdata
+    * realpath
+    */
    log_msg("\ndestroy(userdata=0x%08x)\n", userdata);
 }
 
@@ -189,7 +194,7 @@ int main(int argc, char *argv[])
    // user doing it with the allow_other flag is still there because
    // I don't want to parse the options string.
    if ((getuid() == 0) || (geteuid() == 0)) {
-      fprintf(stderr, "Running ESFS as root opens unnacceptable security holes\n");
+      fprintf(stderr, "Running ESFS as root opens unnacceptable security holes. Aborting.\n");
       return 1;
    }
 
@@ -209,7 +214,7 @@ int main(int argc, char *argv[])
 
    // Pull the rootdir out of the argument list and save it in my
    // internal data
-   fsdata->rootdir = realpath(argv[argc-2], NULL);
+   fsdata->rootdir = realpath(argv[argc-2], NULL); // this calls malloc
    fsdata->rootdir_len = strlen(fsdata->rootdir);
    argv[argc-2] = argv[argc-1];
    argv[argc-1] = NULL;

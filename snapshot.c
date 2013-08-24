@@ -77,6 +77,8 @@ int $sn_init(struct $fsdata_t *fsdata)
    return 0;
 }
 
+// TODO Get the path prefix of the latest snapshot, and possibly a list of snapshots
+
 /* Save information about a file that usually goes into the directory
  * entry, like flags, permissions, and, most importantly, size.
  */
