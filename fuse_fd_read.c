@@ -148,7 +148,7 @@ int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
 int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
 
-   log_msg("\nfgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
+   log_msg("fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
 
    if(fstat(fi->fh, statbuf) == 0){ return 0; }
    return -errno;

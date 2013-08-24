@@ -36,21 +36,19 @@
 
 // This file contains low-level tools.
 
-/* About $$PATH_MAX
- * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
- * suggests that operations need to be thread-safe, although pkg-config does
- * not return -D_REENTRANT on my system. // TODO
- * Using a constant-length string to store the mapped path appears to be the
- * simplest solution under these circumstances, even though incoming paths
- * can be of any length.
+/* USEFUL
+ * strerror(errno)
  */
+
 
 // Define, Check, Map Path in variable path
 // Use this when the command writes - we don't allow that in the snapshot dir, only in the main space.
 #define $$IF_PATH_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
-   switch($cmpath(fpath, path)){ \
-      case -EINVAL : return -EINVAL; \
+   struct $fsdata_t *fsdata; \
+   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   switch($cmpath(fpath, path, fsdata)){ \
+      case -ENAMETOOLONG : return -ENAMETOOLONG; \
       case -EACCES : return -EACCES; \
    }
 
@@ -58,33 +56,37 @@
 #define $$IF_MULTI_PATHS_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
    char fnewpath[$$PATH_MAX]; \
-   switch($cmpath(fpath, path)){ \
-      case -EINVAL : return -EINVAL; \
+   struct $fsdata_t *fsdata; \
+   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   switch($cmpath(fpath, path, fsdata)){ \
+      case -ENAMETOOLONG : return -ENAMETOOLONG; \
       case -EACCES : return -EACCES; \
    } \
-   switch($cmpath(fnewpath, newpath)){ \
-      case -EINVAL : return -EINVAL; \
+   switch($cmpath(fnewpath, newpath, fsdata)){ \
+      case -ENAMETOOLONG : return -ENAMETOOLONG; \
       case -EACCES : return -EACCES; \
    }
 
+
 // Check and map path (path into fpath)
-// Returns
-// 0 - if the path is in the main space, and is mapped
+// Puts the mapped path in fpath and returns
+// 0 - if the path is in the main space
 // -EACCES - if the path is in the snapshot space
-// -EINVAL - if the mapped path is too long
-static int $cmpath(char *fpath, const char *path)
+// -ENAMETOOLONG - if the mapped path is too long
+static int $cmpath(char *fpath, const char *path, struct $fsdata_t *fsdata)
 {
-   $$DFSDATA
    
-   // If path starts with the snapshot folder
-   if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == '/' || path[$$SNDIR_LEN] == '\0'))){
-      return -EACCES;
-   }else{
-      // Add prefix of root folder to map to underlying file
-      strcpy(fpath, $fsdata->rootdir);
-      strncat(fpath, path, $$PATH_MAX - $fsdata->rootdir_len);
-      if(likely(strlen(fpath) < $$PATH_MAX)){ return 0; } // success
-      return -EINVAL;
+   // Add prefix of root folder to map to underlying file
+   strcpy(fpath, fsdata->rootdir);
+   strncat(fpath, path, $$PATH_MAX - fsdata->rootdir_len);
+   if(likely(strlen(fpath) < $$PATH_MAX)){ // success - fpath is not too long
+      // If path starts with the snapshot folder
+      if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == '/' || path[$$SNDIR_LEN] == '\0'))){
+         return -EACCES;
+      }
+      return 0;
    }
+   return -ENAMETOOLONG;
+
 }
    

@@ -44,8 +44,9 @@
 //   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
 {
-   // log_msg("\ngetattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
    $$IF_PATH_MAIN_ONLY
+
+   log_msg("getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
 
    if(lstat(fpath, statbuf) == 0){ return 0; }
    return -errno;
@@ -121,7 +122,7 @@ int $access(const char *path, int mask)
 {
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("\naccess(path=\"%s\", mask=0%o)\n", path, mask);
+   log_msg("access(path=\"%s\", mask=0%o)\n", path, mask);
 
    if(access(fpath, mask) == 0){ return 0; }
    return -errno;

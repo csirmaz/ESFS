@@ -58,8 +58,23 @@
 // Backtrace: fcntl.h, sys/stat.h <- features.h 
 #define _ATFILE_SOURCE 1
 
+// Parameters
+// ----------
+#define $log(...) log_msg(__VA_ARGS__)
+#define $dlog(...) fprintf(fsdata->logfile, __VA_ARGS__)
+#define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__) // important log lines
+
 // Constants
 // ---------
+
+/* About $$PATH_MAX
+ * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
+ * suggests that operations need to be thread-safe, although pkg-config does
+ * not return -D_REENTRANT on my system. // TODO
+ * Using a constant-length string to store the mapped path appears to be the
+ * simplest solution under these circumstances, even though incoming paths
+ * can be of any length.
+ */
 #define $$PATH_MAX PATH_MAX
 
 // The snapshots directory
@@ -81,10 +96,6 @@ struct $fsdata_t {
 
 // Retrieve and cast
 #define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
-
-// Retrieve and store in $fsdata
-#define $$DFSDATA struct $fsdata_t *$fsdata; \
-   $fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data );
 
 // In case it matters
 // ------------------

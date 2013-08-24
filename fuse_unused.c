@@ -1,0 +1,169 @@
+   /**
+    * Perform POSIX file locking operation
+    *
+    * The cmd argument will be either F_GETLK, F_SETLK or F_SETLKW.
+    *
+    * For the meaning of fields in 'struct flock' see the man page
+    * for fcntl(2).  The l_whence field will always be set to
+    * SEEK_SET.
+    *
+    * For checking lock ownership, the 'fuse_file_info->owner'
+    * argument must be used.
+    *
+    * For F_GETLK operation, the library will first check currently
+    * held locks, and if a conflicting lock is found it will return
+    * information without calling this method.   This ensures, that
+    * for local locks the l_pid field is correctly filled in.  The
+    * results may not be accurate in case of race conditions and in
+    * the presence of hard links, but it's unlikely that an
+    * application would rely on accurate GETLK results in these
+    * cases.  If a conflicting lock is not found, this method will be
+    * called, and the filesystem may fill out l_pid by a meaningful
+    * value, or it may leave this field zero.
+    *
+    * For F_SETLK and F_SETLKW the l_pid field will be set to the pid
+    * of the process performing the locking operation.
+    *
+    ** Note: if this method is not implemented, the kernel will still
+    ** allow file locking to work locally.  Hence it is only
+    ** interesting for network filesystems and similar.
+    *
+    * Introduced in version 2.6
+    */
+//   int (*lock) (const char *, struct fuse_file_info *, int cmd,
+//           struct flock *);
+
+
+   /**
+    * Map block index within file to block index within device
+    *
+    * Note: This makes sense only for block device backed filesystems
+    * mounted with the 'blkdev' option
+    *
+    * Introduced in version 2.6
+    */
+//   int (*bmap) (const char *, size_t blocksize, uint64_t *idx);
+
+   /**
+    * Flag indicating that the filesystem can accept a NULL path
+    * as the first argument for the following operations:
+    *
+    * read, write, flush, release, fsync, readdir, releasedir,
+    * fsyncdir, ftruncate, fgetattr, lock, ioctl and poll
+    *
+    * If this flag is set these operations continue to work on
+    * unlinked files even if "-ohard_remove" option was specified.
+    */
+//   unsigned int flag_nullpath_ok:1;
+
+   /**
+    * Flag indicating that the path need not be calculated for
+    * the following operations:
+    *
+    * read, write, flush, release, fsync, readdir, releasedir,
+    * fsyncdir, ftruncate, fgetattr, lock, ioctl and poll
+    *
+    * Closely related to flag_nullpath_ok, but if this flag is
+    * set then the path will not be calculaged even if the file
+    * wasn't unlinked.  However the path can still be non-NULL if
+    * it needs to be calculated for some other reason.
+    */
+//   unsigned int flag_nopath:1;
+
+   /**
+    * Flag indicating that the filesystem accepts special
+    * UTIME_NOW and UTIME_OMIT values in its utimens operation.
+    */
+//   unsigned int flag_utime_omit_ok:1;
+
+   /**
+    * Reserved flags, don't set
+    */
+//   unsigned int flag_reserved:29;
+
+   /**
+    * Ioctl
+    *
+    * flags will have FUSE_IOCTL_COMPAT set for 32bit ioctls in
+    * 64bit environment.  The size and direction of data is
+    * determined by _IOC_*() decoding of cmd.  For _IOC_NONE,
+    * data will be NULL, for _IOC_WRITE data is out area, for
+    * _IOC_READ in area and if both are set in/out area.  In all
+    * non-NULL cases, the area is of _IOC_SIZE(cmd) bytes.
+    *
+    * Introduced in version 2.8
+    */
+//   int (*ioctl) (const char *, int cmd, void *arg,
+//            struct fuse_file_info *, unsigned int flags, void *data);
+
+   /**
+    * Poll for IO readiness events
+    *
+    * Note: If ph is non-NULL, the client should notify
+    * when IO readiness events occur by calling
+    * fuse_notify_poll() with the specified ph.
+    *
+    * Regardless of the number of times poll with a non-NULL ph
+    * is received, single notification is enough to clear all.
+    * Notifying more times incurs overhead but doesn't harm
+    * correctness.
+    *
+    * The callee is responsible for destroying ph with
+    * fuse_pollhandle_destroy() when no longer in use.
+    *
+    * Introduced in version 2.8
+    */
+//   int (*poll) (const char *, struct fuse_file_info *,
+//           struct fuse_pollhandle *ph, unsigned *reventsp);
+
+   /** Write contents of buffer to an open file
+    *
+    * Similar to the write() method, but data is supplied in a
+    * generic buffer.  Use fuse_buf_copy() to transfer data to
+    * the destination.
+    *
+    * Introduced in version 2.9
+    */
+//   int (*write_buf) (const char *, struct fuse_bufvec *buf, off_t off,
+//           struct fuse_file_info *);
+
+   /** Store data from an open file in a buffer
+    *
+    * Similar to the read() method, but data is stored and
+    * returned in a generic buffer.
+    *
+    * No actual copying of data has to take place, the source
+    * file descriptor may simply be stored in the buffer for
+    * later data transfer.
+    *
+    * The buffer must be allocated dynamically and stored at the
+    * location pointed to by bufp.  If the buffer contains memory
+    * regions, they too must be allocated using malloc().  The
+    * allocated memory will be freed by the caller.
+    *
+    * Introduced in version 2.9
+    */
+//   int (*read_buf) (const char *, struct fuse_bufvec **bufp,
+//          size_t size, off_t off, struct fuse_file_info *);
+
+  /**
+    * Perform BSD file locking operation
+    *
+    * The op argument will be either LOCK_SH, LOCK_EX or LOCK_UN
+    *
+    * Nonblocking requests will be indicated by ORing LOCK_NB to
+    * the above operations
+    *
+    * For more information see the flock(2) manual page.
+    *
+    * Additionally fi->owner will be set to a value unique to
+    * this open file.  This same value will be supplied to
+    * ->release() when the file is released.
+    *
+    ** Note: if this method is not implemented, the kernel will still
+    ** allow file locking to work locally.  Hence it is only
+    ** interesting for network filesystems and similar.
+    *
+    * Introduced in version 2.9
+    */
+//   int (*flock) (const char *, struct fuse_file_info *, int op);

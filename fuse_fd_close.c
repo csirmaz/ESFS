@@ -108,7 +108,7 @@ int $release(const char *path, struct fuse_file_info *fi)
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
 
-   log_msg("\nfsync(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
+   log_msg("fsync(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
 
    if(datasync){
       if(fdatasync(fi->fh) == 0){ return 0; }
@@ -132,7 +132,7 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 int $releasedir(const char *path, struct fuse_file_info *fi)
 {
 
-   log_msg("\nreleasedir(path=\"%s\", fi=0x%08x)\n", path, fi);
+   log_msg("releasedir(path=\"%s\", fi=0x%08x)\n", path, fi);
 
    if(closedir((DIR *) (uintptr_t) fi->fh) == 0){ return 0; }
    return -errno;
@@ -152,7 +152,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
 
-   log_msg("\nfsyncdir(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
+   log_msg("fsyncdir(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
 
    // TODO This is ignored
 

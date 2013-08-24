@@ -37,6 +37,46 @@
 // This file contains functions related to saving things in a snapshot
 // and retrieving things from snapshots.
 
+// Create the snapshot dir if necessary.
+// Returns
+// 0 - on success
+// -ENAMETOOLONG - if fpath would be too long
+// -errno - if lstat or mkdir fails
+// 1 - if the node exists but is not a directory
+int $sn_init(struct $fsdata_t *fsdata)
+{
+   struct stat mystat;
+   char fpath[$$PATH_MAX];
+   int ret;
+
+   $dlogi("Init: checking the snapshots dir\n");
+
+   if($cmpath(fpath, $$SNDIR, fsdata) == -ENAMETOOLONG){
+      $dlogi("Init error: path too long\n");
+      return -ENAMETOOLONG;
+   }
+   
+   if(lstat(fpath, &mystat) == 0){
+      // Check if it is a directory
+      if(S_ISDIR(mystat.st_mode)){ return 0; }
+      $dlogi("Init error: found something else than a directory at %s\n", fpath);
+      return 1;
+   } else {
+      ret = errno;
+      if(ret == ENOENT){
+         $dlogi("Init: creating the snapshots dir\n");
+         if(mkdir(fpath, 0700) == 0){ return 0; }
+         ret = errno;
+         $dlog("Init error: mkdir on %s failed with %s\n", fpath, strerror(ret));
+         return -ret;
+      }
+      $dlogi("Init error: lstat on %s failed with %s\n", fpath, strerror(ret));
+      return -ret;
+   }
+
+   return 0;
+}
+
 /* Save information about a file that usually goes into the directory
  * entry, like flags, permissions, and, most importantly, size.
  */

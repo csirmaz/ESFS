@@ -34,6 +34,8 @@
  * in this file. To write $, use \$.
  */
 
+/* This file contains FS operations that modify dentries based on a path
+ */
 
    /** Create a file node
     *
@@ -49,8 +51,7 @@ int $mknod(const char *path, mode_t mode, dev_t dev)
    // As create() is defined, we can return here.
    return -EPERM;
 
-   // retstat = mknod(fpath, mode, dev);
-
+   // Original code from BBFS:
    // On Linux this could just be 'mknod(path, mode, rdev)' but this
    //  is more portable
    /*
