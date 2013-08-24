@@ -14,7 +14,7 @@ THEEND
 ;
 
 
-foreach my $f (qw( esfs.c params.h log.c log.h snapshot.c util.c fuse_fd_close.c fuse_fd_read.c fuse_fd_write.c fuse_path_open.c fuse_path_read.c fuse_path_write.c )){
+foreach my $f (qw( esfs.c params.h log.c log.h snapshot.c util.c stat.c fuse_fd_close.c fuse_fd_read.c fuse_fd_write.c fuse_path_open.c fuse_path_read.c fuse_path_write.c )){
 my $fdest = $f;
 $fdest =~ s/\./_c./;
 $m .= <<THEEND

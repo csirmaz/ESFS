@@ -57,6 +57,7 @@
 
 #include "util_c.c"
 #include "snapshot_c.c"
+#include "stat_c.c"
 #include "fuse_fd_close_c.c"
 #include "fuse_fd_read_c.c"
 #include "fuse_fd_write_c.c"
