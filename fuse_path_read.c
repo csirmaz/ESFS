@@ -46,7 +46,7 @@ int $getattr(const char *path, struct stat *statbuf)
 {
    $$ALL_PATHS
 
-   log_msg("getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
+   log_msg("  getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
 
    if(lstat(fpath, statbuf) == 0){ return 0; }
    return -errno;
@@ -71,7 +71,7 @@ int $readlink(const char *path, char *link, size_t size)
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
+   log_msg("  readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
 
    ret = readlink(fpath, link, size - 1);
    if(unlikely(ret == -1)){
@@ -98,7 +98,7 @@ int $access(const char *path, int mask)
 {
    $$ALL_PATHS
 
-   log_msg("access(path=\"%s\", mask=0%o)\n", path, mask);
+   log_msg("  access(path=\"%s\", mask=0%o)\n", path, mask);
 
    if(access(fpath, mask) == 0){ return 0; }
    return -errno;

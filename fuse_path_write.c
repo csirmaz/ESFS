@@ -57,7 +57,9 @@ int $mkdir(const char *path, mode_t mode)
    char newsnpath[$$PATH_MAX];
    $$IF_PATH_MAIN
 
-      log_msg("mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+      log_msg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+
+      // TODO mark dir as nonexistend in snapshot
 
       if(mkdir(fpath, mode) == 0){ return 0; }
       return -errno;
@@ -97,7 +99,7 @@ int $unlink(const char *path)
 int $rmdir(const char *path)
 {
    // log_msg("rmdir(path=\"%s\")\n", path);
-   $$IF_PATH_MAIN_ONLY
+   $$IF_PATH_MAIN_ONLY // TODO implement deleting snapshot
 
    if(rmdir(fpath) == 0){ return 0; }
    return -errno;
@@ -110,7 +112,7 @@ int $rmdir(const char *path)
 int $rename(const char *path, const char *newpath)
 {
    $$IF_MULTI_PATHS_MAIN_ONLY
-   log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+   log_msg("  rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
    if(rename(fpath, fnewpath) == 0){ return 0; }
    return -errno;
 }
@@ -126,7 +128,7 @@ int $symlink(const char *dest, const char *path)
 {
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("\nsymlink(dest=\"%s\", path=\"%s\")\n", dest, path);
+   log_msg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
 
    if(symlink(dest, fpath) == 0){ return 0; }
    return -errno;

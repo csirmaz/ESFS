@@ -57,9 +57,10 @@ int $open(const char *path, struct fuse_file_info *fi)
 {
    int fd;
    struct $fd_t *mfd;
-   $$IF_PATH_MAIN_ONLY
 
-   log_msg(" open(path\"%s\", fi=0x%08x)\n", path, fi);
+   $$IF_PATH_MAIN_ONLY // TODO need to open files in snapshots (for reading)
+
+   log_msg("  open(path\"%s\", fi=0x%08x)\n", path, fi);
 
    mfd = malloc(sizeof(struct $fd_t));
    if(mfd == NULL){ return -ENOMEM; }
@@ -67,12 +68,10 @@ int $open(const char *path, struct fuse_file_info *fi)
    mfd->is_main = 1;
 
    if((fi->flags & O_WRONLY) == 0 && (fi->flags & O_RDWR) == 0){ // opening for read-only
-      $dlogdbg("Opening %s for read-only, skipping opening map file\n", fpath);
-      mfd->mapfd = -2;
+      $n_open_rdonly(mfd);
    }else{ // opening for writing
       // Save the current status of the file by initialising the map file.
       // We don't delete this even if the subsequent operation fails.
-      $dlogdbg("Opening map file for %s\n", fpath);
       fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
       if(fd < 0){
          free(mfd);
@@ -86,7 +85,7 @@ int $open(const char *path, struct fuse_file_info *fi)
       return -errno;
    }
 
-   log_msg(" open success fd=%d\n", fd);
+   log_msg("  open success main fd=%d\n", fd);
 
    mfd->mainfd = fd;
    fi->fh = (intptr_t) mfd;
@@ -112,9 +111,10 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
    int fd;
    struct $fd_t *mfd;
+
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("\ncreate(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
+   log_msg("  create(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
 
    mfd = malloc(sizeof(struct $fd_t));
    if(mfd == NULL){ return -ENOMEM; }
@@ -155,9 +155,10 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 //   int (*opendir) (const char *, struct fuse_file_info *);
 int $opendir(const char *path, struct fuse_file_info *fi)
 {
-   // log_msg("\nopendir(path=\"%s\", fi=0x%08x)\n", path, fi);
    DIR *dp;
-   $$IF_PATH_MAIN_ONLY
+   $$IF_PATH_MAIN_ONLY // TODO need to open dirs in snapshots
+
+   log_msg("  opendir(path=\"%s\", fi=0x%08x)\n", path, fi);
 
    dp = opendir(fpath);
    if(unlikely(dp == NULL)){ return -errno; }

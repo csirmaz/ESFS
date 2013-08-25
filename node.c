@@ -126,7 +126,7 @@
  *   mfd->mapfd, the map file opened for RDWR or -1 if there are no snapshots
  *   mfd->datfd, the dat file opened for WR or -1 if there are no snapshots
  * Saves
- *   stats of the file into the map file
+ *   stats of the file into the map file, unless the map file already exists.
  * Returns
  *   0 - on success
  *  -errno - on failure
@@ -187,7 +187,7 @@ int $n_open(struct $fd_t *mfd, const char *vpath, const char *fpath, const struc
             return -fd;
          }
          if(unlikely(ret != sizeof(struct $mapheader_t))){
-            $dlogi("n_open: Only read %d bytes from .map at %s\n", ret, fmap);
+            $dlogi("n_open: Only read %d bytes instead of %ld from .map at %s. Broken FS?\n", ret, sizeof(struct $mapheader_t), fmap);
             return -EIO;
          }
          if(mapheader.write_v[0] != '\0'){
@@ -248,6 +248,15 @@ int $n_open(struct $fd_t *mfd, const char *vpath, const char *fpath, const struc
    mfd->mapfd = fd;
    return 0;
 }
+
+
+// Marks main FD as read-only
+static void $n_open_rdonly(struct $fd_t *mfd)
+{
+   mfd->mapfd = -2;
+   mfd->datfd = -2;
+}
+
 
 // $push_whole_file
 
