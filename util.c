@@ -118,7 +118,7 @@
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
-#define $$ADDNSUFFIX(newpath, olpdath, fix, fixlen) \
+#define $$ADDNSUFFIX_RET(newpath, olpdath, fix, fixlen) \
    if(likely(strlen(oldpath) < $$PATH_MAX - fixlen)){ \
       strcpy(newpath, oldpath); \
       strncat(newpath, fix, fixlen); \
@@ -131,7 +131,7 @@
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
-#define $$ADDNPREFIX(newpath, oldpath, fix, fixlen) \
+#define $$ADDNPREFIX_RET(newpath, oldpath, fix, fixlen) \
    $$PATH_LEN_T len; \
    len = $$PATH_MAX - fixlen; \
    if(likely(strlen(oldpath) < len)){ \
@@ -162,7 +162,7 @@
 // -ENAMETOOLONG - if the new path is too long
 static int $get_data_path(char *newpath, const char *oldpath)
 {
-   $$ADDNSUFFIX(newpath, oldpath, $$EXT_DATA, $$EXT_LEN)
+   $$ADDNSUFFIX_RET(newpath, oldpath, $$EXT_DATA, $$EXT_LEN)
 }
 
 
@@ -172,7 +172,7 @@ static int $get_data_path(char *newpath, const char *oldpath)
 // -ENAMETOOLONG - if the new path is too long
 static int $get_hid_path(char *newpath, const char *oldpath)
 {
-   $$ADDNSUFFIX(newpath, oldpath, $$EXT_HID, $$EXT_LEN)
+   $$ADDNSUFFIX_RET(newpath, oldpath, $$EXT_HID, $$EXT_LEN)
 }
 
 
@@ -182,7 +182,7 @@ static int $get_hid_path(char *newpath, const char *oldpath)
 // -ENAMETOOLONG - if the mapped path is too long
 static int $map_path(char *fpath, const char *path, struct $fsdata_t *fsdata)
 {
-   $$ADDNPREFIX(fpath, path, fsdata->rootdir, fsdata->rootdir_len)
+   $$ADDNPREFIX_RET(fpath, path, fsdata->rootdir, fsdata->rootdir_len)
 }
 
 
@@ -261,7 +261,7 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 // -ENAMETOOLONG - if the new path is too long
 static int $sn_id_to_fpath(char *fpath, const char *id, struct $fsdata_t *fsdata)
 {
-   $$ADDNPREFIX(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
+   $$ADDNPREFIX_RET(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
 }
 
 
