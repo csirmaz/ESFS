@@ -73,7 +73,7 @@ int $open(const char *path, struct fuse_file_info *fi)
       // Save the current status of the file by initialising the map file.
       // We don't delete this even if the subsequent operation fails.
       $dlogdbg("Opening map file for %s\n", fpath);
-      fd = $open_init_map(mfd, path, fpath, fsdata); // fd only stores a success flag here
+      fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
       if(fd < 0){
          free(mfd);
          return -fd;
@@ -123,7 +123,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
    // Save the current status of the file by initialising the map file.
    // We don't delete this even if the subsequent operation fails.
-   fd = $open_init_map(mfd, path, fpath, fsdata); // fd only stores a success flag here
+   fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
    if(fd < 0){
       free(mfd);
       return -fd;

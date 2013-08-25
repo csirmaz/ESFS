@@ -104,6 +104,18 @@ int $rmdir(const char *path)
 }
 
 
+
+   /** Rename a file */
+//   int (*rename) (const char *, const char *);
+int $rename(const char *path, const char *newpath)
+{
+   $$IF_MULTI_PATHS_MAIN_ONLY
+   log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+   if(rename(fpath, fnewpath) == 0){ return 0; }
+   return -errno;
+}
+
+
    /** Create a symbolic link */
 //   int (*symlink) (const char *, const char *);
 // The parameters here are a little bit confusing, but do correspond
@@ -211,21 +223,6 @@ int $utimens(const char *path, const struct timespec tv[2])
 
 /* Unsupported operations
  ***********************************************/
-
-
-   /** Rename a file */
-//   int (*rename) (const char *, const char *);
-int $rename(const char *path, const char *newpath)
-{
-   // Due to its complexity, this is not currently supported by ESFS.
-   return -EOPNOTSUPP;
-
-   /*
-   log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
-   if(rename(fpath, fnewpath) == 0){ return 0; }
-   return -errno;
-   */
-}
 
 
    /** Create a hard link to a file */

@@ -64,13 +64,23 @@
 #define $$SNDIR    "/snapshots"
 #define $$SNDIR_LEN 10 // Without null character
 
-#define $$EXT_DATA ".dat"
+#define $$EXT_DAT ".dat"
 #define $$EXT_MAP ".map"
 #define $$EXT_HID ".hid"
 #define $$EXT_LEN 4 // Without null character
 
 #define $$DIRSEP "/"
 #define $$DIRSEPCH '/'
+
+// Check consistency of constants
+// Returns 0 on success, -1 on failure
+int $check_params(void){
+   if(strlen($$SNDIR) != $$SNDIR_LEN){ return -1; }
+   if(strlen($$EXT_DAT) != $$EXT_LEN){ return -1; }
+   if(strlen($$EXT_HID) != $$EXT_LEN){ return -1; }
+   if(strlen($$DIRSEP) != 1){ return -1; }
+   return 0;
+}
 
 
 // Global FS private data
@@ -102,10 +112,12 @@ struct $snpath_t {
 // MAP file header
 // ---------------
 
-// TODO To make FS files portable, the types used here should be reviewed.
+// TODO To make FS files portable, the types used here should be reviewed. and proper (de)serialisation implemented.
 struct $mapheader_t {
    int exists; // whether the file exists
-   struct stat fstat;
+   struct stat fstat; // saved parameters of the file
+   char read_v[$$PATH_MAX]; // the read directive: going forward, read the dest instead. Contains a virtual path or an empty string.
+   char write_v[$$PATH_MAX]; // the write directive: in this snapshot, write the dest instead. Contains a virtual path or an empty string.
    char padding[200];
 };
 
@@ -117,7 +129,8 @@ struct $fd_t {
    int is_main; // 1 if this is a main file; 0 otherwise
    // MAIN FILE FD:
    int mainfd; // filehandle to the main file
-   int mapfd; // filehandle to the map file; -1 if there are no snapshots; -2 if the main file is opened readonly
+   int mapfd; // filehandle to the map file; -1 if there are no snapshots; -2 if the main file is opened for read only
+   int datfd; // filehandle to the dat file; -1 if there are no snapshots; -2 if the main file is opened for read only
 };
 
 // CAST

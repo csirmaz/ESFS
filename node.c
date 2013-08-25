@@ -47,7 +47,8 @@
  *
  * The .map file contains a list of pointers for each block in the file
  * pointing to blocks in the .dat file, which stores data in those blocks
- * that have been modified since the creation of the snapshot.
+ * that have been modified since the creation of the snapshot. If this
+ * pointer is non-0, the block need not be saved again.
  *
  * All original dentry information about a file is saved in the header
  * of the .map file, including its size.
@@ -57,41 +58,114 @@
  *
  * The presence of the .map file means that the file in the main space is
  * already dirty, and dentry changes need not be saved again in the snapshot.
+ *
+ * Renames
+ * =======
+ *
+ * Suppose files A and B have already been modified since the last snapshot:
+ *
+ * A.dat    A(A)
+ * A.map
+ *
+ * B.dat    B(B)
+ * B.map
+ *
+ * Now B is renamed to C.
+ * We don't want to handle it as delete(B) and create(C).
+ * Then we need to know that when we write C, any old blocks need to be saved
+ * in B.dat. This is saved in the header of C.map (in addition to anything
+ * else that might have already been there!).
+ *
+ * A.dat            A(A)
+ * A.map
+ *
+ * B.dat
+ * B.map
+ *
+ * C.map:write B    C(B)
+ *
+ * When we want to read B from the snapshot, we also need to know that
+ * some of the data might be in C (going forward, if this is not
+ * the latest snapshot:
+ *
+ * A.dat
+ * A.map           A(A)
+ *
+ * B.dat
+ * B.map:read C
+ *
+ * C.map:write B   C(B)
+ *
+ * When opening the map file, follow the "write" directive.
+ * On subsequent renames, update the read directive in the map.
+ * On rename/delete, remove the write directive.
+ *
+ * Reading a snapshot
+ * ==================
+ *
+ * Although a snapshot can be thought of as an overlay, reading
+ * starts at the snapshot.
+ *
+ * Get the map file.
+ * If there is no map file, or it is too short, or it contains
+ * 0 for the block, go to the next snapshot (forward in time).
+ * But before doing so, if there is a "read" directive in the map,
+ * switch the path.
+ *
+ * File stats come from the first map file, so "read" directives
+ * play no role there.
+ *
+ * Ultimately, the main file can be used.
  */
 
 
-/* Opens (and initialises, if necessary) the .map file,
- * saving the information about a file that usually goes into the directory
- * entry, like flags, permissions, and, most importantly, size.
+/* Opens (and initialises, if necessary) the .map and .dat files.
+ * Call this before modifying any file, including renaming it.
  *   vpath is the virtual path to the file in the main space.
  * Sets
- *   mfd->mapfd, the map file opened for RDWR or -1
+ *   mfd->mapfd, the map file opened for RDWR or -1 if there are no snapshots
+ *   mfd->datfd, the dat file opened for WR or -1 if there are no snapshots
+ * Saves
+ *   stats of the file into the map file
  * Returns
  *   0 - on success
  *  -errno - on failure
  */
-int $open_init_map(struct $fd_t *mfd, const char *vpath, const char *fpath, const struct $fsdata_t *fsdata)
+int $n_open(struct $fd_t *mfd, const char *vpath, const char *fpath, const struct $fsdata_t *fsdata)
 {
    char fmap[$$PATH_MAX];
+   char fdat[$$PATH_MAX];
    int fd;
    int ret;
    int waserror = 0;
-   struct $mapheader_t *mapheader;
+   struct $mapheader_t mapheader;
+   $$PATH_LEN_T plen;
 
    // No snapshots?
    if(fsdata->sn_is_any == 0){
-      $dlogdbg("Map init: no snapshots found, so returning\n");
+      $dlogdbg("n_open: no snapshots found, so returning\n");
       mfd->mapfd = -1;
+      mfd->datfd = -1;
       return 0;
    }
 
-   $$ADDNPSFIX_CONT(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_LEN)
-   $dlogdbg("Map init: using file %s\n", fmap);
+   // Get the path of the map & dat files
+   $$ADDNPSFIX_CONT(fmap, fdat, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_DAT, $$EXT_LEN)
 
    //////////////////////////////////
-   // TODO implement mkdir -p here //
-   //////////////////////////////////
+   // TODO implement mkdir -p here // TODO which creates directories mirroring them in the main space
+   ////////////////////////////////// (create them when THEY are modified)
 
+   // Open or create the dat file
+   fd = open(fdat, O_WRONLY | O_CREAT, S_IRWXU);
+   if(fd == -1){
+      fd = errno;
+      $dlogi("n_open: Failed to open .dat at %s, error %d = %s\n", fdat, fd, strerror(fd));
+      return -fd;
+   }
+   mfd->datfd = fd;
+
+   // Open or create the map file
    fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU);
 
    if(fd == -1){
@@ -101,55 +175,67 @@ int $open_init_map(struct $fd_t *mfd, const char *vpath, const char *fpath, cons
          // We open the .map file again.
          fd = open(fmap, O_RDWR);
          if(unlikely(fd == -1)){
-            $dlogi("Map init: Failed to open .map again at %s, error %d = %s\n", fmap, errno, strerror(errno));
-            return -errno;
+            fd = errno;
+            $dlogi("n_open: Failed to open .map again at %s, error %d = %s\n", fmap, fd, strerror(fd));
+            return -fd;
          }
+
+         // We need to check if there is a "write" directive in here.
+         ret = pread(fd, &mapheader, sizeof(struct $mapheader_t), 0);
+         if(unlikely(ret == -1)){
+            $dlogi("n_open: Failed to read .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
+            return -fd;
+         }
+         if(unlikely(ret != sizeof(struct $mapheader_t))){
+            $dlogi("n_open: Only read %d bytes from .map at %s\n", ret, fmap);
+            return -EIO;
+         }
+         if(mapheader.write_v[0] != '\0'){
+            // Found a write directive, which we need to follow. This is a virtual path.
+            // Get the full path in fmap
+            $$ADDNPREFIX_CONT(fmap, mapheader.write_v, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len)
+
+            return $n_open(mfd, mapheader.write_v, fmap, fsdata);
+         }
+
          mfd->mapfd = fd;
          return 0;
       }
-      $dlogi("Map init: Failed to open .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
+      $dlogi("n_open: Failed to open .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
       return -fd;
    }
 
    do{
       // We created the .map file; let's save data about the main file.
-      mapheader = malloc(sizeof(struct $mapheader_t));
-      if(mapheader == NULL){
-         waserror = ENOMEM;
-         break;
+
+      mapheader.exists = 1;
+      mapheader.read_v[0] = '\0';
+      mapheader.write_v[0] = '\0';
+
+      // stat the file
+      if(lstat(fpath, &(mapheader.fstat)) != 0){
+         ret = errno;
+         if(ret == ENOENT){ // main file does not exist (yet)
+            mapheader.exists = 0;
+         }else{ // some other error
+            $dlogi("n_open: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
+            waserror = ret;
+            break;
+         }
       }
 
-      do{
-         mapheader->exists = 1;
-
-         // stat the file
-         if(lstat(fpath, &(mapheader->fstat)) != 0){
-            ret = errno;
-            if(ret == ENOENT){ // main file does not exist (yet)
-               mapheader->exists = 0;
-            }else{ // some other error
-               $dlogi("Map init: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
-               waserror = ret;
-               break;
-            }
-         }
-
-         // write into the map file
-         ret = pwrite(fd, mapheader, sizeof(struct $mapheader_t), 0);
-         if(unlikely(ret == -1)){
-            $dlogi("Map init: Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
-            waserror = errno;
-            break;
-         }
-         if(unlikely(ret != sizeof(struct $mapheader_t))){
-            $dlogi("Map init: Failed: only written %d bytes into .map header at %s\n", ret, fmap);
-            waserror = EIO;
-            break;
-         }
-
-      }while(0);
-
-      free(mapheader);
+      // write into the map file
+      ret = pwrite(fd, &mapheader, sizeof(struct $mapheader_t), 0);
+      if(unlikely(ret == -1)){
+         $dlogi("n_open: Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
+         waserror = errno;
+         break;
+      }
+      if(unlikely(ret != sizeof(struct $mapheader_t))){
+         $dlogi("n_open: Failed: only written %d bytes into .map header at %s\n", ret, fmap);
+         waserror = EIO;
+         break;
+      }
 
    }while(0);
 

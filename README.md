@@ -9,5 +9,4 @@ ESFS uses an underlying filesystem to provide support for snapshots. Its primary
 - Only the earliest snapshot can be deleted
 - The perfomrance os reading snapshots does not need to be good
 - Special nodes (FIFO, etc.) and hard links are not allowed
-- Due to their complexity, renames are not currently allowed
 

@@ -127,43 +127,43 @@
    return -ENAMETOOLONG;
 
 
+// Adds a prefix to a path (MAY RETURN)
+// Needs $$PATH_LEN_T plen
+// Returns:
+// -ENAMETOOLONG - if the new path is too long
+#define $$ADDNPREFIX_CONT(newpath, oldpath, fix, fixlen) \
+   plen = $$PATH_MAX - fixlen; \
+   if(unlikely(strlen(oldpath) >= plen)){ \
+      return -ENAMETOOLONG; \
+   } \
+   strcpy(newpath, fix); \
+   strncat(newpath, oldpath, plen); \
+
+
 // Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
 #define $$ADDNPREFIX_RET(newpath, oldpath, fix, fixlen) \
-   $$PATH_LEN_T len; \
-   len = $$PATH_MAX - fixlen; \
-   if(likely(strlen(oldpath) < len)){ \
-      strcpy(newpath, fix); \
-      strncat(newpath, oldpath, len); \
-      return 0; \
-   } \
-   return -ENAMETOOLONG;
+   $$PATH_LEN_T plen; \
+   $$ADDNPREFIX_CONT(newpath, oldpath, fix, fixlen) \
+   return 0;
 
 
-// Adds a prefix and a suffix to a path (MAY RETURN)
+// Adds a prefix and two suffixes to a path (MAY RETURN)
+// Needs $$PATH_LEN_T plen
 // Returns -ENAMETOOLONG - if the new path is too long
 // Otherwise CONTINUES
-#define $$ADDNPSFIX_CONT(newpath, oldpath, prefix, prefixlen, suffix, suffixlen) \
-   $$PATH_LEN_T len; \
-   len = $$PATH_MAX - prefixlen - suffixlen; \
-   if(unlikely(strlen(oldpath) >= len)){ \
+#define $$ADDNPSFIX_CONT(newpath1, newpath2, oldpath, prefix, prefixlen, suffix1, suffix2, suffixlen) \
+   plen = $$PATH_MAX - prefixlen - suffixlen; \
+   if(unlikely(strlen(oldpath) >= plen)){ \
       return -ENAMETOOLONG; \
    } \
-   strcpy(newpath, prefix); \
-   strncat(newpath, oldpath, len); \
-   strncat(newpath, suffix, suffixlen);
-
-
-// Adds data suffix to a path
-// Returns:
-// 0 - success
-// -ENAMETOOLONG - if the new path is too long
-static int $get_data_path(char *newpath, const char *oldpath)
-{
-   $$ADDNSUFFIX_RET(newpath, oldpath, $$EXT_DATA, $$EXT_LEN)
-}
+   strcpy(newpath1, prefix); \
+   strncat(newpath1, oldpath, plen); \
+   strcpy(newpath2, newpath1); \
+   strncat(newpath1, suffix1, suffixlen); \
+   strncat(newpath2, suffix2, suffixlen);
 
 
 // Adds "hidden" suffix to a path
@@ -264,13 +264,3 @@ static int $sn_id_to_fpath(char *fpath, const char *id, const struct $fsdata_t *
    $$ADDNPREFIX_RET(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
 }
 
-
-// Check consistency of constants
-// Returns 0 on success, -1 on failure
-int $check_params(void){
-   if(strlen($$SNDIR) != $$SNDIR_LEN){ return -1; }
-   if(strlen($$EXT_DATA) != $$EXT_LEN){ return -1; }
-   if(strlen($$EXT_HID) != $$EXT_LEN){ return -1; }
-   if(strlen($$DIRSEP) != 1){ return -1; }
-   return 0;
-}
