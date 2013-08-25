@@ -38,6 +38,14 @@
  */
 
 
+/* SPECIAL COMMANDS
+ * ================
+ *
+ * Issuing "mkdir /snapshots/<ID>" creates a new snapshot.
+ * Issuing "rmdir /snapshots" removes the earliest snapshot. // TODO not implemented yet
+ */
+
+
    /** Create a directory
     *
     * Note that the mode argument may not have the type specification
@@ -47,12 +55,29 @@
 //   int (*mkdir) (const char *, mode_t);
 int $mkdir(const char *path, mode_t mode)
 {
-   $$IF_PATH_MAIN_ONLY
+   char newsnpath[$$PATH_MAX];
+   $$IF_PATH_MAIN
 
-   log_msg("mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+      log_msg("mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
-   if(mkdir(fpath, mode) == 0){ return 0; }
-   return -errno;
+      if(mkdir(fpath, mode) == 0){ return 0; }
+      return -errno;
+
+   $$ELIF_PATH_SN
+
+      // Create a new snapshot
+
+      if(snpath->is_there != 1){
+         ret = -EFAULT; // "Bad address" if wrong path was used
+      }else if($sn_id_to_fpath(newsnpath, snpath->id, fsdata) != 0){
+         ret = -ENAMETOOLONG;  // if path gets too long
+      }else if($sn_create(fsdata, newsnpath) != 0){
+         ret = -EIO; // If error occurred while trying to create snapshot; check logs.
+      }else{
+         ret = 0;
+      }
+
+   $$FI_PATH
 }
 
 

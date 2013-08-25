@@ -42,6 +42,7 @@
 
 
 // Use this when the command writes - we don't allow that in the snapshot dir, only in the main space.
+// Uses path; Defines fpath, fsdata
 #define $$IF_PATH_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
    struct $fsdata_t *fsdata; \
@@ -52,6 +53,7 @@
    }
 
 // Use this when there are two paths, path and newpath, and the command writes.
+// Uses path; Defines fpath, fnewpath, fsdata
 #define $$IF_MULTI_PATHS_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
    char fnewpath[$$PATH_MAX]; \
@@ -68,21 +70,92 @@
 
 
 // Use these when there are different things to do in the two spaces
+// Uses path; Defines fpath, fsdata, snpath, ret
 #define $$IF_PATH_MAIN \
    char fpath[$$PATH_MAX]; \
    struct $fsdata_t *fsdata; \
    struct $snpath_t *snpath; \
+   int ret = -EBADE; \
    fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
    switch($cmpath(fpath, path, fsdata)){ \
       case 0 :
 
+// Uses snpath, path
+// DO NOT RETURN FROM THE FOLLOWING BLOCK! SET 'ret' INSTEAD!
 #define $$ELIF_PATH_SN \
       case -EACCES : \
+         snpath = malloc(sizeof(struct $snpath_t)); \
+         if(snpath == NULL){ return -ENOMEM; } \
          $decompose_sn_path(snpath, path);
 
+// Uses ret
 #define $$FI_PATH \
+         free(snpath); \
+         return ret; \
+      case -ENAMETOOLONG : return -ENAMETOOLONG; \
+   } \
+   return -EFAULT;
+
+
+
+// Use this to allow the operation everywhere.
+// TODO Later, replace this with something that hides .hid files
+// and deals with .dat extensions on non-directories.
+// Uses path; Defines fpath, fsdata
+#define $$ALL_PATHS \
+   char fpath[$$PATH_MAX]; \
+   struct $fsdata_t *fsdata; \
+   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   switch($map_path(fpath, path, fsdata)){ \
       case -ENAMETOOLONG : return -ENAMETOOLONG; \
    }
+
+
+// Adds a suffix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+#define $$ADDNSUFFIX(newpath, olpdath, fix, fixlen) \
+   if(likely(strlen(oldpath) < $$PATH_MAX - fixlen)){ \
+      strcpy(newpath, oldpath); \
+      strncat(newpath, fix, fixlen); \
+      return 0; \
+   } \
+   return -ENAMETOOLONG;
+
+
+// Adds a prefix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+#define $$ADDNPREFIX(newpath, oldpath, fix, fixlen) \
+   $$PATH_LEN_T len; \
+   len = $$PATH_MAX - fixlen; \
+   if(likely(strlen(oldpath) < len)){ \
+      strcpy(newpath, fix); \
+      strncat(newpath, oldpath, len); \
+      return 0; \
+   } \
+   return -ENAMETOOLONG;
+
+// Adds data suffix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+static int $get_data_path(char *newpath, const char *oldpath)
+{
+   $$ADDNSUFFIX(newpath, oldpath, $$EXT_DATA, $$EXT_LEN)
+}
+
+
+// Adds "hidden" suffix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+static int $get_hid_path(char *newpath, const char *oldpath)
+{
+   $$ADDNSUFFIX(newpath, oldpath, $$EXT_HID, $$EXT_LEN)
+}
 
 
 // Maps virtual path into real path
@@ -91,16 +164,7 @@
 // -ENAMETOOLONG - if the mapped path is too long
 static int $map_path(char *fpath, const char *path, struct $fsdata_t *fsdata)
 {
-   $$PATH_LEN_T pl;
-
-   // Add prefix of root folder to map to underlying file
-   pl = $$PATH_MAX - fsdata->rootdir_len;
-   if(likely(strlen(path) < pl)){
-      strcpy(fpath, fsdata->rootdir);
-      strncat(fpath, path, pl);
-      return 0;
-   }
-   return -ENAMETOOLONG;
+   $$ADDNPREFIX(fpath, path, fsdata->rootdir, fsdata->rootdir_len)
 }
 
 
@@ -127,9 +191,10 @@ static int $cmpath(char *fpath, const char *path, struct $fsdata_t *fsdata)
 // 0 - if the string is "/snapshots" or "/snapshots?" (from $cmpath we'll know that ?='/') or "/snapshots//"
 // 1 - if the string is "/snapshots/ID($|/)"
 // 2 - if the string is "/snapshots/ID/..."
-static int $decompose_sn_path(struct $snpath_t *snpath, char *path)
+static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 {
    $$PATH_LEN_T len;
+   $$PATH_LEN_T idlen;
    char *idstart;
    char *nextslash;
 
@@ -140,12 +205,12 @@ static int $decompose_sn_path(struct $snpath_t *snpath, char *path)
       return 0;
    }
 
-   idstart = path + $$SNDIR_LEN; // points to the slash at the end of "/snapshots/"
+   idstart = $$SNDIR_LEN + path; // points to the slash at the end of "/snapshots/"
    nextslash = strchr(idstart + 1, $$DIRSEPCH);
 
    if(nextslash == NULL){ // there's no next '/', so the string must be "/snapshots/ID"
       snpath->is_there = 1;
-      strncpy(snpath->id, idstart, len - $$SNDIR_LEN);
+      strcpy(snpath->id, idstart);
       return 1;
    }
 
@@ -156,45 +221,29 @@ static int $decompose_sn_path(struct $snpath_t *snpath, char *path)
 
    if(nextslash == path + len - 1){ // the next slash the last character, so "/snapshots/ID/"
       snpath->is_there = 1;
-      strncpy(snpath->id, idstart, len - $$SNDIR_LEN - 1);
+      idlen = len - $$SNDIR_LEN - 1;
+      strncpy(snpath->id, idstart, idlen);
+      snpath->id[idlen] = '\0';
       return 1;
    }
 
    // otherwise we've got "/snapshots/ID/..."
    snpath->is_there = 2;
-   strncpy(snpath->id, idstart, nextslash - idstart);
+   idlen = nextslash - idstart;
+   strncpy(snpath->id, idstart, idlen);
+   snpath->id[idlen] = '\0';
    strcpy(snpath->inpath, nextslash);
    return 0;
 }
 
 
-// Adds data suffix to a path
+// Map snapshot ID ("/ID") into a real path
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
-static int $get_data_path(char *newpath, const char *oldpath)
+static int $sn_id_to_fpath(char *fpath, const char *id, struct $fsdata_t *fsdata)
 {
-   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)){
-      strcpy(newpath, oldpath);
-      strncat(newpath, $$EXT_DATA, $$EXT_LEN);
-      return 0;
-   }
-   return -ENAMETOOLONG;
-}
-
-
-// Adds "hidden" suffix to a path
-// Returns:
-// 0 - success
-// -ENAMETOOLONG - if the new path is too long
-static int $get_hid_path(char *newpath, const char *oldpath)
-{
-   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)){
-      strcpy(newpath, oldpath);
-      strncat(newpath, $$EXT_HID, $$EXT_LEN);
-      return 0;
-   }
-   return -ENAMETOOLONG;
+   $$ADDNPREFIX(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
 }
 
 

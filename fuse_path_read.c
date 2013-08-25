@@ -44,7 +44,7 @@
 //   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
 {
-   $$IF_PATH_MAIN_ONLY
+   $$ALL_PATHS
 
    log_msg("getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
 
@@ -96,7 +96,7 @@ int $readlink(const char *path, char *link, size_t size)
 //   int (*access) (const char *, int);
 int $access(const char *path, int mask)
 {
-   $$IF_PATH_MAIN_ONLY
+   $$ALL_PATHS
 
    log_msg("access(path=\"%s\", mask=0%o)\n", path, mask);
 

@@ -75,7 +75,7 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
          $dlogi("Init: creating the snapshots dir\n");
          if(mkdir(fsdata->sn_dir, 0700) == 0){ return 0; }
          ret = errno;
-         $dlog("Init error: mkdir on '%s' failed with '%s'\n", fsdata->sn_dir, strerror(ret));
+         $dlogi("Init error: mkdir on '%s' failed with '%s'\n", fsdata->sn_dir, strerror(ret));
          return -ret;
       }
       $dlogi("Init error: lstat on '%s' failed with '%s'\n", fsdata->sn_dir, strerror(ret));
@@ -87,6 +87,7 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
 
 
 /* Snapshot meta-information
+ * =========================
  *
  * There's a pointer to the latest snapshot in /snapshots/.hid
  *   if there is at least one snapshot
@@ -135,12 +136,14 @@ int $sn_get_latest(struct $fsdata_t *fsdata){
       $dlogi("Get latest sn: reading from %s failed with %d = %s\n", path, ret, strerror(ret));
       return -ret;
    }
-   if(ret != $$PATH_MAX){
-      $dlogi("Get latest sn: reading from %s returned %d bytes instead of %d\n", path, ret, $$PATH_MAX);
+   if(ret == 0 || fsdata->sn_lat_dir[ret] != '\0'){
+      $dlogi("Get latest sn: reading from %s returned 0 bytes or string is not 0-terminated.\n", path);
       return -EIO;
    }
 
    close(fd);
+   fsdata->sn_is_any = 1;
+   $dlogdbg("Get latest sn: found latest snapshot '%s' in '%s'\n", fsdata->sn_lat_dir, path);
    return 0;
 }
 
@@ -156,6 +159,7 @@ int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 {
    int fd;
    int ret;
+   int len;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
    if(unlikely(strlen(fsdata->sn_dir) >= $$PATH_MAX - $$EXT_LEN - 1)){
@@ -172,14 +176,15 @@ int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
       return -fd;
    }
 
-   ret = pwrite(fd, newpath, $$PATH_MAX, 0);
+   len = strlen(newpath) + 1;
+   ret = pwrite(fd, newpath, len, 0);
    if(ret == -1){
       ret = errno;
       $dlogi("Set latest sn: writing to %s failed with %d = %s\n", path, ret, strerror(ret));
       return -ret;
    }
-   if(ret != $$PATH_MAX){
-      $dlogi("Set latest sn: writing to %s returned %d bytes instead of %d\n", path, ret, $$PATH_MAX);
+   if(ret != len){
+      $dlogi("Set latest sn: writing to %s returned %d bytes instead of %d\n", path, ret, len);
       return -EIO;
    }
 
@@ -193,7 +198,7 @@ int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 
 
 // Initialises a new snapshot
-//   path is a real path of the form .../snapshots/ID
+//   path is a real path in the form .../snapshots/ID
 // Returns:
 // 0 - on success
 // -1 - on failure
@@ -201,10 +206,11 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
 {
    int fd;
    int ret;
+   int len;
    int waserror = 0;
    char hid[$$PATH_MAX];
 
-   $dlogi("Creating new snapshot at %s\n", path);
+   $dlogi("Creating new snapshot at '%s'\n", path);
 
    // Create root of snapshot
    if(unlikely(mkdir(path, S_IRWXU) != 0)){
@@ -214,12 +220,15 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
    }
 
    do{
-      // Set up pointer file
-      ret = $get_hid_path(hid, path);
-      if(ret < 0){
-         $dlogi("Creating sn: creating %s failed when getting hid path\n", path);
-         waserror = 1;
-         break;
+      if(fsdata->sn_is_any != 0){
+
+         // Set up pointer file to previos snapshot
+         ret = $get_hid_path(hid, path);
+         if(ret < 0){
+            $dlogi("Creating sn: creating %s failed when getting hid path\n", path);
+            waserror = 1;
+            break;
+         }
 
          fd = open(hid, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
          if(fd == -1){
@@ -231,15 +240,16 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
 
          do{
             // Write into pointer file
-            ret = pwrite(fd, fsdata->sn_lat_dir, $$PATH_MAX, 0);
+            len = strlen(fsdata->sn_lat_dir) + 1;
+            ret = pwrite(fd, fsdata->sn_lat_dir, len, 0);
             if(ret == -1){
                ret = errno;
                $dlogi("Creating sn: writing to %s failed with %d = %s\n", hid, ret, strerror(ret));
                waserror = 1;
                break;
             }
-            if(ret != $$PATH_MAX){
-               $dlogi("Creating sn: writing to %s returned %d bytes instead of %d\n", hid, ret, $$PATH_MAX);
+            if(ret != len){
+               $dlogi("Creating sn: writing to %s returned %d bytes instead of %d\n", hid, ret, len);
                waserror = 1;
                break;
             }
@@ -258,6 +268,14 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
             $dlogi("Creating sn: Cleanup: removing %s\n", hid);
             unlink(hid);
          }
+
+      } else { // else: no snapshots yet
+
+            // Save latest sn
+            if($sn_set_latest(fsdata, path) != 0){
+               waserror = 1;
+               break;
+            }
 
       }
    }while(0);

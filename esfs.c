@@ -34,13 +34,14 @@
  * in this file. To write $, use \$.
  */
 
+// TODO Use Doxygen?
+
 #include "params_c.h"
 
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
-// fcntl -- AT_FDCWD
-#include <fcntl.h>
+#include <fcntl.h> // AT_FDCWD
 #include <fuse.h>
 #include <libgen.h>
 #include <limits.h>
@@ -50,8 +51,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/xattr.h>
-// sys/stat.h -- utimens
-#include <sys/stat.h>
+#include <sys/stat.h> // utimens
 
 #include "log_c.h"
 
@@ -174,7 +174,7 @@ struct fuse_operations $oper = {
   .utimens   = $utimens
 };
 
-void $usage()
+void $usage(void)
 {
    fprintf(stderr, "usage:  esfs [FUSE and mount options] rootDir mountPoint\n");
    abort();

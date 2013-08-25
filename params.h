@@ -64,7 +64,7 @@
 // Parameters
 // ----------
 #define $log(...) log_msg(__VA_ARGS__)
-#define $dlog(...) fprintf(fsdata->logfile, __VA_ARGS__)
+#define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__) // debug messages
 #define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__) // important log lines
 
 // Constants
@@ -79,7 +79,7 @@
  * can be of any length.
  */
 #define $$PATH_MAX PATH_MAX
-#define $$PATH_LEN_T int
+#define $$PATH_LEN_T size_t
 
 // The snapshots directory
 //                  0123456789
