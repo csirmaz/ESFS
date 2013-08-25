@@ -59,7 +59,7 @@ int $open(const char *path, struct fuse_file_info *fi)
    struct $fd_t *mfd;
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("open(path\"%s\", fi=0x%08x)\n", path, fi);
+   log_msg(" open(path\"%s\", fi=0x%08x)\n", path, fi);
 
    mfd = malloc(sizeof(struct $fd_t));
    if(mfd == NULL){ return -ENOMEM; }
@@ -67,10 +67,12 @@ int $open(const char *path, struct fuse_file_info *fi)
    mfd->is_main = 1;
 
    if((fi->flags & O_WRONLY) == 0 && (fi->flags & O_RDWR) == 0){ // opening for read-only
+      $dlogdbg("Opening %s for read-only, skipping opening map file\n", fpath);
       mfd->mapfd = -2;
    }else{ // opening for writing
       // Save the current status of the file by initialising the map file.
       // We don't delete this even if the subsequent operation fails.
+      $dlogdbg("Opening map file for %s\n", fpath);
       fd = $open_init_map(mfd, path, fpath, fsdata); // fd only stores a success flag here
       if(fd < 0){
          free(mfd);
@@ -84,7 +86,7 @@ int $open(const char *path, struct fuse_file_info *fi)
       return -errno;
    }
 
-   log_msg("open success fd=%d\n", fd);
+   log_msg(" open success fd=%d\n", fd);
 
    mfd->mainfd = fd;
    fi->fh = (intptr_t) mfd;

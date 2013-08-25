@@ -80,11 +80,17 @@ int $open_init_map(struct $fd_t *mfd, const char *vpath, const char *fpath, cons
 
    // No snapshots?
    if(fsdata->sn_is_any == 0){
+      $dlogdbg("Map init: no snapshots found, so returning\n");
       mfd->mapfd = -1;
       return 0;
    }
 
-   $$ADDNPSFIX(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_LEN)
+   $$ADDNPSFIX_CONT(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_LEN)
+   $dlogdbg("Map init: using file %s\n", fmap);
+
+   //////////////////////////////////
+   // TODO implement mkdir -p here //
+   //////////////////////////////////
 
    fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU);
 
@@ -95,13 +101,13 @@ int $open_init_map(struct $fd_t *mfd, const char *vpath, const char *fpath, cons
          // We open the .map file again.
          fd = open(fmap, O_RDWR);
          if(unlikely(fd == -1)){
-            $dlogi("Failed to open .map again at %s, error %d = %s\n", fmap, errno, strerror(errno));
+            $dlogi("Map init: Failed to open .map again at %s, error %d = %s\n", fmap, errno, strerror(errno));
             return -errno;
          }
          mfd->mapfd = fd;
          return 0;
       }
-      $dlogi("Failed to open .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
+      $dlogi("Map init: Failed to open .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
       return -fd;
    }
 
@@ -122,7 +128,7 @@ int $open_init_map(struct $fd_t *mfd, const char *vpath, const char *fpath, cons
             if(ret == ENOENT){ // main file does not exist (yet)
                mapheader->exists = 0;
             }else{ // some other error
-               $dlogi("Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
+               $dlogi("Map init: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
                waserror = ret;
                break;
             }
@@ -131,12 +137,12 @@ int $open_init_map(struct $fd_t *mfd, const char *vpath, const char *fpath, cons
          // write into the map file
          ret = pwrite(fd, mapheader, sizeof(struct $mapheader_t), 0);
          if(unlikely(ret == -1)){
-            $dlogi("Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
+            $dlogi("Map init: Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
             waserror = errno;
             break;
          }
          if(unlikely(ret != sizeof(struct $mapheader_t))){
-            $dlogi("Failed: only written %d bytes into .map header at %s\n", ret, fmap);
+            $dlogi("Map init: Failed: only written %d bytes into .map header at %s\n", ret, fmap);
             waserror = EIO;
             break;
          }

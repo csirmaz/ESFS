@@ -114,7 +114,7 @@
    }
 
 
-// Adds a suffix to a path
+// Adds a suffix to a path (STANDALONE - ALWAYS RETURNS!)
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
@@ -127,7 +127,7 @@
    return -ENAMETOOLONG;
 
 
-// Adds a prefix to a path
+// Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
@@ -142,20 +142,18 @@
    return -ENAMETOOLONG;
 
 
-// Adds a prefix and a suffix to a path
-// Returns:
-// 0 - success
-// -ENAMETOOLONG - if the new path is too long
-#define $$ADDNPSFIX(newpath, oldpath, prefix, prefixlen, suffix, suffixlen) \
+// Adds a prefix and a suffix to a path (MAY RETURN)
+// Returns -ENAMETOOLONG - if the new path is too long
+// Otherwise CONTINUES
+#define $$ADDNPSFIX_CONT(newpath, oldpath, prefix, prefixlen, suffix, suffixlen) \
    $$PATH_LEN_T len; \
    len = $$PATH_MAX - prefixlen - suffixlen; \
-   if(likely(strlen(oldpath) < len)){ \
-      strcpy(newpath, prefix); \
-      strncat(newpath, oldpath, len); \
-      strncat(newpath, suffix, suffixlen); \
-      return 0; \
+   if(unlikely(strlen(oldpath) >= len)){ \
+      return -ENAMETOOLONG; \
    } \
-   return -ENAMETOOLONG;
+   strcpy(newpath, prefix); \
+   strncat(newpath, oldpath, len); \
+   strncat(newpath, suffix, suffixlen);
 
 
 // Adds data suffix to a path
