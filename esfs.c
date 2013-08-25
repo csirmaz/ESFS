@@ -224,8 +224,13 @@ int main(int argc, char *argv[])
 
    // Initial things to do
 
+   if($check_params() != 0){
+      fprintf(stderr, "There's a problem with the parameters; ESFS need to be recompiled. Aborting.\n");
+      return 1;
+   }
+
    // Get the main snapshot dir path
-   if($cmpath(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG){
+   if($map_path(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG){
       fprintf(stderr, "Snapshot dir path is too long. Aborting.\n");
       return 1;
    }

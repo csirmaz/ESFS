@@ -67,26 +67,104 @@
    }
 
 
-// Checks and map path (path into fpath)
+// Use these when there are different things to do in the two spaces
+#define $$IF_PATH_MAIN \
+   char fpath[$$PATH_MAX]; \
+   struct $fsdata_t *fsdata; \
+   struct $snpath_t *snpath; \
+   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   switch($cmpath(fpath, path, fsdata)){ \
+      case 0 :
+
+#define $$ELIF_PATH_SN \
+      case -EACCES : \
+         $decompose_sn_path(snpath, path);
+
+#define $$FI_PATH \
+      case -ENAMETOOLONG : return -ENAMETOOLONG; \
+   }
+
+
+// Maps virtual path into real path
+// Puts the mapped path in fpath and returns
+// 0 - if the path is in the main space
+// -ENAMETOOLONG - if the mapped path is too long
+static int $map_path(char *fpath, const char *path, struct $fsdata_t *fsdata)
+{
+   $$PATH_LEN_T pl;
+
+   // Add prefix of root folder to map to underlying file
+   pl = $$PATH_MAX - fsdata->rootdir_len;
+   if(likely(strlen(path) < pl)){
+      strcpy(fpath, fsdata->rootdir);
+      strncat(fpath, path, pl);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
+
+
+// Checks and maps path (path into fpath)
 // Puts the mapped path in fpath and returns
 // 0 - if the path is in the main space
 // -EACCES - if the path is in the snapshot space
 // -ENAMETOOLONG - if the mapped path is too long
 static int $cmpath(char *fpath, const char *path, struct $fsdata_t *fsdata)
 {
-   
+   // If path starts with the snapshot folder
+   if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == $$DIRSEPCH || path[$$SNDIR_LEN] == '\0'))){
+      return -EACCES;
+   }
+
    // Add prefix of root folder to map to underlying file
-   strcpy(fpath, fsdata->rootdir);
-   strncat(fpath, path, $$PATH_MAX - fsdata->rootdir_len);
-   if(likely(strlen(fpath) < $$PATH_MAX)){ // success - fpath is not too long
-      // If path starts with the snapshot folder
-      if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == '/' || path[$$SNDIR_LEN] == '\0'))){
-         return -EACCES;
-      }
+   return $map_path(fpath, path, fsdata); // TODO copy code here to ensure optimisation?
+}
+
+
+// Breaks up a VIRTUAL path in the snapshots space into a struct $snpath_t
+// "/snapshots/ID/dir/dir/file"
+// Returns snpath->is_there:
+// 0 - if the string is "/snapshots" or "/snapshots?" (from $cmpath we'll know that ?='/') or "/snapshots//"
+// 1 - if the string is "/snapshots/ID($|/)"
+// 2 - if the string is "/snapshots/ID/..."
+static int $decompose_sn_path(struct $snpath_t *snpath, char *path)
+{
+   $$PATH_LEN_T len;
+   char *idstart;
+   char *nextslash;
+
+   len = strlen(path);
+   // we know the string starts with "/snapshots"
+   if(len <= $$SNDIR_LEN + 1){ // the string is "/snapshots" or "/snapshots?"
+      snpath->is_there = 0;
       return 0;
    }
-   return -ENAMETOOLONG;
 
+   idstart = path + $$SNDIR_LEN; // points to the slash at the end of "/snapshots/"
+   nextslash = strchr(idstart + 1, $$DIRSEPCH);
+
+   if(nextslash == NULL){ // there's no next '/', so the string must be "/snapshots/ID"
+      snpath->is_there = 1;
+      strncpy(snpath->id, idstart, len - $$SNDIR_LEN);
+      return 1;
+   }
+
+   if(nextslash == idstart + 1){ // the string must be "/snapshots//"
+      snpath->is_there = 0;
+      return 0;
+   }
+
+   if(nextslash == path + len - 1){ // the next slash the last character, so "/snapshots/ID/"
+      snpath->is_there = 1;
+      strncpy(snpath->id, idstart, len - $$SNDIR_LEN - 1);
+      return 1;
+   }
+
+   // otherwise we've got "/snapshots/ID/..."
+   snpath->is_there = 2;
+   strncpy(snpath->id, idstart, nextslash - idstart);
+   strcpy(snpath->inpath, nextslash);
+   return 0;
 }
 
 
@@ -96,12 +174,12 @@ static int $cmpath(char *fpath, const char *path, struct $fsdata_t *fsdata)
 // -ENAMETOOLONG - if the new path is too long
 static int $get_data_path(char *newpath, const char *oldpath)
 {
-   if(unlikely(strlen(oldpath) >= $$PATH_MAX - $$EXT_LEN)){
-      return -ENAMETOOLONG;
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)){
+      strcpy(newpath, oldpath);
+      strncat(newpath, $$EXT_DATA, $$EXT_LEN);
+      return 0;
    }
-   strcpy(newpath, oldpath);
-   strncat(newpath, $$EXT_DATA, $$EXT_LEN);
-   return 0;
+   return -ENAMETOOLONG;
 }
 
 
@@ -111,10 +189,21 @@ static int $get_data_path(char *newpath, const char *oldpath)
 // -ENAMETOOLONG - if the new path is too long
 static int $get_hid_path(char *newpath, const char *oldpath)
 {
-   if(unlikely(strlen(oldpath) >= $$PATH_MAX - $$EXT_LEN)){
-      return -ENAMETOOLONG;
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)){
+      strcpy(newpath, oldpath);
+      strncat(newpath, $$EXT_HID, $$EXT_LEN);
+      return 0;
    }
-   strcpy(newpath, oldpath);
-   strncat(newpath, $$EXT_HID, $$EXT_LEN);
+   return -ENAMETOOLONG;
+}
+
+
+// Check consistency of constants
+// Returns 0 on success, -1 on failure
+int $check_params(void){
+   if(strlen($$SNDIR) != $$SNDIR_LEN){ return -1; }
+   if(strlen($$EXT_DATA) != $$EXT_LEN){ return -1; }
+   if(strlen($$EXT_HID) != $$EXT_LEN){ return -1; }
+   if(strlen($$DIRSEP) != 1){ return -1; }
    return 0;
 }

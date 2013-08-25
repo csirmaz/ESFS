@@ -37,6 +37,21 @@
 // This file contains functions related to saving things in a snapshot
 // and retrieving things from snapshots.
 
+
+/* Save information about a file that usually goes into the directory
+ * entry, like flags, permissions, and, most importantly, size.
+ */
+// $push_dentry
+
+// $push_whole_file
+
+// $pull_directory
+
+// $push_blocks
+
+// $pull_blocks
+
+
 // Create the snapshot dir if necessary.
 // Returns
 // 0 - on success
@@ -47,12 +62,12 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
    struct stat mystat;
    int ret;
 
-   $dlogi("Init: checking the snapshots dir\n");
+   $dlogi("Init: checking the snapshots dir '%s'\n", fsdata->sn_dir);
    
    if(lstat(fsdata->sn_dir, &mystat) == 0){
       // Check if it is a directory
       if(S_ISDIR(mystat.st_mode)){ return 0; }
-      $dlogi("Init error: found something else than a directory at %s\n", fsdata->sn_dir);
+      $dlogi("Init error: found something else than a directory at '%s'\n", fsdata->sn_dir);
       return 1;
    } else {
       ret = errno;
@@ -60,10 +75,10 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
          $dlogi("Init: creating the snapshots dir\n");
          if(mkdir(fsdata->sn_dir, 0700) == 0){ return 0; }
          ret = errno;
-         $dlog("Init error: mkdir on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
+         $dlog("Init error: mkdir on '%s' failed with '%s'\n", fsdata->sn_dir, strerror(ret));
          return -ret;
       }
-      $dlogi("Init error: lstat on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
+      $dlogi("Init error: lstat on '%s' failed with '%s'\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
 
@@ -111,6 +126,8 @@ int $sn_get_latest(struct $fsdata_t *fsdata){
       $dlogi("Get latest sn: opening %s failed with %d = %s\n", path, fd, strerror(fd));
       return -fd;
    }
+
+   // TODO check if the directory really exists before setting sn_lat_dir?
 
    ret = pread(fd, fsdata->sn_lat_dir, $$PATH_MAX, 0);
    if(ret == -1){
@@ -228,7 +245,7 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
             }
 
             // Save latest sn
-            if($sn_set_latest(fsdata, path) < 0){
+            if($sn_set_latest(fsdata, path) != 0){
                waserror = 1;
                break;
             }
@@ -302,16 +319,3 @@ int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to locate the
    return 0;
 }
 
-
-/* Save information about a file that usually goes into the directory
- * entry, like flags, permissions, and, most importantly, size.
- */
-// $push_dentry
-
-// $push_whole_file
-
-// $pull_directory
-
-// $push_blocks
-
-// $pull_blocks

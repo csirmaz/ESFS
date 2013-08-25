@@ -42,10 +42,13 @@
 #ifndef _PARAMS_H_
 #define _PARAMS_H_
 
+#include <limits.h> // for FILE
+#include <stdio.h> // for FILE
+
 // The FUSE API has been changed a number of times.  So, our code
 // needs to define the version of the API that we assume.  As of this
 // writing, the most current API version is 26
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 26 // TODO
 
 // For libraries
 // -------------
@@ -76,9 +79,10 @@
  * can be of any length.
  */
 #define $$PATH_MAX PATH_MAX
+#define $$PATH_LEN_T int
 
 // The snapshots directory
-//                  1234567890
+//                  0123456789
 #define $$SNDIR    "/snapshots"
 #define $$SNDIR_LEN 10 // Without null character
 
@@ -87,12 +91,10 @@
 #define $$EXT_LEN 4 // Without null character
 
 #define $$DIRSEP "/"
+#define $$DIRSEPCH '/'
 
 // Global FS private data
 // ----------------------
-
-#include <limits.h>
-#include <stdio.h>
 
 struct $fsdata_t {
     FILE *logfile;
@@ -106,9 +108,18 @@ struct $fsdata_t {
 // Retrieve and cast
 #define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
 
+// A path inside the snapshots space
+// ---------------------------------
+
+struct $snpath_t {
+   int is_there; // 0=nothing, 1=ID, 2=ID&inpath -- always check this before using the strings
+   char id[$$PATH_MAX]; // e.g. "/ID"
+   char inpath[$$PATH_MAX]; // e.g. "/dir/dir/file"
+};
+
 // In case it matters
 // ------------------
 #define likely(x) (__builtin_expect((x), 1))
 #define unlikely(x) (__builtin_expect((x), 0))
-   
+
 #endif
