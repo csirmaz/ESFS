@@ -180,7 +180,7 @@ static int $get_hid_path(char *newpath, const char *oldpath)
 // Puts the mapped path in fpath and returns
 // 0 - if the path is in the main space
 // -ENAMETOOLONG - if the mapped path is too long
-static int $map_path(char *fpath, const char *path, struct $fsdata_t *fsdata)
+static int $map_path(char *fpath, const char *path, const struct $fsdata_t *fsdata)
 {
    $$ADDNPREFIX_RET(fpath, path, fsdata->rootdir, fsdata->rootdir_len)
 }
@@ -191,7 +191,7 @@ static int $map_path(char *fpath, const char *path, struct $fsdata_t *fsdata)
 // 0 - if the path is in the main space
 // -EACCES - if the path is in the snapshot space
 // -ENAMETOOLONG - if the mapped path is too long
-static int $cmpath(char *fpath, const char *path, struct $fsdata_t *fsdata)
+static int $cmpath(char *fpath, const char *path, const struct $fsdata_t *fsdata)
 {
    // If path starts with the snapshot folder
    if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == $$DIRSEPCH || path[$$SNDIR_LEN] == '\0'))){
@@ -213,8 +213,8 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 {
    $$PATH_LEN_T len;
    $$PATH_LEN_T idlen;
-   char *idstart;
-   char *nextslash;
+   const char *idstart;
+   const char *nextslash;
 
    len = strlen(path);
    // we know the string starts with "/snapshots"
@@ -259,7 +259,7 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
-static int $sn_id_to_fpath(char *fpath, const char *id, struct $fsdata_t *fsdata)
+static int $sn_id_to_fpath(char *fpath, const char *id, const struct $fsdata_t *fsdata)
 {
    $$ADDNPREFIX_RET(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
 }
