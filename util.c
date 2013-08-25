@@ -52,6 +52,7 @@
       case -EACCES : return -EACCES; \
    }
 
+
 // Use this when there are two paths, path and newpath, and the command writes.
 // Uses path; Defines fpath, fnewpath, fsdata
 #define $$IF_MULTI_PATHS_MAIN_ONLY \
@@ -71,6 +72,8 @@
 
 // Use these when there are different things to do in the two spaces
 // Uses path; Defines fpath, fsdata, snpath, ret
+// ! For performance, we only allocate memory for snpath when needed, but because of this,
+// one cannot return in the SN branch.
 #define $$IF_PATH_MAIN \
    char fpath[$$PATH_MAX]; \
    struct $fsdata_t *fsdata; \
@@ -137,6 +140,23 @@
       return 0; \
    } \
    return -ENAMETOOLONG;
+
+
+// Adds a prefix and a suffix to a path
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+#define $$ADDNPSFIX(newpath, oldpath, prefix, prefixlen, suffix, suffixlen) \
+   $$PATH_LEN_T len; \
+   len = $$PATH_MAX - prefixlen - suffixlen; \
+   if(likely(strlen(oldpath) < len)){ \
+      strcpy(newpath, prefix); \
+      strncat(newpath, oldpath, len); \
+      strncat(newpath, suffix, suffixlen); \
+      return 0; \
+   } \
+   return -ENAMETOOLONG;
+
 
 // Adds data suffix to a path
 // Returns:

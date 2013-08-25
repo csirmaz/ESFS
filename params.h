@@ -39,11 +39,8 @@
   #including all the headers.
 */
 
-#ifndef _PARAMS_H_
-#define _PARAMS_H_
-
-#include <limits.h> // for FILE
-#include <stdio.h> // for FILE
+#ifndef $$PARAMS_H_
+#define $$PARAMS_H_
 
 // The FUSE API has been changed a number of times.  So, our code
 // needs to define the version of the API that we assume.  As of this
@@ -61,61 +58,6 @@
 // Backtrace: fcntl.h, sys/stat.h <- features.h 
 #define _ATFILE_SOURCE 1
 
-// Parameters
-// ----------
-#define $log(...) log_msg(__VA_ARGS__)
-#define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__) // debug messages
-#define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__) // important log lines
-
-// Constants
-// ---------
-
-/* About $$PATH_MAX
- * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
- * suggests that operations need to be thread-safe, although pkg-config does
- * not return -D_REENTRANT on my system. // TODO
- * Using a constant-length string to store the mapped path appears to be the
- * simplest solution under these circumstances, even though incoming paths
- * can be of any length.
- */
-#define $$PATH_MAX PATH_MAX
-#define $$PATH_LEN_T size_t
-
-// The snapshots directory
-//                  0123456789
-#define $$SNDIR    "/snapshots"
-#define $$SNDIR_LEN 10 // Without null character
-
-#define $$EXT_DATA ".dat"
-#define $$EXT_HID ".hid"
-#define $$EXT_LEN 4 // Without null character
-
-#define $$DIRSEP "/"
-#define $$DIRSEPCH '/'
-
-// Global FS private data
-// ----------------------
-
-struct $fsdata_t {
-    FILE *logfile;
-    char *rootdir; // the underlying root acting as the source of the FS
-    size_t rootdir_len; // length of rootdir string, without terminating NULL
-    char sn_dir[$$PATH_MAX]; // the real path to the snapshot directory
-    char sn_lat_dir[$$PATH_MAX]; // the real path to the root of the latest snapshot
-    int sn_is_any; // whether there are any snapshots
-};
-
-// Retrieve and cast
-#define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
-
-// A path inside the snapshots space
-// ---------------------------------
-
-struct $snpath_t {
-   int is_there; // 0=nothing, 1=ID, 2=ID&inpath -- always check this before using the strings
-   char id[$$PATH_MAX]; // e.g. "/ID"
-   char inpath[$$PATH_MAX]; // e.g. "/dir/dir/file"
-};
 
 // In case it matters
 // ------------------

@@ -57,10 +57,10 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 {
    int ret;
 
-   log_msg("read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x, fd=%d)\n", path, buf, size, offset, fi, fi->fh);
+   log_msg("read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x, main fd=%d)\n", path, buf, size, offset, fi, $$MFD->mainfd);
    // TODO Check if path is null, as expected
 
-   ret = pread(fi->fh, buf, size, offset);
+   ret = pread($$MFD->mainfd, buf, size, offset);
    if(ret >= 0){ return ret; }
    return -errno;
 }
@@ -150,7 +150,7 @@ int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 
    log_msg("fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
 
-   if(fstat(fi->fh, statbuf) == 0){ return 0; }
+   if(fstat($$MFD->mainfd, statbuf) == 0){ return 0; }
    return -errno;
 }
 

@@ -34,23 +34,18 @@
  * in this file. To write $, use \$.
  */
 
-// This file contains functions related to saving things in a snapshot
-// and retrieving things from snapshots.
-
-
-/* Save information about a file that usually goes into the directory
- * entry, like flags, permissions, and, most importantly, size.
+/* This file contains functions related to the snapshots themselves.
+ *
+ * Organisation of snapshots
+ * =========================
+ *
+ * Each snapshot is a directory in ROOT/snapshots (or $$SNDIR).
+ *
+ * There's a pointer to the latest snapshot in /snapshots/.hid
+ * if there is at least one snapshot.
+ * Also, there's a pointer from each snapshot to the earlier one in /snapshots/<ID>.hid
+ * All these pointers contain the real paths to the snapshot roots: ROOT/snapshots/<ID>
  */
-// $push_dentry
-
-// $push_whole_file
-
-// $pull_directory
-
-// $push_blocks
-
-// $pull_blocks
-
 
 // Create the snapshot dir if necessary.
 // Returns
@@ -85,15 +80,6 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
    return 0;
 }
 
-
-/* Snapshot meta-information
- * =========================
- *
- * There's a pointer to the latest snapshot in /snapshots/.hid
- *   if there is at least one snapshot
- * There's a pointer from each snapshot to the earlier one in /snapshots/ID.hid
- * All these pointers contain the real paths to the snapshot roots: ..../snapshots/ID
- */
 
 
 // Gets the path to the root of the latest snapshot:
@@ -143,6 +129,7 @@ int $sn_get_latest(struct $fsdata_t *fsdata){
 
    close(fd);
    fsdata->sn_is_any = 1;
+   fsdata->sn_lat_dir_len = ret - 1;
    $dlogdbg("Get latest sn: found latest snapshot '%s' in '%s'\n", fsdata->sn_lat_dir, path);
    return 0;
 }
@@ -191,6 +178,7 @@ int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
    close(fd);
 
    strcpy(fsdata->sn_lat_dir, newpath);
+   fsdata->sn_lat_dir_len = len - 1;
    fsdata->sn_is_any = 1;
 
    return 0;
@@ -230,7 +218,7 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
             break;
          }
 
-         fd = open(hid, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+         fd = open(hid, O_WRONLY | O_CREAT | O_EXCL, S_IRWXU);
          if(fd == -1){
             fd = errno;
             $dlogi("Creating sn: opening %s failed with %d = %s\n", hid, fd, strerror(fd));

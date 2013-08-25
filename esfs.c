@@ -34,8 +34,6 @@
  * in this file. To write $, use \$.
  */
 
-// TODO Use Doxygen?
-
 #include "params_c.h"
 
 #include <ctype.h>
@@ -44,19 +42,22 @@
 #include <fcntl.h> // AT_FDCWD
 #include <fuse.h>
 #include <libgen.h>
-#include <limits.h>
+#include <limits.h> // PATH_MAX
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/xattr.h>
+#include <sys/xattr.h> // TODO not needed?
 #include <sys/stat.h> // utimens
+
+#include "types_c.h"
 
 #include "log_c.h"
 
 #include "util_c.c"
 #include "snapshot_c.c"
+#include "node_c.c"
 #include "stat_c.c"
 #include "fuse_fd_close_c.c"
 #include "fuse_fd_read_c.c"

@@ -34,11 +34,10 @@
  * in this file. To write $, use \$.
  */
 
+
 /* This file contains FS operations that modify dentries based on a path
- */
-
-
-/* SPECIAL COMMANDS
+ *
+ * SPECIAL COMMANDS
  * ================
  *
  * Issuing "mkdir /snapshots/<ID>" creates a new snapshot.
@@ -122,30 +121,6 @@ int $symlink(const char *dest, const char *path)
 }
 
 
-   /** Rename a file */
-//   int (*rename) (const char *, const char *);
-int $rename(const char *path, const char *newpath)
-{
-   $$IF_MULTI_PATHS_MAIN_ONLY
-
-   log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
-
-   if(rename(fpath, fnewpath) == 0){ return 0; }
-   return -errno;
-}
-
-
-   /** Create a hard link to a file */
-//   int (*link) (const char *, const char *);
-int $link(const char *path, const char *newpath)
-{
-   // This is not allowed in ESFS.
-   return -EOPNOTSUPP;
-
-   // To pass the request on, call link(fpath, fnewpath);
-}
-
-
    /** Change the permission bits of a file */
 //   int (*chmod) (const char *, mode_t);
 int $chmod(const char *path, mode_t mode)
@@ -182,35 +157,6 @@ int $truncate(const char *path, off_t newsize)
 }
 
 
-
-
-   /**
-    * Create and open a file
-    *
-    * If the file does not exist, first create it with the specified
-    * mode, and then open it.
-    *
-    * If this method is not implemented or under Linux kernel
-    * versions earlier than 2.6.15, the mknod() and open() methods
-    * will be called instead.
-    *
-    * Introduced in version 2.5
-    */
-//   int (*create) (const char *, mode_t, struct fuse_file_info *);
-int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
-{
-   int fd;
-   $$IF_PATH_MAIN_ONLY
-
-   log_msg("\ncreate(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
-
-   fd = creat(fpath, mode);
-   if(fd < 0){ return -errno; }
-
-   fi->fh = fd;
-
-   return 0;
-}
 
 
    /**
@@ -265,6 +211,32 @@ int $utimens(const char *path, const struct timespec tv[2])
 
 /* Unsupported operations
  ***********************************************/
+
+
+   /** Rename a file */
+//   int (*rename) (const char *, const char *);
+int $rename(const char *path, const char *newpath)
+{
+   // Due to its complexity, this is not currently supported by ESFS.
+   return -EOPNOTSUPP;
+
+   /*
+   log_msg("\nrename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+   if(rename(fpath, fnewpath) == 0){ return 0; }
+   return -errno;
+   */
+}
+
+
+   /** Create a hard link to a file */
+//   int (*link) (const char *, const char *);
+int $link(const char *path, const char *newpath)
+{
+   // This is not allowed in ESFS.
+   return -EOPNOTSUPP;
+
+   // To pass the request on, call link(fpath, fnewpath);
+}
 
 
    /** Create a file node

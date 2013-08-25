@@ -87,13 +87,19 @@ int $flush(const char *path, struct fuse_file_info *fi)
 //   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
 {
+   int ret = 0;
 
-   log_msg("release(path=\"%s\", fi=0x%08x, fd=%d)\n", path, fi, fi->fh);
+   log_msg("release(path=\"%s\", fi=0x%08x, mainfd=%d)\n", path, fi, $$MFD->mainfd);
 
-   // We need to close the file.  Had we allocated any resources
-   // (buffers etc) we'd need to free them here as well.
-   if(close(fi->fh) == 0){ return 0; }
-   return -errno;
+   if($$MFD->is_main == 1){
+      if($$MFD->mapfd >= 0){ close($$MFD->mapfd); }
+      if(unlikely(close($$MFD->mainfd) != 0)){ ret = -errno; }
+   }
+   // TODO close non-main fds
+
+   free($$MFD);
+
+   return ret;
 }
 
 
@@ -111,12 +117,12 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
    log_msg("fsync(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
 
    if(datasync){
-      if(fdatasync(fi->fh) == 0){ return 0; }
+      if(fdatasync($$MFD->mainfd) == 0){ return 0; } // TODO sync other files
       return -errno;
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed
    }
 
-   if(fsync(fi->fh) == 0){ return 0; }
+   if(fsync($$MFD->mainfd) == 0){ return 0; } // TODO sync other files
    return -errno;
       // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for)
       // the file referred to by the file descriptor fd to the disk device

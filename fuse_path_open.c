@@ -56,16 +56,85 @@
 int $open(const char *path, struct fuse_file_info *fi)
 {
    int fd;
+   struct $fd_t *mfd;
    $$IF_PATH_MAIN_ONLY
 
    log_msg("open(path\"%s\", fi=0x%08x)\n", path, fi);
 
+   mfd = malloc(sizeof(struct $fd_t));
+   if(mfd == NULL){ return -ENOMEM; }
+
+   mfd->is_main = 1;
+
+   if((fi->flags & O_WRONLY) == 0 && (fi->flags & O_RDWR) == 0){ // opening for read-only
+      mfd->mapfd = -2;
+   }else{ // opening for writing
+      // Save the current status of the file by initialising the map file.
+      // We don't delete this even if the subsequent operation fails.
+      fd = $open_init_map(mfd, path, fpath, fsdata); // fd only stores a success flag here
+      if(fd < 0){
+         free(mfd);
+         return -fd;
+      }
+   }
+
    fd = open(fpath, fi->flags);
-   if(fd == -1){ return -errno; }
+   if(fd == -1){
+      free(mfd);
+      return -errno;
+   }
 
    log_msg("open success fd=%d\n", fd);
 
-   fi->fh = fd;
+   mfd->mainfd = fd;
+   fi->fh = (intptr_t) mfd;
+
+   return 0;
+}
+
+
+   /**
+    * Create and open a file
+    *
+    * If the file does not exist, first create it with the specified
+    * mode, and then open it.
+    *
+    * If this method is not implemented or under Linux kernel
+    * versions earlier than 2.6.15, the mknod() and open() methods
+    * will be called instead.
+    *
+    * Introduced in version 2.5
+    */
+//   int (*create) (const char *, mode_t, struct fuse_file_info *);
+int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+   int fd;
+   struct $fd_t *mfd;
+   $$IF_PATH_MAIN_ONLY
+
+   log_msg("\ncreate(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
+
+   mfd = malloc(sizeof(struct $fd_t));
+   if(mfd == NULL){ return -ENOMEM; }
+
+   mfd->is_main = 1;
+
+   // Save the current status of the file by initialising the map file.
+   // We don't delete this even if the subsequent operation fails.
+   fd = $open_init_map(mfd, path, fpath, fsdata); // fd only stores a success flag here
+   if(fd < 0){
+      free(mfd);
+      return -fd;
+   }
+
+   fd = creat(fpath, mode);
+   if(fd < 0){
+      free(mfd);
+      return -errno;
+   }
+
+   mfd->mainfd = fd;
+   fi->fh = (intptr_t) mfd;
 
    return 0;
 }

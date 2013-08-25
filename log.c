@@ -51,7 +51,9 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <limits.h> // PATH_MAX
 
+#include "types_c.h"
 #include "log_c.h"
 
 FILE *log_open()

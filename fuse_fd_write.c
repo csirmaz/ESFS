@@ -54,7 +54,7 @@ int $write(const char *path, const char *buf, size_t size, off_t offset,
 
    log_msg("\nwrite(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n", path, buf, size, offset, fi);
 
-   ret = pwrite(fi->fh, buf, size, offset);
+   ret = pwrite($$MFD->mainfd, buf, size, offset); // TODO push to snapshot
    if(ret >= 0){ return ret; }
    return -errno;
 }
@@ -78,7 +78,7 @@ int $ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 
    log_msg("\nftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n", path, offset, fi);
 
-   if(ftruncate(fi->fh, offset) == 0){ return 0; }
+   if(ftruncate($$MFD->mainfd, offset) == 0){ return 0; } // TODO push on snapshot
    return -errno;
 }
 
