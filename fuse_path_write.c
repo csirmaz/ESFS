@@ -89,6 +89,8 @@ int $unlink(const char *path)
    // log_msg("unlink(path=\"%s\")\n", path);
    $$IF_PATH_MAIN_ONLY
 
+   // TODO push to snapshot
+
    if(unlink(fpath) == 0){ return 0; }
    return -errno;
 }
@@ -99,7 +101,7 @@ int $unlink(const char *path)
 int $rmdir(const char *path)
 {
    // log_msg("rmdir(path=\"%s\")\n", path);
-   $$IF_PATH_MAIN_ONLY // TODO implement deleting snapshot
+   $$IF_PATH_MAIN_ONLY // TODO implement deleting snapshot (rm -r); push change to snapshot
 
    if(rmdir(fpath) == 0){ return 0; }
    return -errno;
@@ -113,6 +115,15 @@ int $rename(const char *path, const char *newpath)
 {
    $$IF_MULTI_PATHS_MAIN_ONLY
    log_msg("  rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+   /* TODO
+    * - remove write directive from our own direct map (with nofollow) (for current name)
+    *    This may be the same as our current map if the file hasn't been renamed. See is_renamed
+    * - add/overwrite write directive in map file for new name
+    *    to point to snapshot name
+    *    This might not exist in which case it needs to be marked as nonexistent
+    * - Add/overwrite read directive in our normal map file (for name in snapshot - this is what has been opened)
+    *    to point to new name
+    */
    if(rename(fpath, fnewpath) == 0){ return 0; }
    return -errno;
 }
@@ -130,6 +141,8 @@ int $symlink(const char *dest, const char *path)
 
    log_msg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
 
+   // TODO push to snapshot
+
    if(symlink(dest, fpath) == 0){ return 0; }
    return -errno;
 }
@@ -141,6 +154,8 @@ int $chmod(const char *path, mode_t mode)
 {
    // log_msg("\nchmod(fpath=\"%s\", mode=0%03o)\n", path, mode);
    $$IF_PATH_MAIN_ONLY
+
+   // TODO push to snapshot
 
    if(chmod(fpath, mode) == 0){ return 0; }
    return -errno;
@@ -154,6 +169,8 @@ int $chown(const char *path, uid_t uid, gid_t gid)
    // log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
    $$IF_PATH_MAIN_ONLY
 
+   // TODO only root can do this - should we support this?
+
    if(chown(fpath, uid, gid) == 0){ return 0; }
    return -errno;
 }
@@ -165,6 +182,8 @@ int $truncate(const char *path, off_t newsize)
 {
    // log_msg("\ntruncate(path=\"%s\", newsize=%lld)\n", path, newsize);
    $$IF_PATH_MAIN_ONLY
+
+   // TODO push to snapshot
 
    if(truncate(fpath, newsize) == 0){ return 0; }
    return -errno;
@@ -190,6 +209,8 @@ int $truncate(const char *path, off_t newsize)
 int $utimens(const char *path, const struct timespec tv[2])
 {
    $$IF_PATH_MAIN_ONLY
+
+   // TODO push to snapshot?
 
    /*
     int utimensat(int dirfd, const char *pathname,

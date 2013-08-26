@@ -96,6 +96,18 @@
  *
  * C.map:write B   C(B)
  *
+ * If C(B) is renamed again:
+ *
+ * A.dat
+ * A.map           A(A)
+ *
+ * B.dat
+ * B.map:read D
+ *
+ * C.map
+ *
+ * D.map:write B   D(B)
+ *
  * When opening the map file, follow the "write" directive.
  * On subsequent renames, update the read directive in the map.
  * On rename/delete, remove the write directive.
@@ -125,6 +137,7 @@
  * Sets
  *   mfd->mapfd, the map file opened for RDWR or -1 if there are no snapshots
  *   mfd->datfd, the dat file opened for WR or -1 if there are no snapshots
+ *   mfd->is_renamed, 0 or 1
  * Saves
  *   stats of the file into the map file, unless the map file already exists.
  * Returns
@@ -194,6 +207,7 @@ int $n_open(
             if(mapheader.write_v[0] != '\0'){
                // Found a write directive, which we need to follow. This is a virtual path.
                $dlogdbg("n_open: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, mapheader.write_v);
+               mfd->is_renamed = 1;
                waserror = -1;
                break;
             }

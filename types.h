@@ -125,12 +125,13 @@ struct $mapheader_t {
 // Filehandle struct
 // -----------------
 
-struct $fd_t {
+struct $fd_t { // Usually the mfd variable
    int is_main; // 1 if this is a main file; 0 otherwise
    // MAIN FILE FD:
    int mainfd; // filehandle to the main file
-   int mapfd; // filehandle to the map file; -1 if there are no snapshots; -2 if the main file is opened for read only
-   int datfd; // filehandle to the dat file; -1 if there are no snapshots; -2 if the main file is opened for read only
+   int mapfd; // filehandle to the map file; -1 if there are no snapshots; -2 if the main file is opened for read only. See $n_open
+   int datfd; // filehandle to the dat file; -1 if there are no snapshots; -2 if the main file is opened for read only. See $n_open
+   int is_renamed; // 0 or 1 if we have followed a write directive. See $n_open
 };
 
 // CAST
