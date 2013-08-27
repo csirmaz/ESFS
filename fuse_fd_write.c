@@ -47,14 +47,26 @@
 //            struct fuse_file_info *);
 // As  with read(), the documentation above is inconsistent with the
 // documentation for the write() system call.
-int $write(const char *path, const char *buf, size_t size, off_t offset,
-          struct fuse_file_info *fi)
+int $write(
+   const char *path,
+   const char *buf,
+   size_t size,
+   off_t offset,
+   struct fuse_file_info *fi
+)
 {
    int ret;
+   $$DFSDATA // TODO currently used for logging only - check and remove?
 
-   log_msg("\nwrite(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n", path, buf, size, offset, fi);
+   // Only allow writes on main FDs
+   if($$MFD->is_main != 1){ return -EACCES; }
 
-   ret = pwrite($$MFD->mainfd, buf, size, offset); // TODO push to snapshot
+   $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, $$MFD->mainfd);
+
+   // Save block into snapshot
+   if((ret = $b_write(fsdata, $$MFD, size, offset)) != 0){ return ret; }
+
+   ret = pwrite($$MFD->mainfd, buf, size, offset);
    if(ret >= 0){ return ret; }
    return -errno;
 }
@@ -76,7 +88,7 @@ int $write(const char *path, const char *buf, size_t size, off_t offset,
 int $ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 {
 
-   log_msg("\nftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n", path, offset, fi);
+   log_msg("  ftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n", path, offset, fi);
 
    if(ftruncate($$MFD->mainfd, offset) == 0){ return 0; } // TODO push on snapshot
    return -errno;

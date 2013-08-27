@@ -46,6 +46,7 @@
 
 // Constants
 // ---------
+// IMPORTANT: When changing these, update $check_params.
 
 /* About $$PATH_MAX
  * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
@@ -59,11 +60,17 @@
 #define $$PATH_LEN_T size_t // type to store path lengths in
 #define $$FILESIZE_T unsigned long // type to store file size in
 
+#define $$BL_S 131072 // blocksize in bytes. 128K = 2^17
+#define $$BL_SLOG 17 // log2(blocksize)
+#define $$BLP_T size_t // block pointer type. Note: filesizes are stored in off_t
+#define $$BLP_S (sizeof($$BLP_T)) // block pointer size in bytes
+
 // The snapshots directory
 //                  0123456789
 #define $$SNDIR    "/snapshots"
 #define $$SNDIR_LEN 10 // Without null character
 
+// Extensions for snapshot files
 #define $$EXT_DAT ".dat"
 #define $$EXT_MAP ".map"
 #define $$EXT_HID ".hid"
@@ -72,14 +79,15 @@
 #define $$DIRSEP "/"
 #define $$DIRSEPCH '/'
 
-// Check consistency of constants
-// Returns 0 on success, -1 on failure
-int $check_params(void){
-   if(strlen($$SNDIR) != $$SNDIR_LEN){ return -1; }
-   if(strlen($$EXT_DAT) != $$EXT_LEN){ return -1; }
-   if(strlen($$EXT_HID) != $$EXT_LEN){ return -1; }
-   if(strlen($$DIRSEP) != 1){ return -1; }
-   return 0;
+// Locking
+#define $$LOCK_NUM 64 // Number of locks; this determines the number of concurrent files that can be written
+
+// File-based locking
+// ------------------
+
+struct $flock_t {
+   pthread_mutex_t mutex;
+   ino_t inode;
 }
 
 
@@ -94,10 +102,8 @@ struct $fsdata_t {
     char sn_lat_dir[$$PATH_MAX]; // the real path to the root of the latest snapshot
     $$PATH_LEN_T sn_lat_dir_len; // length of the latest snapshot dir string
     int sn_is_any; // whether there are any snapshots, 1 or 0
+    struct $flock_t *mflocks; // Used for file-based locks.
 };
-
-// Retrieve and cast
-#define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
 
 // A path inside the snapshots space
 // ---------------------------------
@@ -125,16 +131,24 @@ struct $mapheader_t {
 // Filehandle struct
 // -----------------
 
+// * = can also be:
+// -1 = if there are no snapshots
+// -2 = if the main file is opened for read-only
+// ** = can also be:
+// -3 = if the file didn't exist when the snapshot was taken
+
 struct $fd_t { // Usually the mfd variable
    int is_main; // 1 if this is a main file; 0 otherwise
    // MAIN FILE FD:
    int mainfd; // filehandle to the main file
-   int mapfd; // filehandle to the map file; -1 if there are no snapshots; -2 if the main file is opened for read only. See $n_open
-   int datfd; // filehandle to the dat file; -1 if there are no snapshots; -2 if the main file is opened for read only. See $n_open
+   ino_t main_inode; // the inode number of the main file
+   int mapfd; // filehandle to the map file*. See $n_open
+   int datfd; // filehandle to the dat file* **. See $n_open
    int is_renamed; // 0 or 1 if we have followed a write directive. See $n_open
 };
 
 // CAST
+// TODO Are repeated accesses fast enough, or should we store this in a variable?
 #define $$MFD ((struct $fd_t *) fi->fh)
 
 #endif

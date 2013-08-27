@@ -34,6 +34,14 @@
  * in this file. To write $, use \$.
  */
 
+/*
+ * Useful information
+ * ==================
+ *
+ * Get the fuse command line arguments by passing -h to the compiled binary.
+ *
+ */
+
 #include "params_c.h"
 
 #include <ctype.h>
@@ -50,6 +58,7 @@
 #include <sys/types.h>
 #include <sys/xattr.h> // TODO not needed?
 #include <sys/stat.h> // utimens
+#include <pthread.h> // mutexes
 
 #include "types_c.h"
 
@@ -58,6 +67,8 @@
 #include "util_c.c"
 #include "snapshot_c.c"
 #include "node_c.c"
+#include "block_c.c"
+#include "mutex_c.c"
 #include "stat_c.c"
 #include "fuse_fd_close_c.c"
 #include "fuse_fd_read_c.c"
@@ -114,8 +125,13 @@ int $statfs(const char *path, struct statvfs *statv)
 // FUSE).
 void *$init(struct fuse_conn_info *conn)
 {
+   struct $fsdata_t *fsdata;
 
-   return $$FSDATA; // TODO -- We put user_data into fuse_context
+   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data );
+
+   $dlogi("Initialised ESFS\n");
+
+   return fsdata;
 }
 
    /**
@@ -125,15 +141,19 @@ void *$init(struct fuse_conn_info *conn)
     *
     * Introduced in version 2.3
     */
-//   void (*destroy) (void *);
-void $destroy(void *userdata)
+//   void (*destroy) (void *userdata==private_data);
+void $destroy(void *privdata)
 {
-   // TODO free all memory -- search for malloc
-   /*
-    * fsdata
-    * realpath
-    */
-   log_msg("\ndestroy(userdata=0x%08x)\n", userdata);
+   // TODO free all memory
+
+   struct $fsdata_t *fsdata;
+
+   fsdata = ((struct $fsdata_t *) privdata );
+
+   $dlogi("Bye!\n");
+
+   free(fsdata->rootdir);
+   free(fsdata);
 }
 
 
@@ -183,6 +203,7 @@ void $usage(void)
 
 int main(int argc, char *argv[])
 {
+   int ret;
    struct $fsdata_t *fsdata;
 
    // ESFS doesn't do any access checking on its own (the comment
@@ -199,6 +220,17 @@ int main(int argc, char *argv[])
       return 1;
    }
 
+   if((ret = $check_params()) != 0){
+      fprintf(stderr, "There's a problem with the parameters; ESFS needs to be recompiled. Code = %d. Aborting.\n", ret);
+      return 1;
+   }
+
+   fsdata = malloc(sizeof(struct $fsdata_t));
+   if (fsdata == NULL) {
+      fprintf(stderr, "Out of memory. Aborting.\n");
+      return 1;
+   }
+
    // Perform some sanity checking on the command line:  make sure
    // there are enough arguments, and that neither of the last two
    // start with a hyphen (this will break if you actually have a
@@ -207,28 +239,23 @@ int main(int argc, char *argv[])
    if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
       $usage();
 
-   fsdata = malloc(sizeof(struct $fsdata_t));
-   if (fsdata == NULL) {
-      fprintf(stderr, "out of memory\n");
-      return 1;
-   }
-
    // Pull the rootdir out of the argument list and save it in my
    // internal data
    fsdata->rootdir = realpath(argv[argc-2], NULL); // this calls malloc
+   if(fsdata->rootdir == NULL){
+      fprintf(stderr, "Error getting the root dir %s. Aborting.\n", argv[argc-2]);
+      return 1;
+   }
+
    fsdata->rootdir_len = strlen(fsdata->rootdir);
+
    argv[argc-2] = argv[argc-1];
    argv[argc-1] = NULL;
    argc--;
-   
-   fsdata->logfile = log_open();
+
+   fsdata->logfile = log_open(); // TODO check for errors
 
    // Initial things to do
-
-   if($check_params() != 0){
-      fprintf(stderr, "There's a problem with the parameters; ESFS need to be recompiled. Aborting.\n");
-      return 1;
-   }
 
    // Get the main snapshot dir path
    if($map_path(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG){
@@ -247,31 +274,10 @@ int main(int argc, char *argv[])
    }
 
    // turn over control to fuse
-   return fuse_main(argc, argv, &$oper, fsdata);
+   // user_data   user data supplied in the context during the init() method
+   // Returns: 0 on success, nonzero on failure
+   if((ret = fuse_main(argc, argv, &$oper, fsdata)) != 0){
+      fprintf(stderr, "FUSE returned with error %d. Sorry.\n", ret);
+   }
+   return ret;
 }
-
-/*
-FUSE options:
--d -o debug    enable debug output (implies -f)
--f    foreground operation
--s    disable multi-threaded operation
--o allow_other    allow access to other users
--o allow_root   allow access to root
--o nonempty    allow mounts over non-empty file/dir
--o default_permissions  enable permission checking by kernel
--o fsname=NAME    set file system name
--o large_read  issue large read requests (2.4 only)
--o max_read=N  set maximum size of read requests
--o hard_remove    immediate removal (don't hide files)
--o use_ino     let file system set inode numbers
--o readdir_ino    try to fill in d_ino in readdir
--o direct_io   use direct I/O
--o kernel_cache   cache files in kernel
--o umask=M  set file permissions (octal)
--o uid=N    set file owner
--o gid=N    set file group
--o entry_timeout=T   cache timeout for names (1.0s)
--o negative_timeout=T    cache timeout for deleted names (0.0s)
--o attr_timeout=T    cache timeout for attributes (1.0s)
-http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
-*/

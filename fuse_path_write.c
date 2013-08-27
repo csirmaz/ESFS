@@ -123,6 +123,8 @@ int $rename(const char *path, const char *newpath)
     *    This might not exist in which case it needs to be marked as nonexistent
     * - Add/overwrite read directive in our normal map file (for name in snapshot - this is what has been opened)
     *    to point to new name
+    * 
+    * TODO Renaming directories? Maybe that shouldn't be allowed.
     */
    if(rename(fpath, fnewpath) == 0){ return 0; }
    return -errno;
@@ -211,6 +213,15 @@ int $utimens(const char *path, const struct timespec tv[2])
    $$IF_PATH_MAIN_ONLY
 
    // TODO push to snapshot?
+
+   // TODO from fusexmp.c:
+   /* don't use utime/utimes since they follow symlinks */
+   /*
+        res = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
+        if (res == -1)
+                return -errno;
+   */
+   
 
    /*
     int utimensat(int dirfd, const char *pathname,

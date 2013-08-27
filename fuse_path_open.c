@@ -56,7 +56,9 @@
 int $open(const char *path, struct fuse_file_info *fi)
 {
    int fd;
+   int waserror = 0;
    struct $fd_t *mfd;
+   struct stat mystat;
 
    $$IF_PATH_MAIN_ONLY // TODO need to open files in snapshots (for reading)
 
@@ -65,29 +67,42 @@ int $open(const char *path, struct fuse_file_info *fi)
    mfd = malloc(sizeof(struct $fd_t));
    if(mfd == NULL){ return -ENOMEM; }
 
-   mfd->is_main = 1;
-
-   if((fi->flags & O_WRONLY) == 0 && (fi->flags & O_RDWR) == 0){ // opening for read-only
-      $n_open_rdonly(mfd);
-   }else{ // opening for writing
-      // Save the current status of the file by initialising the map file.
-      // We don't delete this even if the subsequent operation fails.
-      fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
-      if(fd < 0){
-         free(mfd);
-         return -fd;
+   do{
+      if((fi->flags & O_WRONLY) == 0 && (fi->flags & O_RDWR) == 0){ // opening for read-only
+         $n_open_rdonly(mfd);
+      }else{ // opening for writing
+         // Save the current status of the file by initialising the map file.
+         // We don't delete this even if the subsequent operation fails.
+         fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
+         if(fd < 0){
+            waserror = -fd; // converting -errno to +errno
+            break;
+         }
       }
-   }
 
-   fd = open(fpath, fi->flags);
-   if(fd == -1){
+      fd = open(fpath, fi->flags);
+      if(fd == -1){
+         waserror = errno;
+         break;
+      }
+
+      // We need to store the inode no of the file. We can only do that here as it's possibly new
+      if(fstat(fd, &mystat) == -1){
+         waserror = errno;
+         break;
+      }
+   }while(0);
+
+   if(waserror != 0){
       free(mfd);
-      return -errno;
+      return -waserror;
    }
 
    log_msg("  open success main fd=%d\n", fd);
 
+   mfd->is_main = 1;
    mfd->mainfd = fd;
+   mfd->main_inode = mystat.st_ino;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -110,7 +125,9 @@ int $open(const char *path, struct fuse_file_info *fi)
 int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
    int fd;
+   int waserror = 0;
    struct $fd_t *mfd;
+   struct stat mystat;
 
    $$IF_PATH_MAIN_ONLY
 
@@ -119,23 +136,36 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
    mfd = malloc(sizeof(struct $fd_t));
    if(mfd == NULL){ return -ENOMEM; }
 
+   do{
+      // Save the current status of the file by initialising the map file.
+      // We don't delete this even if the subsequent operation fails.
+      fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
+      if(fd < 0){
+         waserror = -fd; // Converting -errno to +errno;
+         break;
+      }
+
+      fd = creat(fpath, mode);
+      if(fd < 0){
+         waserror = errno;
+         break;
+      }
+
+      // We need to store the inode no of the file. We can only do that here as it's new
+      if(fstat(fd, &mystat) == -1){
+         waserror = errno;
+         break;
+      }
+   }while(0);
+
+   if(waserror != 0){
+      free(mfd);
+      return -waserror;
+   }
+
    mfd->is_main = 1;
-
-   // Save the current status of the file by initialising the map file.
-   // We don't delete this even if the subsequent operation fails.
-   fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
-   if(fd < 0){
-      free(mfd);
-      return -fd;
-   }
-
-   fd = creat(fpath, mode);
-   if(fd < 0){
-      free(mfd);
-      return -errno;
-   }
-
    mfd->mainfd = fd;
+   mfd->main_inode = mystat.st_ino;
    fi->fh = (intptr_t) mfd;
 
    return 0;

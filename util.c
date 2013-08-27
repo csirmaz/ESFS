@@ -41,12 +41,19 @@
  */
 
 
+// Extract and cast fsdata
+#define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
+
+
+// Define, extract and cast fsdata
+#define $$DFSDATA struct $fsdata_t *fsdata; fsdata = $$FSDATA;
+
+
 // Use this when the command writes - we don't allow that in the snapshot dir, only in the main space.
 // Uses path; Defines fpath, fsdata
 #define $$IF_PATH_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
-   struct $fsdata_t *fsdata; \
-   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   $$DFSDATA \
    switch($cmpath(fpath, path, fsdata)){ \
       case -ENAMETOOLONG : return -ENAMETOOLONG; \
       case -EACCES : return -EACCES; \
@@ -58,8 +65,7 @@
 #define $$IF_MULTI_PATHS_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
    char fnewpath[$$PATH_MAX]; \
-   struct $fsdata_t *fsdata; \
-   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   $$DFSDATA \
    switch($cmpath(fpath, path, fsdata)){ \
       case -ENAMETOOLONG : return -ENAMETOOLONG; \
       case -EACCES : return -EACCES; \
@@ -76,10 +82,9 @@
 // one cannot return in the SN branch.
 #define $$IF_PATH_MAIN \
    char fpath[$$PATH_MAX]; \
-   struct $fsdata_t *fsdata; \
    struct $snpath_t *snpath; \
    int ret = -EBADE; \
-   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   $$DFSDATA \
    switch($cmpath(fpath, path, fsdata)){ \
       case 0 :
 
@@ -107,8 +112,7 @@
 // Uses path; Defines fpath, fsdata
 #define $$ALL_PATHS \
    char fpath[$$PATH_MAX]; \
-   struct $fsdata_t *fsdata; \
-   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data ); \
+   $$DFSDATA \
    switch($map_path(fpath, path, fsdata)){ \
       case -ENAMETOOLONG : return -ENAMETOOLONG; \
    }
@@ -262,5 +266,25 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 static int $sn_id_to_fpath(char *fpath, const char *id, const struct $fsdata_t *fsdata)
 {
    $$ADDNPREFIX_RET(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
+}
+
+
+// Check consistency of constants
+// Returns 0 on success, -1 on failure
+int $check_params(void){
+   // Check string lengths
+   if(strlen($$SNDIR) != $$SNDIR_LEN){ return -51; }
+   if(strlen($$EXT_DAT) != $$EXT_LEN){ return -52; }
+   if(strlen($$EXT_HID) != $$EXT_LEN){ return -53; }
+   if(strlen($$DIRSEP) != 1){ return -54; }
+
+   // Check if the block and block pointer sizes make it possible to store files off_t large.
+   // The max file size + 1 on the system is 2^( sizeof(off_t)*8 ) bytes.
+   // The max file size + 1 in ESFS is $$BL_S * 2^($$BLP_S*8) = 2^( log($$BL_S) + $$BLP_S*8 ) bytes.
+   if(sizeof($$BLP_T) != $$BLP_S){ return -10; }
+   if( sizeof(off_t) * 8.0 > ( $$BL_SLOG + ((double)$$BLP_S)*8.0) ){ return -11; }
+   if( (1 << $$BL_SLOG) != $$BL_S ){ return -12; }
+
+   return 0;
 }
 

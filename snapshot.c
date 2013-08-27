@@ -52,7 +52,7 @@
 // 0 - on success
 // -errno - if lstat or mkdir fails
 // 1 - if the node exists but is not a directory
-int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
+static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
 {
    struct stat mystat;
    int ret;
@@ -89,7 +89,7 @@ int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the l
 // Returns:
 // 0 - on success
 // -errno - on failure
-int $sn_get_latest(struct $fsdata_t *fsdata){
+static int $sn_get_latest(struct $fsdata_t *fsdata){
    int fd;
    int ret;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
@@ -142,7 +142,7 @@ int $sn_get_latest(struct $fsdata_t *fsdata){
 // Returns:
 //   0 - on success
 //   -errno - on failure
-int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
+static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 {
    int fd;
    int ret;
@@ -284,7 +284,7 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
 // 0 on success
 // -errno on any failure
 // 1 on unexpected value
-int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
+static int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
 {
    int ret;
    char value[2];

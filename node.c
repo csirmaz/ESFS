@@ -34,8 +34,8 @@
  * in this file. To write $, use \$.
  */
 
-/* This file contains functions related to storing and retriecing
- * files and data in snapshots.
+/* This file contains functions related to snapshot files and
+ * changes to the dentries of main files.
  *
  * Files in snapshots
  * ==================
@@ -136,7 +136,7 @@
  *   vpath is the virtual path to the file in the main space.
  * Sets
  *   mfd->mapfd, the map file opened for RDWR or -1 if there are no snapshots
- *   mfd->datfd, the dat file opened for WR or -1 if there are no snapshots
+ *   mfd->datfd, the dat file opened for WR|APPEND or -1 if there are no snapshots
  *   mfd->is_renamed, 0 or 1
  * Saves
  *   stats of the file into the map file, unless the map file already exists.
@@ -144,7 +144,18 @@
  *   0 - on success
  *  -errno - on failure
  */
-int $n_open(
+
+#define $$N_OPEN_DAT_FILE \
+            fd = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
+            if(fd == -1){ \
+               fd = errno; \
+               $dlogi("n_open: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd, strerror(fd)); \
+               waserror = fd; \
+               break; \
+            } \
+            mfd->datfd = fd;
+
+static int $n_open(
    struct $fd_t *mfd,
    const char *vpath,
    const char *fpath,
@@ -156,8 +167,8 @@ int $n_open(
    int fd;
    int ret;
    int waserror = 0;
-   struct $mapheader_t mapheader;
    $$PATH_LEN_T plen;
+   struct $mapheader_t mapheader; // TODO use lockable buffers?
 
    // No snapshots?
    if(fsdata->sn_is_any == 0){
@@ -167,6 +178,7 @@ int $n_open(
       return 0;
    }
 
+   
    // Get the paths of the map & dat files
    $$ADDNPSFIX_CONT(fmap, fdat, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_DAT, $$EXT_LEN)
 
@@ -175,7 +187,7 @@ int $n_open(
    ////////////////////////////////// (create them when THEY are modified)
 
    // Open or create the map file
-   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU);
+   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL | O_NOATIME, S_IRWXU);
 
    if(fd == -1){
 
@@ -213,15 +225,14 @@ int $n_open(
             }
 
             // There's no write directive
-            // Open or create the dat file
-            fd = open(fdat, O_WRONLY | O_CREAT, S_IRWXU);
-            if(fd == -1){
-               fd = errno;
-               $dlogi("n_open: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd, strerror(fd));
-               waserror = fd;
-               break;
+            // Check if the file existed in the snapshot
+            if(mapheader.exists == 0){
+               mfd->datfd = -3;
+               break; // not an error, but we want to skip opening the dat file
             }
-            mfd->datfd = fd;
+
+            // Open or create the dat file
+            $$N_OPEN_DAT_FILE
 
          }while(0);
 
@@ -243,7 +254,7 @@ int $n_open(
          return -fd;
       }
 
-   } else { // We've created a new .map file
+   } else { // ----- We've created a new .map file -----
 
       do{
          // We've created the .map file; let's save data about the main file.
@@ -257,7 +268,7 @@ int $n_open(
          // stat the main file
          if(lstat(fpath, &(mapheader.fstat)) != 0){
             ret = errno;
-            if(ret == ENOENT){ // main file does not exist (yet)
+            if(ret == ENOENT){ // main file does not exist (yet?)
                mapheader.exists = 0;
             }else{ // some other error
                $dlogi("n_open: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
@@ -280,14 +291,7 @@ int $n_open(
          }
 
          // Open or create the dat file
-         fd = open(fdat, O_WRONLY | O_CREAT, S_IRWXU);
-         if(fd == -1){
-            fd = errno;
-            $dlogi("n_open: Failed to open .dat at %s, error %d = %s (2)\n", fdat, fd, strerror(fd));
-            waserror = fd;
-            break;
-         }
-         mfd->datfd = fd;
+         $$N_OPEN_DAT_FILE
 
       }while(0);
 

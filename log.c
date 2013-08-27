@@ -79,7 +79,7 @@ void log_msg(const char *format, ...)
     va_list ap;
     va_start(ap, format);
 
-    vfprintf($$FSDATA->logfile, format, ap); // TODO not too optimal!
+    vfprintf(((struct $fsdata_t *) fuse_get_context()->private_data )->logfile, format, ap); // TODO not too optimal!
 }
 
 // struct fuse_file_info keeps information about files (surprise!).
