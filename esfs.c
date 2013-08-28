@@ -58,6 +58,7 @@
 #include <sys/types.h>
 #include <sys/xattr.h> // TODO not needed?
 #include <sys/stat.h> // utimens
+#include <sys/select.h> // pselect
 #include <pthread.h> // mutexes
 
 #include "types_c.h"
@@ -67,8 +68,8 @@
 #include "util_c.c"
 #include "snapshot_c.c"
 #include "node_c.c"
-#include "block_c.c"
 #include "mutex_c.c"
+#include "block_c.c"
 #include "stat_c.c"
 #include "fuse_fd_close_c.c"
 #include "fuse_fd_read_c.c"
@@ -149,6 +150,8 @@ void $destroy(void *privdata)
    struct $fsdata_t *fsdata;
 
    fsdata = ((struct $fsdata_t *) privdata );
+
+   $flock_destroy(fsdata);
 
    $dlogi("Bye!\n");
 
@@ -270,6 +273,11 @@ int main(int argc, char *argv[])
 
    if($sn_get_latest(fsdata) != 0){
       fprintf(stderr, "Getting latest snapshot failed, please check logs. Aborting.\n");
+      return 1;
+   }
+
+   if($flock_init(fsdata) != 0){
+      fprintf(stderr, "Failed to initialise mutexes. Aborting.\n");
       return 1;
    }
 

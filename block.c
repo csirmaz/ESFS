@@ -57,122 +57,177 @@
  * "POSIX requires that a read(2) which can be proved to occur after a write() has returned returns the new data.  Note that not all file systems are
        POSIX conforming." (man write)
  *
- * /
+ * http://librelist.com/browser//usp.ruby/2013/6/5/o-append-atomicity/#757836465710253f784f6446f028292d
+ *
+ * Parallel writes
+ * ===============
+ *
+ * The writing procedure is the following:
+ *
+ * 1. read map
+ * 2. read block from main file
+ * 3. write block to dat file
+ * 4. write map
+ * 5. allow write to main file
+ *
+ * We need locking because of a different thread reads the map (1) before this thread
+ * reaches (4), it will think it needs to save the block. However, the block in the
+ * main file may be written by this thread before it reads it.
+ *
+ * Also, appending to the dat file and getting where we wrote to are not atomic
+ * operations.
+ */
 
-/* Checks a block and saves it if necessary.
- *   blockno is the number of the block, not an offset.
+
+#define $$BLOCK_READ_POINTER \
+      ret = pread(mfd->mapfd, &pointer, $$BLP_S, mapoffset); \
+      if(unlikely(ret != $$BLP_S && ret != 0)){ \
+         waserror = (ret==-1 ? errno : ENXIO); \
+         $dlogdbg("Error: pread on .map for main file FD %d, map FD %d, err (%d) %d = %s\n", mfd->mainfd, mfd->mapfd, ret, waserror, strerror(waserror)); \
+         break; \
+      } \
+      if(ret == 0){ pointer = 0; } \
+      $dlogdbg("b_write: Read %zu as pointer from %d:%td for main FD %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
+
+/* Called when a write operation is attempted
  * Returns:
  * 0 - on success
  * -errno - on failure
  */
-static inline int $b_check_save_block(const struct $fsdata_t *fsdata, struct $fd_t *mfd, $$BLP_T blockno){
+static inline int $b_write(
+   struct $fsdata_t *fsdata, // not const as locks are written
+   struct $fd_t *mfd,
+   size_t writesize,
+   off_t writeoffset
+)
+{
    $$BLP_T pointer;
    off_t mapoffset;
-   int waserror;
-   char *buf;
+   off_t datsize;
+   int waserror = 0;
+   int lock = -1;
+   char *buf = NULL;
+   off_t blockoffset; // starting number of blocks written
+   size_t blocknumber; // number of blocks written
+   int ret;
 
-   $dlogdbg("Saving block no %ld from main FD %d\n", blockno, mfd->mainfd);
+   // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
+   if(mfd->datfd < 0){ return 0; }
 
-   mapoffset = (sizeof(struct $mapheader_t)) + blockno * $$BLP_S;
+   $dlogdbg("b_write: offset %lld size %d\n", (long long int)writeoffset, (int)writesize);
 
-   // Read the pointer from the map file
-   // For this to work, we need to make sure that the underlying FS is POSIX conforming,
-   // and that any write has returned on this file.
-   // To achieve this, we use mutexes.
+   if(writesize <= 0){ return 0; } // Nothing to write
+
+   /////////////////////////////////////////////////////////////////
+   // TODO Don't save blocks outside original length of main file //
+   /////////////////////////////////////////////////////////////////
+
+   blockoffset = (writeoffset >> $$BL_SLOG);
+   blocknumber = (writesize >> $$BL_SLOG) + 1;
+
+   $dlogdbg("b_write: bloffs %lld blockno %d\n", (long long int)blockoffset, (int)blocknumber);
+
+   for(;blocknumber > 0; blocknumber--, blockoffset++){
+
+      // ============== BLOCK LOOP ================= //
+
+      $dlogdbg("b_write: Processing block no %ld from main FD %d\n", blockoffset, mfd->mainfd);
+
+      mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S;
+
+      // Read the pointer from the map file.
+      // This may not be the final pointer if we haven't got the lock, but if it's already non-0, we
+      // save ourselves the trouble of getting the lock.
+      $$BLOCK_READ_POINTER
+
+      if(pointer != 0){ continue; } // We don't need to save, so go to next block
+
+      // Read the pointer from the map file - for real.
+      // For this to work correctly, we need to make sure that the underlying FS is POSIX conforming,
+      // and that any write has returned on this file (see the quote above).
+      // It seems we can only be sure that we're reading the new value then.
+      // So we lock here.
+      if(lock == -1){ // If we already have the lock, the first read was for real.
+
+         if(unlikely((lock = $flock_lock(fsdata, mfd->main_inode)) < 0)){
+            waserror = -lock;
+            $dlogdbg("Error: lock for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+            break;
+         }
+         $dlogdbg("b_write: Got lock %d for main file FD %d\n", lock, mfd->mainfd);
 
 
-   
-   // Read the pointer from the map file
-   if(pread(mfd->mapfd, &pointer, $$BLP_S, mapoffset) != 0){
-      waserror = errno;
-      $dlogdbg("Error: pread on .map for main file FD %d, map FD %d, err %d = %s\n", mfd->mainfd, mfd->mapfd, waserror, strerror(waserror));
-      return -waserror;
-   }
+         // Read the pointer from the map file
+         $$BLOCK_READ_POINTER
 
-   if(pointer != 0){ return 0; } // We don't need to save
+         if(pointer != 0){ continue; } // We don't need to save
 
-   // We need to save the block
-   // TODO implement a list of buffers various threads can lock and use
-   buf = malloc($$BL_S);
-   if(buf == NULL){ return -ENOMEM; }
+      }
 
-   do{
+      // We need to save the block
+      // TODO implement a list of buffers various threads can lock and use
+      if(buf == NULL){ // only allocate once in the loop
+         buf = malloc($$BL_S);
+         if(unlikely(buf == NULL)){
+            waserror = ENOMEM;
+            break;
+         }
+      }
 
-// TODO LOCKING!!!! - manual or use mutexes
+      // Read the old block from the main file
+      ret = pread(mfd->mainfd, buf, $$BL_S, (blockoffset << $$BL_SLOG));
+      if(unlikely(ret < 1)){ // We should be able to read from the main file at least 1 byte
+         waserror = (ret==-1 ? errno : ENXIO);
+         $dlogdbg("Error: pread from main file FD %d count %d offset %td, err (%d) %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
+         break;
+      }
 
-      if(pread(mfd->mainfd, buf, $$BL_S, (blockno << $$BL_SLOG)) != 0){
+      // Get the size of the dat file -- this is where we'll write
+      if(unlikely((datsize = lseek(mfd->datfd, 0, SEEK_END)) == -1)){
          waserror = errno;
-         $dlogdbg("Error: pread on main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+         $dlogdbg("Error: lseek on dat for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
          break;
       }
 
       // Sanity check: the size of the dat file should be divisible by $$BL_S
-      // We could use a mask here
-**      if( ((mfd->dat_size >> $$BL_SLOG) << $$BL_SLOG) != mfd->dat_size ){
+      if(unlikely( (datsize & ($$BL_S - 1)) != 0 )){
          $dlogi("Error: Size of dat file is not divisible by block size (%d = 2^%d) for main FD %d.\n", $$BL_S, $$BL_SLOG, mfd->mainfd);
          waserror = EFAULT;
          break;
       }
 
       // First we try to append to the dat file
-**      if(pwrite(mfd->datfd, buf, $$BL_S, mfd->dat_size) != 0){
-         waserror = errno;
-         $dlogdbg("Error: pwrite on .dat for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+      ret = write(mfd->datfd, buf, $$BL_S);
+      if(unlikely(ret != $$BL_S)){
+         waserror = (ret==-1 ? errno : ENXIO);
+         $dlogdbg("Error: write into .dat for main file FD %d, err (%d) %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
-**      pointer = (mfd->dat_size >> $$BL_SLOG); // Get where we've written the block
-**      mfd->dat_size += $$BL_S; // Update the cached length
 
+      pointer = (datsize >> $$BL_SLOG); // Get where we've written the block
       pointer++; // We save pointer+1 in the map
-      if(pwrite(mfd->mapfd, &pointer, $$BLP_S, mapoffset) != 0){
-         waserror = errno;
-         $dlogdbg("Error: pwrite on .map for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
-         // TODO If we fail here, why not reuse the block in the dat file:
+
+      ret = pwrite(mfd->mapfd, &pointer, $$BLP_S, mapoffset);
+      if(unlikely(ret != $$BLP_S)){
+         waserror = (ret==-1 ? errno : ENXIO);
+         $dlogdbg("Error: pwrite on .map for main file FD %d, err (%d) %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
-   }while(0);
 
-   free(buf);
+      $dlogdbg("b_write: wrote pointer %zu to %d:%td for main fd %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
-   if(waserror != 0){
-      return -waserror;
+   } // end for
+
+   // Cleanup
+   if(lock != -1){
+      $dlogdbg("b_write: Releasing lock %d for main file FD %d\n", lock, mfd->mainfd);
+      if(unlikely((lock = $flock_unlock(fsdata, lock)) < 0)){
+         $dlogdbg("Error: unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
+         return -lock;
+      }
+
+      if(buf != NULL){ free(buf); }
    }
-   return 0;
-}
 
-
-/* Called when a write operation is attempted
- * Returns the same things as $b_check_save_block.
- */
-static inline int $b_write(
-   const struct $fsdata_t *fsdata,
-   struct $fd_t *mfd,
-   size_t size,
-   off_t offset
-)
-{
-   off_t bloffs; // starting number of blocks written
-   size_t blockno; // number of blocks written
-   int ret;
-
-   // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
-   if(mfd->datfd < 0){ return 0; }
-
-   $dlogdbg("b_write: offset %lld size %d\n", (long long int)offset, (int)size);
-
-   if(size <= 0){ return 0; } // Nothing to write
-
-   // TODO Don't save blocks outside original length of main file
-
-   bloffs = (offset >> $$BL_SLOG);
-   blockno = (size >> $$BL_SLOG) + 1;
-
-   $dlogdbg("b_write: bloffs %lld blockno %d\n", (long long int)bloffs, (int)blockno);
-
-   while(blockno > 0){
-      if((ret = $b_check_save_block(fsdata, mfd, bloffs)) != 0){ return ret; }
-      blockno--;
-      bloffs++;
-   }
-   return 0;
+   return -waserror; // this is 0 if waserror==0
 }

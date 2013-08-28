@@ -56,6 +56,7 @@
 int $open(const char *path, struct fuse_file_info *fi)
 {
    int fd;
+   int flags;
    int waserror = 0;
    struct $fd_t *mfd;
    struct stat mystat;
@@ -68,9 +69,14 @@ int $open(const char *path, struct fuse_file_info *fi)
    if(mfd == NULL){ return -ENOMEM; }
 
    do{
-      if((fi->flags & O_WRONLY) == 0 && (fi->flags & O_RDWR) == 0){ // opening for read-only
+      flags = fi->flags;
+
+      if((flags & O_WRONLY) == 0 && (flags & O_RDWR) == 0){ // opening for read-only
+
          $n_open_rdonly(mfd);
+
       }else{ // opening for writing
+
          // Save the current status of the file by initialising the map file.
          // We don't delete this even if the subsequent operation fails.
          fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
@@ -78,19 +84,28 @@ int $open(const char *path, struct fuse_file_info *fi)
             waserror = -fd; // converting -errno to +errno
             break;
          }
+
+         // If the client wants to open O_WRONLY, we still need to read from the file to save
+         // the overwritten blocks.
+         // TODO Should we get a new filehandle to do this?
+         if(flags & O_WRONLY){ flags ^= O_WRONLY; flags |= O_RDWR; }
+
       }
 
-      fd = open(fpath, fi->flags);
+      fd = open(fpath, flags);
       if(fd == -1){
          waserror = errno;
          break;
       }
 
-      // We need to store the inode no of the file. We can only do that here as it's possibly new
+      // We need to store the inode no of the file.
+      // We can only do that here after the open as it's possibly new
+      // TODO but if it's not, we could get the inode from $n_open!
       if(fstat(fd, &mystat) == -1){
          waserror = errno;
          break;
       }
+
    }while(0);
 
    if(waserror != 0){

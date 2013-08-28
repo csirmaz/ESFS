@@ -53,7 +53,8 @@
 // need this to get pwrite().  I have to use setvbuf() instead of
 // setlinebuf() later in consequence.
 // pwrite needs >= 500
-#define _XOPEN_SOURCE 500
+// pselect needs >= 600
+#define _XOPEN_SOURCE 600
 
 // Needed to get utimensat and AT_FDCWD
 // Backtrace: fcntl.h, sys/stat.h <- features.h 

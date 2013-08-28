@@ -38,14 +38,30 @@
  * $$LOCK_NUM files to be written in parallel by different threads,
  * while only one thread may write a file at any time.
  *
- * The label and the mutex need to be a unit, so we protect
- * changing them with the MOD mutexes.
+ * We need this restriction to ensure that when a block is saved in the dat file,
+ * only one thread is writing that file. This applies even if the dat file
+ * is a journal storing possibly more changes to the same block, and
+ * if it's opened with O_APPEND.
  *
- * Rules:
+ * We set up a limited number of locks here to save the overhead of a hash
+ * storage (from files(inodes) to a mutex). Mutexes here are organised in a table
+ * and can be labelled with an inode. We need to protect changes to the table
+ * so that a label and a mutex would function as a unit, but instead of
+ * locking the whole table whenever it changes, we use MOD mutexes
+ * which only lock changes related to certain inodes. There are $$LOCK_NUM
+ * MOD mutexes, and MOD mutex i is used when inode%$$LOCK_NUM==i.
+ *
+ * Moreover, to save the overhead or re-labelling mutexes, there is a system
+ * where mutexes can be handed over to other threads if they are waiting
+ * for the mutex on the same inode. This is done using the 'want' member.
+ *
+ * Rules of thumb:
  * - Reverse procedures should be symmetrical
  * - Re-check expected condition after getting mutex
- * 
- * GET LOCK:
+ *
+ */
+
+/* GET LOCK:
  *
  * START:
  * if(inode is in table -> i){
@@ -72,9 +88,9 @@
  * }
  *
  * FIND:
- * find mutex that looks free and unlabelled -> i TODO RANDOMISE
- * get mutex i
+ * try all non-labelled mutexes in a loop until able to get one -> i
  * recheck: if(label no longer empty){
+ *    // we must be in the middle of a handover
  *    release mutex i
  *    goto FIND: - OR - release MOD mutex; goto START:
  * }
@@ -98,23 +114,22 @@
  *
  *
  * Consequences:
- * - an inode can only be added to the table if its MOD mutex is held,
+ * - an inode can only be added to / removed from the table if its MOD mutex is held,
  *    AND the mutex being labelled is held
  *
- * A labels the mutex and B takes over:
- * 
+ * A labels the mutex and hands it over to B:
+ *
  * MOD   -----AAAAAAAAAAAA--|--------------|--BBBBBBBBBB-----
  * LABEL ------------+++++++|++++++++++++++|+++++------------
  * MUTEX ---------AAAAAAAAAA|AAAAAAAA--BBBB|BBBBBBBB---------
  * WANT  -------------------|---111111111--|-----------------
  *
- * Handover fails because want is set too late:
+ * Handover fails because want is set too late by B. B starts over.
  *
  * MOD   -----AAAAAAAAAAAA--|-B--AAAAAAA-----
  * LABEL ------------+++++++|++++++----------
  * MUTEX ---------AAAAAAAAAA|AAAAAAAA--------
  * WANT  -------------------|----------111---
- * 
  *
  * A and B try to add the same inode, but A gets the MOD mutex first,
  * so it becomes a handover:
@@ -124,24 +139,6 @@
  * MUTEX1 -----AAAAAAAAAAAAAAA-BBBBBB
  * WANT1  ------------------11111----
  *
- * Inserting is delayed because the mutex is taken over by C
- * and handed over to B:
- * 
- * MOD1  -----AAAAAAAAAAAAAA|AAAAAAAAAA|AAAAAAAAAAAAAAA----
- * MOD2  -----CCCCCCCCCCCC--|----------|---BBBBBBBbbb------
- * LABEL ------------jjjjjjj|jjjjjjjjjj|jjjjjj-----iiiiiiii
- * MUTEX ---------CCCCCCCCCC|CCC--BBBBB|BBBBBBBB-AAAAAAAAAA
- * WANT  -----------------11|1111111---|-------------------
- *
- * Inserting goes wrong because the mutex is taken over, and
- * then is waited for when A gets it. A tries to find another mutex.
- *
- * MOD1  -----AAAAAAAAAAAAAA|AAAAAAAAAAAAAAAAA
- * MOD2  -----CCCCCCCCCCCC--|-----------------
- * LABEL ------------jjjjjjj|jjjjjjjjjjjjjjjjj
- * MUTEX ---------CCCCCCCCCC|CCC--AAAAA--BBBBB
- * WANT  -----------------11|11111111111111---
-
  *
  */
 
@@ -158,12 +155,14 @@ static int $flock_init(struct $fsdata_t *fsdata){
    pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_ERRORCHECK_NP);
    // TODO Later switch to the default by using NULL instead of mutexattr below
 
-   fsdata->mflocks = malloc(sizeof($flock_t) * $$LOCK_NUM);
+   fsdata->mflocks = malloc(sizeof(struct $mflock_t) * $$LOCK_NUM);
    if(fsdata->mflocks == NULL){ return -ENOMEM; }
 
    for(i=0; i<$$LOCK_NUM; i++){
-      pthread_mutex_init(fsdata->mflocks[i].mutex, &mutexattr);
+      pthread_mutex_init(&(fsdata->mflocks[i].mutex), &mutexattr);
+      pthread_mutex_init(&(fsdata->mflocks[i].mod_mutex), &mutexattr);
       fsdata->mflocks[i].inode = 0;
+      fsdata->mflocks[i].want = 0;
    }
 
    pthread_mutexattr_destroy(&mutexattr);
@@ -172,66 +171,134 @@ static int $flock_init(struct $fsdata_t *fsdata){
 
 
 static int $flock_destroy(struct $fsdata_t *fsdata){
+   int i;
+
+   for(i=0; i<$$LOCK_NUM; i++){
+      pthread_mutex_destroy(&(fsdata->mflocks[i].mutex));
+      pthread_mutex_destroy(&(fsdata->mflocks[i].mod_mutex));
+   }
    free(fsdata->mflocks);
    return 0;
 }
 
 
-/* Returns:
- * 0 on success
+/* Get a lock on a particular inode
+ * Returns:
+ * lock number on success (>=0)
  * -errno on error
  */
 static int $flock_lock(struct $fsdata_t *fsdata, ino_t inode){
    int i;
    int ret;
-   timespec delay = { 0, 10000000 }; // nanoseconds: 1 000 000 000
+   int ml = -1;
+   struct $mflock_t *mylock;
+   pthread_mutex_t *modmutex = NULL;
+   struct timespec delay = { 0, 10000000 }; // nanoseconds: 1 000 000 000
 
-   do{
+   while(1){ // START:
 
-      // First we check that the inode is not locked already
-      ret = 0;
+      mylock = NULL;
       for(i=0; i<$$LOCK_NUM; i++){
-         if(fsdata->flocks[i].inode == inode){
-            ret = 1;
-            // Sleep
-            pselect(0, NULL, NULL, NULL, &delay, NULL);
+         if(fsdata->mflocks[i].inode == inode){
+            ml = i;
+            mylock = &(fsdata->mflocks[i]);
             break;
          }
       }
 
-      if(ret==1){ continue; }
-
-      // If not, we try to acquire any of the locks
-
-      for(i=0; i<$$LOCK_NUM; i++){
-
-         ret = pthread_mutex_trylock(fsdata->mflocks[i].mutex);
-
-         if(ret == 0){ // the lock is free, so try to get it
-
-               // Set the inode *before* getting the mutex, for additional safety
-               fsdata->mflocks[i].inode = inode;
-               if((ret = pthread_mutex_lock(fsdata->mflocks[i].mutex)) != 0){ // this blocks
-                  fsdata->mflocks[i].inode = 0;
-                  return -ret; // error
-               }
-               // We've got the mutex
-               fsdata->mflocks[i].inode = inode; // set the inode again -- now no one else should set this
-               return 0;
+      if(mylock != NULL){ // if inode is in the table
+         if(unlikely(modmutex != NULL)){
+            // recheck failed; release the modmutex and carry on as usual
+            pthread_mutex_unlock(modmutex);
+            modmutex = NULL;
          }
-
-         if(ret == EBUSY){ // the lock is busy; carry on
-            continue;
+         (mylock->want)++; // request handover
+         pthread_mutex_lock(&(mylock->mutex));
+         (mylock->want)--;
+         if(likely(mylock->inode == inode)){ // recheck
+            // We have (successfully taken over) the mutex and it's labelled with the inode
+            return ml;
          }
-
-         // Error
-         return -ret;
+         // If recheck fails, retry from start
+         $$SLEEP
+         continue;
       }
 
-      // Sleep
-      pselect(0, NULL, NULL, NULL, &delay, NULL);
+      // inode is not in the table:
+      // get the modmutes and re-check that the inode is still not in the table
 
-   }while(1);
+      if(modmutex == NULL){ // If we don't yet have the modmutex
+         modmutex = &(fsdata->mflocks[inode & ($$LOCK_NUM - 1)].mod_mutex);
+         if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)){ return -ret; }
+         continue; // Start over for a re-check.
+      }
 
+      // We have the modmutex and inode is not in the table
+      // try all non-labelled locks in the table
+      while(1){ // FIND:
+         ml = -1;
+         for(i=0; i<$$LOCK_NUM; i++){
+            if(likely(fsdata->mflocks[i].inode == 0)){
+               ret = pthread_mutex_trylock(&(fsdata->mflocks[i].mutex));
+               if(likely(ret == 0)){ // got the lock
+                  ml = i;
+                  break;
+               }else if(ret == EBUSY){ // lock is busy
+                  continue;
+               }else{ // error
+                  return -ret;
+               }
+            }
+         }
+
+         if(ml>-1){ // managed to get a mutex
+            // recheck if the mutex is still unlabelled
+            if(likely(fsdata->mflocks[ml].inode == 0)){
+               // Success
+               fsdata->mflocks[ml].inode = inode;
+               if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
+               return ml;
+            }
+            // if recheck fails, release the mutex and continue from FIND
+            // (this must be the middle of a handover)
+            if(unlikely((ret = pthread_mutex_unlock(&(fsdata->mflocks[i].mutex))) != 0)){ return -ret; }
+         }
+
+         $$SLEEP
+
+      } // end FIND
+
+   } // end START
+
+   return -EIO; // unreachable
 }
 
+
+/* Release a lock
+ * Returns:
+ * 0 on success
+ * -errno on error
+ */
+static int $flock_unlock(struct $fsdata_t *fsdata, int lockid){
+   int ret;
+   struct $mflock_t *mylock;
+   pthread_mutex_t *modmutex;
+
+   mylock = &(fsdata->mflocks[lockid]);
+
+   if(mylock->want == 0){ // no one wants a handover
+      modmutex = &(fsdata->mflocks[mylock->inode & ($$LOCK_NUM - 1)].mod_mutex);
+      if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)){ return -ret; }
+      if(mylock->want == 0){ // recheck
+         mylock->inode = 0;
+         if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)){ return -ret; }
+         if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
+         return 0;
+      }
+      // oops - they want a handover
+      if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
+   }
+   // handover - release lock without removing label
+   if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)){ return -ret; }
+   return 0;
+}

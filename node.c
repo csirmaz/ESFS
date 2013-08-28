@@ -146,14 +146,15 @@
  */
 
 #define $$N_OPEN_DAT_FILE \
-            fd = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
-            if(fd == -1){ \
-               fd = errno; \
-               $dlogi("n_open: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd, strerror(fd)); \
-               waserror = fd; \
+            fd_dat = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
+            if(fd_dat == -1){ \
+               fd_dat = errno; \
+               $dlogi("n_open: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd_dat, strerror(fd_dat)); \
+               waserror = fd_dat; \
                break; \
             } \
-            mfd->datfd = fd;
+            $dlogdbg("n_open: Opened dat file at %s FD %d\n", fdat, fd_dat); \
+            mfd->datfd = fd_dat;
 
 static int $n_open(
    struct $fd_t *mfd,
@@ -164,7 +165,8 @@ static int $n_open(
 {
    char fmap[$$PATH_MAX];
    char fdat[$$PATH_MAX];
-   int fd;
+   int fd; // map file FD
+   int fd_dat; // dat file FD
    int ret;
    int waserror = 0;
    $$PATH_LEN_T plen;
@@ -178,7 +180,6 @@ static int $n_open(
       return 0;
    }
 
-   
    // Get the paths of the map & dat files
    $$ADDNPSFIX_CONT(fmap, fdat, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_DAT, $$EXT_LEN)
 
@@ -187,7 +188,7 @@ static int $n_open(
    ////////////////////////////////// (create them when THEY are modified)
 
    // Open or create the map file
-   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL | O_NOATIME, S_IRWXU);
+   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU); // TODO add O_NOATIME
 
    if(fd == -1){
 
@@ -201,6 +202,9 @@ static int $n_open(
             $dlogi("n_open: Failed to open .map again at %s, error %d = %s\n", fmap, fd, strerror(fd));
             return -fd;
          }
+         $dlogdbg("n_open: Managed to open .map file again at %s, FD %d\n", fmap, fd);
+
+         mfd->mapfd = fd;
 
          do{ // From here we either return with a positive errno, or -1 if we need to try again
 
@@ -216,6 +220,7 @@ static int $n_open(
                waserror = EIO;
                break;
             }
+
             if(mapheader.write_v[0] != '\0'){
                // Found a write directive, which we need to follow. This is a virtual path.
                $dlogdbg("n_open: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, mapheader.write_v);
@@ -246,7 +251,6 @@ static int $n_open(
             return -waserror;
          }
 
-         mfd->mapfd = fd;
          // Continue below
 
       } else { // Other error
@@ -258,6 +262,7 @@ static int $n_open(
 
       do{
          // We've created the .map file; let's save data about the main file.
+         $dlogdbg("n_open: created a new map file at %s FD %d\n", fmap, fd);
 
          mfd->mapfd = fd;
 

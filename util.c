@@ -41,6 +41,10 @@
  */
 
 
+// Sleep: needs struct timespec delay
+#define $$SLEEP pselect(0, NULL, NULL, NULL, &delay, NULL);
+
+
 // Extract and cast fsdata
 #define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
 
