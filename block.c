@@ -114,17 +114,20 @@ static inline int $b_write(
    // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
    if(mfd->datfd < 0){ return 0; }
 
-   $dlogdbg("b_write: woffset: %zu wsize: %td size_in_sn: %zu\n", writeoffset, writesize, mfd->size_in_sn);
-
+   $dlogdbg("b_write: woffset: %zu wsize: %td size_in_sn: %zu\n", writeoffset, writesize, mfd->mapheader.fstat.st_size);
 
    // Don't save blocks outside original length of main file
-   if(writeoffset + writesize > mfd->size_in_sn){
-      if(writeoffset >= mfd->size_in_sn){ // the offset is already past the length
+   // Because datfd>=0, we know the file existed when the snapshot was taken, so mapheader.fstat should be valid.
+#define $$B_SNSIZE blockoffset // variable to store the original file size in during this short block
+   $$B_SNSIZE = mfd->mapheader.fstat.st_size;
+   if(writeoffset + writesize > $$B_SNSIZE){
+      if(writeoffset >= $$B_SNSIZE){ // the offset is already past the length
          $dlogdbg("b_write: nothing to write\n");
          return 0;
       }
-      writesize = mfd->size_in_sn - writeoffset; // warning: size_t is unsigned and can underflow
+      writesize = $$B_SNSIZE - writeoffset; // warning: size_t is unsigned and can underflow
    }
+#undef $$B_SNSIZE
 
    blockoffset = (writeoffset >> $$BL_SLOG);
    blocknumber = (writesize >> $$BL_SLOG) + 1;

@@ -127,11 +127,12 @@ struct $snpath_t {
 
 // TODO To make FS files portable, the types used here should be reviewed. and proper (de)serialisation implemented.
 struct $mapheader_t {
-   int exists; // whether the file exists
-   struct stat fstat; // saved parameters of the file
+   int $version;
+   int exists; // whether the file exists, 0 or 1
+   struct stat fstat; // saved parameters of the file (only if exists==1)
    char read_v[$$PATH_MAX]; // the read directive: going forward, read the dest instead. Contains a virtual path or an empty string.
    char write_v[$$PATH_MAX]; // the write directive: in this snapshot, write the dest instead. Contains a virtual path or an empty string.
-   char padding[200];
+   char signature[4];
 };
 
 
@@ -149,8 +150,8 @@ struct $fd_t {
    int is_main; // 1 if this is a main file; 0 otherwise
    // MAIN FILE FD:
    int mainfd; // filehandle to the main file
-   ino_t main_inode; // the inode number of the main file, used for locking
-   off_t size_in_sn; // the size of the file when the snapshot was taken, not initialised if datfd is -1, -2 or -3
+   struct $mapheader_t mapheader; // The whole mapheader loaded into memory
+   ino_t main_inode; // the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking
    int mapfd; // filehandle to the map file*. See $n_open
    int datfd; // filehandle to the dat file* **. See $n_open
    int is_renamed; // 0 or 1 if we have followed a write directive. See $n_open

@@ -92,18 +92,7 @@ int $release(const char *path, struct fuse_file_info *fi)
    log_msg("release(path=\"%s\", fi=0x%08x, mainfd=%d)\n", path, fi, $$MFD->mainfd);
 
    if($$MFD->is_main == 1){
-
-      if(unlikely(close($$MFD->mainfd) != 0)){ ret = -errno; }
-
-      if($$MFD->datfd >= 0){
-         if(unlikely(close($$MFD->datfd) != 0)){ ret = -errno; }
-      }
-
-      if($$MFD->mapfd >= 0){
-         if(unlikely(close($$MFD->mapfd) != 0)){ ret = -errno; }
-      }
-
-
+      ret = $n_close($$MFD);
    }
 
    // TODO close non-main fds

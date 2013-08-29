@@ -146,7 +146,17 @@
  *  -errno - on failure
  */
 
+// breaks below are not errors, but we want to skip opening/creating the dat file
+// if the file was empty or nonexistent when the snapshot was taken
 #define $$N_OPEN_DAT_FILE \
+            if(maphead->exists == 0){ \
+               mfd->datfd = -3; \
+               break; \
+            } \
+            if(unlikely(maphead->fstat.st_size == 0)){ \
+               mfd->datfd = -4; \
+               break; \
+            } \
             fd_dat = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
             if(fd_dat == -1){ \
                fd_dat = errno; \
@@ -170,11 +180,15 @@ static int $n_open(
    int fd_dat; // dat file FD
    int ret;
    int waserror = 0;
+   struct $mapheader_t *maphead;
    $$PATH_LEN_T plen;
-   struct $mapheader_t mapheader; // TODO use lockable buffers?
+
+   // Pointers
+   maphead = &(mfd->mapheader);
 
    // Default values
    mfd->is_renamed = 0;
+   mfd->is_main = 1;
 
    // No snapshots?
    if(fsdata->sn_is_any == 0){
@@ -212,8 +226,8 @@ static int $n_open(
 
          do{ // From here we either return with a positive errno, or -1 if we need to try again
 
-            // We need to check if there is a "write" directive in here.
-            ret = pread(fd, &mapheader, sizeof(struct $mapheader_t), 0);
+            // Read the mapheader
+            ret = pread(fd, maphead, sizeof(struct $mapheader_t), 0);
             if(unlikely(ret == -1)){
                waserror = errno;
                $dlogi("n_open: Failed to read .map at %s, error %d = %s\n", fmap, waserror, strerror(waserror));
@@ -225,32 +239,26 @@ static int $n_open(
                break;
             }
 
-            if(mapheader.write_v[0] != '\0'){
+            // Check the version and the signature
+            if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0){
+               $dlogi("n_open: version or signature bad in map file %s. Broken FS?\n", fmap);
+               waserror = EFAULT;
+               break;
+            }
+
+            // We need to check if there is a "write" directive in here.
+            if(maphead->write_v[0] != '\0'){
                // Found a write directive, which we need to follow. This is a virtual path.
-               $dlogdbg("n_open: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, mapheader.write_v);
+               $dlogdbg("n_open: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, maphead->write_v);
                mfd->is_renamed = 1;
                waserror = -1;
                break;
             }
 
             // There's no write directive
+
             // Read information about the file as it was at the time of the snapshot
-
-            // Check if the file existed in the snapshot
-            if(mapheader.exists == 0){
-               mfd->datfd = -3;
-               break; // not an error, but we want to skip opening the dat file
-            }
-
-            // The size of the file when the snapshot was taken
-            mfd->size_in_sn = mapheader.fstat.st_size;
-
-            if(unlikely(mfd->size_in_sn == 0)){
-               mfd->datfd = -4;
-               break; // not an error, but we want to skip opening the dat file
-            }
-
-            // Open or create the dat file
+            // and open or create the dat file if necessary
             $$N_OPEN_DAT_FILE
 
          }while(0);
@@ -259,8 +267,8 @@ static int $n_open(
             close(fd);
             if(waserror == -1){ // Follow the write directive
                // Get the full path in fmap
-               $$ADDNPREFIX_CONT(fmap, mapheader.write_v, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len)
-               return $n_open(mfd, mapheader.write_v, fmap, fsdata);
+               $$ADDNPREFIX_CONT(fmap, maphead->write_v, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len)
+               return $n_open(mfd, maphead->write_v, fmap, fsdata);
             }
             return -waserror;
          }
@@ -280,15 +288,19 @@ static int $n_open(
 
          mfd->mapfd = fd;
 
-         mapheader.exists = 1;
-         mapheader.read_v[0] = '\0';
-         mapheader.write_v[0] = '\0';
+         // Default values for a new mapheader
+         maphead->$version = 10000;
+         strncpy(maphead->signature, "ESFS", 4);
+         maphead->exists = 1;
+         maphead->read_v[0] = '\0';
+         maphead->write_v[0] = '\0';
 
          // stat the main file
-         if(lstat(fpath, &(mapheader.fstat)) != 0){
+         if(lstat(fpath, &(maphead->fstat)) != 0){
             ret = errno;
             if(ret == ENOENT){ // main file does not exist (yet?)
-               mapheader.exists = 0;
+               // WARNING In this case, mfd.mapheader remains uninitialised!
+               maphead->exists = 0;
             }else{ // some other error
                $dlogi("n_open: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
                waserror = ret;
@@ -297,7 +309,7 @@ static int $n_open(
          }
 
          // write into the map file
-         ret = pwrite(fd, &mapheader, sizeof(struct $mapheader_t), 0);
+         ret = pwrite(fd, maphead, sizeof(struct $mapheader_t), 0);
          if(unlikely(ret == -1)){
             $dlogi("n_open: Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
             waserror = errno;
@@ -309,15 +321,8 @@ static int $n_open(
             break;
          }
 
-         // The size of the file when the snapshot was taken
-         mfd->size_in_sn = mapheader.fstat.st_size;
-
-         if(unlikely(mfd->size_in_sn == 0)){
-            mfd->datfd = -4;
-            break; // not an error, but we want to skip opening the dat file
-         }
-
-         // Open or create the dat file
+         // Read information about the file as it was at the time of the snapshot
+         // and open or create the dat file if necessary
          $$N_OPEN_DAT_FILE
 
       }while(0);
@@ -335,19 +340,29 @@ static int $n_open(
 
 
 // Marks main FD as read-only
-static void $n_open_rdonly(struct $fd_t *mfd)
+static inline void $n_open_rdonly(struct $fd_t *mfd)
 {
    mfd->mapfd = -2;
    mfd->datfd = -2;
 }
 
 
-// $push_whole_file
+// Close a main MFD
+// Returns
+// 0 on success
+// -errno on error (the last errno)
+static inline int $n_close(struct $fd_t *mfd){
+   int waserror = 0;
 
-// $pull_directory
+   if(unlikely(close(mfd->mainfd) != 0)){ waserror = errno; }
 
-// $push_blocks
+   if(mfd->datfd >= 0){
+      if(unlikely(close(mfd->datfd) != 0)){ waserror = errno; }
+   }
 
-// $pull_blocks
+   if(mfd->mapfd >= 0){
+      if(unlikely(close(mfd->mapfd) != 0)){ waserror = errno; }
+   }
 
-
+   return -waserror;
+}

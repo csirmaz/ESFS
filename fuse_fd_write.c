@@ -56,15 +56,15 @@ int $write(
 )
 {
    int ret;
-   $$DFSDATA // TODO currently used for logging only - check and remove?
+   $$DFSDATA
 
    // Only allow writes on main FDs
    if($$MFD->is_main != 1){ return -EACCES; }
 
    $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, $$MFD->mainfd);
 
-   // Save block into snapshot
-   if((ret = $b_write(fsdata, $$MFD, size, offset)) != 0){ return ret; }
+   // Save blocks into snapshot
+   if(unlikely((ret = $b_write(fsdata, $$MFD, size, offset)) != 0)){ return ret; }
 
    ret = pwrite($$MFD->mainfd, buf, size, offset);
    if(ret >= 0){ return ret; }
@@ -85,12 +85,23 @@ int $write(
     * Introduced in version 2.5
     */
 //   int (*ftruncate) (const char *, off_t, struct fuse_file_info *);
-int $ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
+int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 {
+   struct $fd_t *mfd;
+   int ret;
+   $$DFSDATA
 
-   log_msg("  ftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n", path, offset, fi);
+   mfd = $$MFD;
 
-   if(ftruncate($$MFD->mainfd, offset) == 0){ return 0; } // TODO push on snapshot
+   log_msg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
+
+   // If the file existed and was larger than newsize, save the blocks
+   // NB Any blocks outside the current main file should have already been saved
+   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size){
+      if(unlikely((ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize)) != 0)){ return ret; }
+   }
+
+   if(ftruncate($$MFD->mainfd, newsize) == 0){ return 0; }
    return -errno;
 }
 

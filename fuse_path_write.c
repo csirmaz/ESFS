@@ -90,6 +90,7 @@ int $unlink(const char *path)
    $$IF_PATH_MAIN_ONLY
 
    // TODO push to snapshot
+   // TODO add optimisation: move file to snapshot if feasible
 
    if(unlink(fpath) == 0){ return 0; }
    return -errno;
@@ -176,24 +177,6 @@ int $chown(const char *path, uid_t uid, gid_t gid)
    if(chown(fpath, uid, gid) == 0){ return 0; }
    return -errno;
 }
-
-
-   /** Change the size of a file */
-//   int (*truncate) (const char *, off_t);
-int $truncate(const char *path, off_t newsize)
-{
-   // log_msg("\ntruncate(path=\"%s\", newsize=%lld)\n", path, newsize);
-   $$IF_PATH_MAIN_ONLY
-
-   log_msg("  trunc(path=\"%s\")\n", path);
-
-   // TODO push to snapshot
-
-   if(truncate(fpath, newsize) == 0){ return 0; }
-   return -errno;
-}
-
-
 
 
    /**

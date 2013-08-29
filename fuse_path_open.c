@@ -52,6 +52,7 @@
     *
     * Changed in version 2.2
     */
+// TODO Use (-o atomic_o_trunc) and provide support for atomic_o_trunc (see above) for greater efficiency
 //   int (*open) (const char *, struct fuse_file_info *);
 int $open(const char *path, struct fuse_file_info *fi)
 {
@@ -63,13 +64,17 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    $$IF_PATH_MAIN_ONLY // TODO need to open files in snapshots (for reading)
 
-   log_msg("  open(path\"%s\", fi=0x%08x)\n", path, fi);
-
    mfd = malloc(sizeof(struct $fd_t));
    if(mfd == NULL){ return -ENOMEM; }
 
    do{
       flags = fi->flags;
+
+      $dlogdbg("  open(%s, %s %s %s %s)\n", fpath,
+               ((flags&O_TRUNC)>0)?"TRUNC":"", 
+               ((flags&O_RDWR)>0)?"RDWR":"",
+               ((flags&O_RDONLY)>0)?"RD":"",
+               ((flags&O_WRONLY)>0)?"WR":"");
 
       if((flags & O_WRONLY) == 0 && (flags & O_RDWR) == 0){ // opening for read-only
 
@@ -95,6 +100,7 @@ int $open(const char *path, struct fuse_file_info *fi)
       fd = open(fpath, flags);
       if(fd == -1){
          waserror = errno;
+         // TODO CLEAN UP MAP/DAT FILES (if opening for writing)
          break;
       }
 
@@ -109,13 +115,13 @@ int $open(const char *path, struct fuse_file_info *fi)
    }while(0);
 
    if(waserror != 0){
+      $n_close(mfd);
       free(mfd);
       return -waserror;
    }
 
    log_msg("  open success main fd=%d\n", fd);
 
-   mfd->is_main = 1;
    mfd->mainfd = fd;
    mfd->main_inode = mystat.st_ino;
    fi->fh = (intptr_t) mfd;
@@ -163,28 +169,99 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       fd = creat(fpath, mode);
       if(fd < 0){
          waserror = errno;
+         // TODO CLEAN UP MAP/DAT FILES
          break;
       }
 
       // We need to store the inode no of the file. We can only do that here as it's new
       if(fstat(fd, &mystat) == -1){
          waserror = errno;
+         // TODO CLEAN UP MAP/DAT FILES
          break;
       }
    }while(0);
 
    if(waserror != 0){
+      $n_close(mfd);
       free(mfd);
       return -waserror;
    }
 
-   mfd->is_main = 1;
    mfd->mainfd = fd;
    mfd->main_inode = mystat.st_ino;
    fi->fh = (intptr_t) mfd;
 
    return 0;
 }
+
+
+
+   /** Change the size of a file */
+//   int (*truncate) (const char *, off_t);
+int $truncate(const char *path, off_t newsize)
+{
+   struct $fd_t mfd;
+   int ret;
+   int waserror = 0;
+
+   $$IF_PATH_MAIN_ONLY
+
+   log_msg("  trunc(path=\"%s\" size=%zu)\n", path, newsize);
+
+   // TODO should there be a lock for the whole of truncate?
+
+   if(unlikely((ret = $n_open(&(mfd), path, fpath, fsdata)) != 0)){ return ret; }
+
+   /////////////////////////////////////////////
+   // TODO                                    //
+   // Return here if the file does not exist. //
+   // Put the inode into mfd.                 //
+   /////////////////////////////////////////////
+
+   do{
+      ret = open(fpath, O_RDONLY);
+      if(ret == -1){
+         waserror = errno;
+         // TODO CLEAN UP MAP/DAT FILES
+         break;
+      }
+
+      mfd.mainfd = ret;
+
+      do{
+
+         // If the file existed and was larger than newsize, save the blocks
+         // NB Any blocks outside the current main file should have already been saved
+         if(mfd.mapheader.exists == 1 && newsize < mfd.mapheader.fstat.st_size){
+            ret = $b_write(fsdata, &(mfd), mfd.mapheader.fstat.st_size - newsize, newsize);
+            if(ret != 0){
+               waserror = -ret;
+               break;
+            }
+         }
+
+         if(truncate(fpath, newsize) != 0){
+            waserror = errno;
+            break;
+         }
+
+      }while(0);
+
+      close(mfd.mainfd);
+
+   }while(0);
+
+   if(unlikely((ret = $n_close(&(mfd))) != 0)){
+      return ret;
+   }
+
+   return -waserror;
+
+   // TODO add optimisation: copy file to snapshot if that's faster?
+   // TODO add optimisation: set whole_saved if newsize==0
+
+}
+
 
 
    /** Open directory
