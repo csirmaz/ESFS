@@ -135,8 +135,9 @@
  * Call this before modifying any file, including renaming it.
  *   vpath is the virtual path to the file in the main space.
  * Sets
- *   mfd->mapfd, the map file opened for RDWR or -1 if there are no snapshots
- *   mfd->datfd, the dat file opened for WR|APPEND or -1 if there are no snapshots
+ *   mfd->mapfd, the map file opened for RDWR or a negative value if unused -- see types.h
+ *   mfd->datfd, the dat file opened for WR|APPEND or a negative value if unused -- see types.h
+ *   mfd->size_in_sn, the size of the main file in the snapshot, not always initialised -- see types.h
  *   mfd->is_renamed, 0 or 1
  * Saves
  *   stats of the file into the map file, unless the map file already exists.
@@ -171,6 +172,9 @@ static int $n_open(
    int waserror = 0;
    $$PATH_LEN_T plen;
    struct $mapheader_t mapheader; // TODO use lockable buffers?
+
+   // Default values
+   mfd->is_renamed = 0;
 
    // No snapshots?
    if(fsdata->sn_is_any == 0){
@@ -230,9 +234,19 @@ static int $n_open(
             }
 
             // There's no write directive
+            // Read information about the file as it was at the time of the snapshot
+
             // Check if the file existed in the snapshot
             if(mapheader.exists == 0){
                mfd->datfd = -3;
+               break; // not an error, but we want to skip opening the dat file
+            }
+
+            // The size of the file when the snapshot was taken
+            mfd->size_in_sn = mapheader.fstat.st_size;
+
+            if(unlikely(mfd->size_in_sn == 0)){
+               mfd->datfd = -4;
                break; // not an error, but we want to skip opening the dat file
             }
 
@@ -293,6 +307,14 @@ static int $n_open(
             $dlogi("n_open: Failed: only written %d bytes into .map header at %s\n", ret, fmap);
             waserror = EIO;
             break;
+         }
+
+         // The size of the file when the snapshot was taken
+         mfd->size_in_sn = mapheader.fstat.st_size;
+
+         if(unlikely(mfd->size_in_sn == 0)){
+            mfd->datfd = -4;
+            break; // not an error, but we want to skip opening the dat file
          }
 
          // Open or create the dat file

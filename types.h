@@ -143,12 +143,14 @@ struct $mapheader_t {
 // -2 = if the main file is opened for read-only
 // ** = can also be:
 // -3 = if the file didn't exist when the snapshot was taken
+// -4 = if the file was 0 length when the snapshot was taken
 
 struct $fd_t {
    int is_main; // 1 if this is a main file; 0 otherwise
    // MAIN FILE FD:
    int mainfd; // filehandle to the main file
-   ino_t main_inode; // the inode number of the main file
+   ino_t main_inode; // the inode number of the main file, used for locking
+   off_t size_in_sn; // the size of the file when the snapshot was taken, not initialised if datfd is -1, -2 or -3
    int mapfd; // filehandle to the map file*. See $n_open
    int datfd; // filehandle to the dat file* **. See $n_open
    int is_renamed; // 0 or 1 if we have followed a write directive. See $n_open

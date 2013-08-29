@@ -185,6 +185,8 @@ int $truncate(const char *path, off_t newsize)
    // log_msg("\ntruncate(path=\"%s\", newsize=%lld)\n", path, newsize);
    $$IF_PATH_MAIN_ONLY
 
+   log_msg("  trunc(path=\"%s\")\n", path);
+
    // TODO push to snapshot
 
    if(truncate(fpath, newsize) == 0){ return 0; }

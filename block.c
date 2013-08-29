@@ -70,7 +70,7 @@
  * 4. write map
  * 5. allow write to main file
  *
- * We need locking because of a different thread reads the map (1) before this thread
+ * We need locking because if a different thread reads the map (1) before this thread
  * reaches (4), it will think it needs to save the block. However, the block in the
  * main file may be written by this thread before it reads it.
  *
@@ -87,7 +87,7 @@
          break; \
       } \
       if(ret == 0){ pointer = 0; } \
-      $dlogdbg("b_write: Read %zu as pointer from %d:%td for main FD %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
+      $dlogdbg("b_write: Read %zu as pointer from fd %d offs %td for main FD %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
 /* Called when a write operation is attempted
  * Returns:
@@ -114,26 +114,30 @@ static inline int $b_write(
    // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
    if(mfd->datfd < 0){ return 0; }
 
-   $dlogdbg("b_write: offset %lld size %d\n", (long long int)writeoffset, (int)writesize);
+   $dlogdbg("b_write: woffset: %zu wsize: %td size_in_sn: %zu\n", writeoffset, writesize, mfd->size_in_sn);
 
-   if(writesize <= 0){ return 0; } // Nothing to write
 
-   /////////////////////////////////////////////////////////////////
-   // TODO Don't save blocks outside original length of main file //
-   /////////////////////////////////////////////////////////////////
+   // Don't save blocks outside original length of main file
+   if(writeoffset + writesize > mfd->size_in_sn){
+      if(writeoffset >= mfd->size_in_sn){ // the offset is already past the length
+         $dlogdbg("b_write: nothing to write\n");
+         return 0;
+      }
+      writesize = mfd->size_in_sn - writeoffset; // warning: size_t is unsigned and can underflow
+   }
 
    blockoffset = (writeoffset >> $$BL_SLOG);
    blocknumber = (writesize >> $$BL_SLOG) + 1;
 
-   $dlogdbg("b_write: bloffs %lld blockno %d\n", (long long int)blockoffset, (int)blocknumber);
+   $dlogdbg("b_write: bloffs %zu blockno %td (%td,%td)\n", blockoffset, blocknumber, writesize, (writesize >> $$BL_SLOG));
 
    for(;blocknumber > 0; blocknumber--, blockoffset++){
 
-      // ============== BLOCK LOOP ================= //
+      // ============== BLOCK LOOP =================
 
-      $dlogdbg("b_write: Processing block no %ld from main FD %d\n", blockoffset, mfd->mainfd);
+      $dlogdbg("b_write: Processing block no %zu from main FD %d\n", blockoffset, mfd->mainfd);
 
-      mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S;
+      mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO There shouldn't be overflow as blockoffset is off_t
 
       // Read the pointer from the map file.
       // This may not be the final pointer if we haven't got the lock, but if it's already non-0, we
@@ -175,10 +179,10 @@ static inline int $b_write(
       }
 
       // Read the old block from the main file
-      ret = pread(mfd->mainfd, buf, $$BL_S, (blockoffset << $$BL_SLOG));
+      ret = pread(mfd->mainfd, buf, $$BL_S, (blockoffset << $$BL_SLOG)); // TODO check all left shifts for potential overflow. Here, blockoffset is off_t
       if(unlikely(ret < 1)){ // We should be able to read from the main file at least 1 byte
          waserror = (ret==-1 ? errno : ENXIO);
-         $dlogdbg("Error: pread from main file FD %d count %d offset %td, err (%d) %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
+         $dlogdbg("Error: pread from main file FD %d count %d offset %td, ret %d err %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
          break;
       }
 
@@ -200,7 +204,7 @@ static inline int $b_write(
       ret = write(mfd->datfd, buf, $$BL_S);
       if(unlikely(ret != $$BL_S)){
          waserror = (ret==-1 ? errno : ENXIO);
-         $dlogdbg("Error: write into .dat for main file FD %d, err (%d) %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
+         $dlogdbg("Error: write into .dat for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
 
@@ -210,11 +214,11 @@ static inline int $b_write(
       ret = pwrite(mfd->mapfd, &pointer, $$BLP_S, mapoffset);
       if(unlikely(ret != $$BLP_S)){
          waserror = (ret==-1 ? errno : ENXIO);
-         $dlogdbg("Error: pwrite on .map for main file FD %d, err (%d) %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
+         $dlogdbg("Error: pwrite on .map for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
 
-      $dlogdbg("b_write: wrote pointer %zu to %d:%td for main fd %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
+      $dlogdbg("b_write: wrote pointer %zu to fd %d offs %td for main fd %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
    } // end for
 
