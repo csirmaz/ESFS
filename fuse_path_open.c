@@ -97,33 +97,41 @@ int $open(const char *path, struct fuse_file_info *fi)
 
       }
 
-      fd = open(fpath, flags);
-      if(fd == -1){
-         waserror = errno;
-         // TODO CLEAN UP MAP/DAT FILES (if opening for writing)
-         break;
-      }
+      do{
 
-      // We need to store the inode no of the file.
-      // We can only do that here after the open as it's possibly new
-      // TODO but if it's not, we could get the inode from $n_open!
-      if(fstat(fd, &mystat) == -1){
-         waserror = errno;
+         fd = open(fpath, flags);
+         if(fd == -1){
+            waserror = errno;
+            break;
+         }
+         mfd->mainfd = fd;
+
+         // We need to store the inode no of the file.
+         // We can only do that here after the open as it's possibly new
+         // TODO but if it's not, we could get the inode from $n_open!
+         if(fstat(fd, &mystat) == -1){
+            waserror = errno;
+            break;
+         }
+         mfd->main_inode = mystat.st_ino;
+
+      }while(0);
+
+      if(waserror != 0){
+         // TODO CLEAN UP MAP/DAT FILES if they have just been created?
+         $n_close(mfd);
          break;
       }
 
    }while(0);
 
    if(waserror != 0){
-      $n_close(mfd);
       free(mfd);
       return -waserror;
    }
 
    log_msg("  open success main fd=%d\n", fd);
 
-   mfd->mainfd = fd;
-   mfd->main_inode = mystat.st_ino;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -166,29 +174,37 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
          break;
       }
 
-      fd = creat(fpath, mode);
-      if(fd < 0){
-         waserror = errno;
+      do{
+
+         fd = creat(fpath, mode);
+         if(fd < 0){
+            waserror = errno;
+            break;
+         }
+         mfd->mainfd = fd;
+
+         // We need to store the inode no of the file. We can only do that here as it's new
+         if(fstat(fd, &mystat) == -1){
+            waserror = errno;
+            break;
+         }
+         mfd->main_inode = mystat.st_ino;
+
+      }while(0);
+
+      if(waserror != 0){
          // TODO CLEAN UP MAP/DAT FILES
+         $n_close(mfd);
          break;
       }
 
-      // We need to store the inode no of the file. We can only do that here as it's new
-      if(fstat(fd, &mystat) == -1){
-         waserror = errno;
-         // TODO CLEAN UP MAP/DAT FILES
-         break;
-      }
    }while(0);
 
    if(waserror != 0){
-      $n_close(mfd);
       free(mfd);
       return -waserror;
    }
 
-   mfd->mainfd = fd;
-   mfd->main_inode = mystat.st_ino;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -201,6 +217,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 int $truncate(const char *path, off_t newsize)
 {
    struct $fd_t mfd;
+   struct stat mystat;
    int ret;
    int waserror = 0;
 
@@ -210,25 +227,30 @@ int $truncate(const char *path, off_t newsize)
 
    // TODO should there be a lock for the whole of truncate?
 
-   if(unlikely((ret = $n_open(&(mfd), path, fpath, fsdata)) != 0)){ return ret; }
+   if(unlikely((ret = $n_open(&(mfd), path, fpath, fsdata)) != 0)){
+      return ret;
+   }
 
-   /////////////////////////////////////////////
-   // TODO                                    //
-   // Return here if the file does not exist. //
-   // Put the inode into mfd.                 //
-   /////////////////////////////////////////////
+   // TODO Return here if the file does not exist.
 
    do{
       ret = open(fpath, O_RDONLY);
       if(ret == -1){
          waserror = errno;
-         // TODO CLEAN UP MAP/DAT FILES
+         $dlogdbg("truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
          break;
       }
-
       mfd.mainfd = ret;
 
       do{
+
+         // Put the inode into mfd
+         if(fstat(mfd.mainfd, &mystat) != 0){
+            waserror = errno;
+            $dlogdbg("truncate(%s): failed to stat main file err %d = %s\n", fpath, waserror, strerror(waserror));
+            break;
+         }
+         mfd.main_inode = mystat.st_ino;
 
          // If the file existed and was larger than newsize, save the blocks
          // NB Any blocks outside the current main file should have already been saved
@@ -236,12 +258,14 @@ int $truncate(const char *path, off_t newsize)
             ret = $b_write(fsdata, &(mfd), mfd.mapheader.fstat.st_size - newsize, newsize);
             if(ret != 0){
                waserror = -ret;
+               $dlogdbg("truncate(%s): b_write failed err %d = %s\n", fpath, waserror, strerror(waserror));
                break;
             }
          }
 
          if(truncate(fpath, newsize) != 0){
             waserror = errno;
+            $dlogdbg("truncate(%s): truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
             break;
          }
 
@@ -251,7 +275,9 @@ int $truncate(const char *path, off_t newsize)
 
    }while(0);
 
+   // TODO CLEAN UP MAP/DAT FILES
    if(unlikely((ret = $n_close(&(mfd))) != 0)){
+      $dlogdbg("truncate(%s): n_close failed err %d = %s\n", fpath, -ret, strerror(-ret));
       return ret;
    }
 

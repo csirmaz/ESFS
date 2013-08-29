@@ -299,7 +299,7 @@ static int $n_open(
          if(lstat(fpath, &(maphead->fstat)) != 0){
             ret = errno;
             if(ret == ENOENT){ // main file does not exist (yet?)
-               // WARNING In this case, mfd.mapheader remains uninitialised!
+               // WARNING In this case, mfd.mapheader.fstat remains uninitialised!
                maphead->exists = 0;
             }else{ // some other error
                $dlogi("n_open: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
@@ -353,8 +353,6 @@ static inline void $n_open_rdonly(struct $fd_t *mfd)
 // -errno on error (the last errno)
 static inline int $n_close(struct $fd_t *mfd){
    int waserror = 0;
-
-   if(unlikely(close(mfd->mainfd) != 0)){ waserror = errno; }
 
    if(mfd->datfd >= 0){
       if(unlikely(close(mfd->datfd) != 0)){ waserror = errno; }

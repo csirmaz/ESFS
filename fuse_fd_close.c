@@ -87,17 +87,21 @@ int $flush(const char *path, struct fuse_file_info *fi)
 //   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
 {
+   struct $fd_t *mfd;
    int ret = 0;
+
+   mfd = $$MFD;
 
    log_msg("release(path=\"%s\", fi=0x%08x, mainfd=%d)\n", path, fi, $$MFD->mainfd);
 
-   if($$MFD->is_main == 1){
-      ret = $n_close($$MFD);
+   if(mfd->is_main == 1){
+      ret = $n_close(mfd);
+      if(unlikely(close(mfd->mainfd) != 0)){ ret = errno; }
    }
 
    // TODO close non-main fds
 
-   free($$MFD);
+   free(mfd);
 
    return ret;
 }
