@@ -238,3 +238,24 @@ static inline int $b_write(
 
    return -waserror; // this is 0 if waserror==0
 }
+
+
+/* Helper for truncate operations
+ * Returns 0 or -errno
+ */
+static inline int $b_truncate(struct $fsdata_t *fsdata, struct $fd_t *mfd, off_t newsize)
+{
+   int ret;
+
+   // If the file existed and was larger than newsize, save the blocks
+   // NB Any blocks outside the current main file should have already been saved
+   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size){
+      ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize);
+      if(ret == 0){
+         return 0;
+      }
+      $dlogdbg("b_truncate: b_write on main fd %d failed with err %d = %s\n", mfd->mainfd, -ret, strerror(-ret));
+      return ret;
+   }
+   return 0;
+}

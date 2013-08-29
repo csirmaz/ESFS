@@ -1,4 +1,6 @@
 
+Remove code duplications: open/create - truncate - ftruncate
+
 Add locking around open, truncate, remove
 (There is no '0' inode, but the locking could still add a constant to
 the inode when generating the label so that some special-purpose negative

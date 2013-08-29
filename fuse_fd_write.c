@@ -95,11 +95,7 @@ int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 
    log_msg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
 
-   // If the file existed and was larger than newsize, save the blocks
-   // NB Any blocks outside the current main file should have already been saved
-   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size){
-      if(unlikely((ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize)) != 0)){ return ret; }
-   }
+   if(unlikely((ret = $b_truncate(fsdata, mfd, newsize)) != 0)){ return ret; }
 
    if(ftruncate($$MFD->mainfd, newsize) == 0){ return 0; }
    return -errno;

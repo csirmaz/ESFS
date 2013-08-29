@@ -272,15 +272,10 @@ int $truncate(const char *path, off_t newsize)
          }
          mfd->main_inode = mystat.st_ino;
 
-         // If the file existed and was larger than newsize, save the blocks
-         // NB Any blocks outside the current main file should have already been saved
-         if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size){
-            ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize);
-            if(ret != 0){
-               waserror = -ret;
-               $dlogdbg("truncate(%s): b_write failed err %d = %s\n", fpath, waserror, strerror(waserror));
-               break;
-            }
+         ret = $b_truncate(fsdata, mfd, newsize);
+         if(ret != 0){
+            waserror = -ret;
+            break;
          }
 
       }while(0);
