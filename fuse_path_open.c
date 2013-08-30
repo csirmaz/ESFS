@@ -110,7 +110,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
             // We need to store the inode no of the file.
             // We can only do that here after the open as it's possibly new
-            // TODO but if it's not, we could get the inode from $n_open!
+            // TODO but if it's not (see mapheader.exists), we could get the inode from $n_open!
             if(fstat(fd, &mystat) == -1){
                waserror = errno;
                break;
@@ -234,7 +234,6 @@ int $truncate(const char *path, off_t newsize)
 {
    struct $fd_t myfd;
    struct $fd_t *mfd;
-   struct stat mystat;
    int ret;
    int fd;
    int waserror = 0;
@@ -251,7 +250,10 @@ int $truncate(const char *path, off_t newsize)
       return ret;
    }
 
-   // TODO Return here if the file does not exist.
+   // Return here if the file does not exist.
+   if(mfd->mapheader.exists == 0){
+      return -ENOENT;
+   }
 
    do{
       fd = open(fpath, O_RDONLY);
@@ -265,12 +267,9 @@ int $truncate(const char *path, off_t newsize)
       do{
 
          // Put the inode into mfd
-         if(fstat(fd, &mystat) != 0){
-            waserror = errno;
-            $dlogdbg("truncate(%s): failed to stat main file err %d = %s\n", fpath, waserror, strerror(waserror));
-            break;
-         }
-         mfd->main_inode = mystat.st_ino;
+         // We have already stat'd the main file.
+         // mfd->mapheader.fstat has been initialised as mapheader.exists == 1.
+         mfd->main_inode = mfd->mapheader.fstat.st_ino;
 
          ret = $b_truncate(fsdata, mfd, newsize);
          if(ret != 0){
