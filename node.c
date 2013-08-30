@@ -137,7 +137,6 @@
  * Sets
  *   mfd->mapfd, the map file opened for RDWR or a negative value if unused -- see types.h
  *   mfd->datfd, the dat file opened for WR|APPEND or a negative value if unused -- see types.h
- *   mfd->size_in_sn, the size of the main file in the snapshot, not always initialised -- see types.h
  *   mfd->is_renamed, 0 or 1
  * Saves
  *   stats of the file into the map file, unless the map file already exists.

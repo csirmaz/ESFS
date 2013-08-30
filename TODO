@@ -1,12 +1,20 @@
 
-Implement mkdir -p, rm -r
+* Implement mkdir -p, rm -r
 
-Add locking around open, truncate, remove
+* Add plan to list directories in snapshots
+
+* Add locking around open, truncate, unlink
+- that is, ensure when we read the map file (existence) or the map header,
+that we see the latest state. Maybe the same file-based lock should be used,
+but the label could be a hash of the filename, not the inode.
+
+- or at least around creating the map file and stating the main file, to
+make sure that we store before the first change.
 (There is no '0' inode, but the locking could still add a constant to
 the inode when generating the label so that some special-purpose negative
 lock labels could be used.)
 
-Add "all_already_saved" flag to mapheader; set in truncate if newsize==0 and rm,
+* Add "all_already_saved" flag to mapheader; set in truncate if newsize==0 and rm,
 read it in $n_open and set datfd to negative if true
 
-Ensure all functions are static
+* Ensure all functions are static

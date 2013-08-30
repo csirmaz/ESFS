@@ -89,7 +89,7 @@
       if(ret == 0){ pointer = 0; } \
       $dlogdbg("b_write: Read %zu as pointer from fd %d offs %td for main FD %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
-/* Called when a write operation is attempted
+/* Saves the overwritten part of a file
  * Returns:
  * 0 - on success
  * -errno - on failure
@@ -129,6 +129,8 @@ static inline int $b_write(
    }
 #undef $$B_SNSIZE
 
+   // TODO Check if writesize > 0
+
    blockoffset = (writeoffset >> $$BL_SLOG);
    blocknumber = (writesize >> $$BL_SLOG) + 1;
 
@@ -147,7 +149,7 @@ static inline int $b_write(
       // save ourselves the trouble of getting the lock.
       $$BLOCK_READ_POINTER
 
-      if(pointer != 0){ continue; } // We don't need to save, so go to next block
+      if(pointer != 0){ continue; } // We don't need to save again, so go to next block
 
       // Read the pointer from the map file - for real.
       // For this to work correctly, we need to make sure that the underlying FS is POSIX conforming,
@@ -240,7 +242,7 @@ static inline int $b_write(
 }
 
 
-/* Helper for truncate operations
+/* Saves the truncated part of a file
  * Returns 0 or -errno
  */
 static inline int $b_truncate(struct $fsdata_t *fsdata, struct $fd_t *mfd, off_t newsize)
@@ -249,7 +251,7 @@ static inline int $b_truncate(struct $fsdata_t *fsdata, struct $fd_t *mfd, off_t
 
    // If the file existed and was larger than newsize, save the blocks
    // NB Any blocks outside the current main file should have already been saved
-   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size){
+   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size){ // TODO check, but in all cases we should know that mfd->mapheader.exists == 1
       ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize);
       if(ret == 0){
          return 0;

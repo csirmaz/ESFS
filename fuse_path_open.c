@@ -227,88 +227,6 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 }
 
 
-
-   /** Change the size of a file */
-//   int (*truncate) (const char *, off_t);
-int $truncate(const char *path, off_t newsize)
-{
-   struct $fd_t myfd;
-   struct $fd_t *mfd;
-   int ret;
-   int fd;
-   int waserror = 0;
-
-   $$IF_PATH_MAIN_ONLY
-
-   mfd = &myfd;
-
-   log_msg("  trunc(path=\"%s\" size=%zu)\n", path, newsize);
-
-   // TODO should there be a lock for the whole of truncate?
-
-   if(unlikely((ret = $n_open(mfd, path, fpath, fsdata)) != 0)){
-      return ret;
-   }
-
-   // Return here if the file does not exist.
-   if(mfd->mapheader.exists == 0){
-      return -ENOENT;
-   }
-
-   do{
-      fd = open(fpath, O_RDONLY);
-      if(fd == -1){
-         waserror = errno;
-         $dlogdbg("truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
-         break;
-      }
-      mfd->mainfd = fd;
-
-      do{
-
-         // Put the inode into mfd
-         // We have already stat'd the main file.
-         // mfd->mapheader.fstat has been initialised as mapheader.exists == 1.
-         mfd->main_inode = mfd->mapheader.fstat.st_ino;
-
-         ret = $b_truncate(fsdata, mfd, newsize);
-         if(ret != 0){
-            waserror = -ret;
-            break;
-         }
-
-      }while(0);
-
-      close(fd);
-
-   }while(0);
-
-   // TODO CLEAN UP MAP/DAT FILES
-   if(unlikely((ret = $n_close(mfd)) != 0)){
-      $dlogdbg("truncate(%s): n_close failed err %d = %s\n", fpath, -ret, strerror(-ret));
-      return ret;
-   }
-
-   if(waserror != 0){
-      return -waserror;
-   }
-
-   // Actually do the truncate
-   if(truncate(fpath, newsize) != 0){
-      waserror = errno;
-      $dlogdbg("truncate(%s): truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
-      return -errno;
-   }
-
-   return 0;
-
-   // TODO add optimisation: copy file to snapshot if that's faster?
-   // TODO add optimisation: set whole_saved if newsize==0
-
-}
-
-
-
    /** Open directory
     *
     * Unless the 'default_permissions' mount option is given,
@@ -336,3 +254,62 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 }
 
 
+/* =================== Helper functions ===================== */
+
+/* Opens a file, saves the part to be truncated, closes it.
+ * Returns 0 or -errno.
+ */
+static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *path, const char *fpath, off_t newsize)
+{
+   struct $fd_t myfd;
+   struct $fd_t *mfd;
+   int ret;
+   int waserror = 0;
+
+   mfd = &myfd;
+
+   if(unlikely((ret = $n_open(mfd, path, fpath, fsdata)) != 0)){
+      return ret;
+   }
+
+   do{
+
+      // Return here if the file did not exist.
+      if(mfd->mapheader.exists == 0){
+         waserror = ENOENT;
+         break;
+      }
+
+      ret = open(fpath, O_RDONLY);
+      if(unlikely(ret == -1)){
+         waserror = errno;
+         $dlogdbg("truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
+         break;
+      }
+      mfd->mainfd = ret;
+
+      // Put the inode into mfd
+      // We have already stat'd the main file.
+      // mfd->mapheader.fstat has been initialised as mapheader.exists == 1.
+      mfd->main_inode = mfd->mapheader.fstat.st_ino;
+
+      ret = $b_truncate(fsdata, mfd, newsize);
+      if(unlikely(ret != 0)){
+         waserror = -ret;
+         // Don't break here, we want to close mainfd anyway
+      }
+
+      close(mfd->mainfd);
+
+   }while(0);
+
+   // TODO CLEAN UP MAP/DAT FILES unnecessarily created?
+   if(unlikely((ret = $n_close(mfd)) != 0)){
+      $dlogdbg("_open_truncate_close(%s): n_close failed err %d = %s\n", fpath, -ret, strerror(-ret));
+      return ret;
+   }
+
+   return -waserror;
+
+   // TODO add optimisation: set whole_saved if newsize==0
+}

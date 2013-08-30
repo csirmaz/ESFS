@@ -82,21 +82,6 @@ int $mkdir(const char *path, mode_t mode)
 }
 
 
-   /** Remove a file */
-//   int (*unlink) (const char *);
-int $unlink(const char *path)
-{
-   // log_msg("unlink(path=\"%s\")\n", path);
-   $$IF_PATH_MAIN_ONLY
-
-   // TODO push to snapshot
-   // TODO add optimisation: move file to snapshot if feasible
-
-   if(unlink(fpath) == 0){ return 0; }
-   return -errno;
-}
-
-
    /** Remove a directory */
 //   int (*rmdir) (const char *);
 int $rmdir(const char *path)
@@ -176,6 +161,56 @@ int $chown(const char *path, uid_t uid, gid_t gid)
 
    if(chown(fpath, uid, gid) == 0){ return 0; }
    return -errno;
+}
+
+
+   /** Remove a file */
+//   int (*unlink) (const char *);
+int $unlink(const char *path)
+{
+   int ret;
+
+   $$IF_PATH_MAIN_ONLY
+
+   $dlogdbg("  unlink(path=\"%s\")\n", path);
+
+   if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)){
+      return ret;
+   }
+
+   // Actually do the unlink
+   if(unlink(fpath) == 0){ return 0; }
+
+   ret = errno;
+   $dlogdbg("unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
+   return -ret;
+
+   // TODO add optimisation: move file to snapshot if feasible
+}
+
+
+   /** Change the size of a file */
+//   int (*truncate) (const char *, off_t);
+int $truncate(const char *path, off_t newsize)
+{
+   int ret;
+
+   $$IF_PATH_MAIN_ONLY
+
+   $dlogdbg("  trunc(path=\"%s\" size=%zu)\n", path, newsize);
+
+   if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, newsize)) != 0)){
+      return ret;
+   }
+
+   // Actually do the truncate
+   if(truncate(fpath, newsize) == 0){ return 0; }
+
+   ret = errno;
+   $dlogdbg("truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
+   return -ret;
+
+   // TODO add optimisation: copy file to snapshot if that's faster?
 }
 
 
