@@ -88,6 +88,8 @@
 #define $$LOCK_NUM 64 // Number of locks; this determines the number of concurrent files that can be written
 #define $$LOCKLABEL_T ino_t // ==, & used on it. 0 is a special value
 
+#define $$RECURSIVE_RM_FDS 3 // number of filehandles used when traversing tree
+
 // File-based locking
 // ------------------
 

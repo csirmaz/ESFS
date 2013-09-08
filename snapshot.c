@@ -58,7 +58,7 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
    int ret;
 
    $dlogi("Init: checking the snapshots dir '%s'\n", fsdata->sn_dir);
-   
+
    if(lstat(fsdata->sn_dir, &mystat) == 0){
       // Check if it is a directory
       if(S_ISDIR(mystat.st_mode)){ return 0; }
@@ -81,6 +81,42 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
 }
 
 
+// Get the earliest snapshot
+//   reads fsdata ->sn_is_any, sn_lat_dir
+//   Sets snpath to the real path of the earliest snapshot (".../snapshots/ID")
+//     and prevpointerpath to the real path of the pointer file of the second earliest snapshot.
+// Returns
+//   1 - if there are no snapshots
+//   0 - on success
+//   -errno - on internal error
+static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_MAX], char prevpointerpath[$$PATH_MAX])
+{
+   int ret;
+   char pointerpath[$$PATH_MAX];
+
+   if(fsdata->sn_is_any == 0){ return 1; } // no snapshots at all
+
+   strcpy(snpath, fsdata->sn_lat_dir);
+
+   while(1){
+
+      ret = $get_hid_path(pointerpath, snpath);
+      if(ret != 0){ return ret; }
+
+      ret = $get_sndir_from_file(fsdata, snpath, pointerpath);
+
+      if(ret == 0){ // no pointer to a previous snapshot; we've found the earliest one
+         return 0;
+      }
+
+      if(ret < 0){ return ret; } // error
+
+      strcpy(prevpointerpath, pointerpath);
+      // TODO: check for infinite loops here?
+   }
+
+}
+
 
 // Gets the path to the root of the latest snapshot:
 //   reads .../snapshots/.hid
@@ -89,8 +125,8 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
 // Returns:
 // 0 - on success
 // -errno - on failure
-static int $sn_get_latest(struct $fsdata_t *fsdata){
-   int fd;
+static int $sn_get_latest(struct $fsdata_t *fsdata)
+{
    int ret;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
@@ -102,34 +138,18 @@ static int $sn_get_latest(struct $fsdata_t *fsdata){
    strncat(path, $$DIRSEP, 1);
    strncat(path, $$EXT_HID, $$EXT_LEN);
 
-   fd = open(path, O_RDONLY);
-   if(fd == -1){
-      fd = errno;
-      if(fd == ENOENT){
-         fsdata->sn_is_any = 0;
-         $dlogi("Get latest sn: %s not found, so there must be no snapshots\n", path);
-         return 0;
-      }
-      $dlogi("Get latest sn: opening %s failed with %d = %s\n", path, fd, strerror(fd));
-      return -fd;
+   ret = $get_sndir_from_file(fsdata, fsdata->sn_lat_dir, path);
+
+   if(ret == 0){
+      fsdata->sn_is_any = 0;
+      $dlogi("Get latest sn: %s not found, so there must be no snapshots\n", path);
+      return 0;
    }
 
-   // TODO check if the directory really exists before setting sn_lat_dir?
+   if(ret < 0){ return ret; }
 
-   ret = pread(fd, fsdata->sn_lat_dir, $$PATH_MAX, 0);
-   if(ret == -1){
-      ret = errno;
-      $dlogi("Get latest sn: reading from %s failed with %d = %s\n", path, ret, strerror(ret));
-      return -ret;
-   }
-   if(ret == 0 || fsdata->sn_lat_dir[ret] != '\0'){
-      $dlogi("Get latest sn: reading from %s returned 0 bytes or string is not 0-terminated.\n", path);
-      return -EIO;
-   }
-
-   close(fd);
    fsdata->sn_is_any = 1;
-   fsdata->sn_lat_dir_len = ret - 1;
+   fsdata->sn_lat_dir_len = ret;
    $dlogdbg("Get latest sn: found latest snapshot '%s' in '%s'\n", fsdata->sn_lat_dir, path);
    return 0;
 }
@@ -273,6 +293,33 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
       rmdir(path);
       return -1;
    }
+
+   return 0;
+}
+
+
+// Destroy the earliest snapshot
+// Returns
+// 0 - on success
+// -errno - on failure
+static int $sn_destroy(struct $fsdata_t *fsdata)
+{
+   char snpath[$$PATH_MAX];
+   char prevpointerpath[$$PATH_MAX];
+   int ret;
+
+   ret = $sn_get_earliest(fsdata, snpath, prevpointerpath);
+
+   if(ret == 1){ return -ENOENT; } // there are no snapshots at all
+   if(ret != 0){ return ret; } // internal error
+
+   $dlogi("Removing snapshot '%s' and pointer '%s'\n", snpath, prevpointerpath);
+
+   // Remove the "previous" pointer from the second earliest snapshot
+   if(unlink(prevpointerpath) != 0){ return -errno; }
+
+   // Remove the earliest snapshot
+   if((ret = $recursive_remove(snpath)) != 0){ return ret; }
 
    return 0;
 }

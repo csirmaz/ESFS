@@ -54,8 +54,19 @@
 //   int (*mkdir) (const char *, mode_t);
 int $mkdir(const char *path, mode_t mode)
 {
-   char newsnpath[$$PATH_MAX];
-   $$IF_PATH_MAIN
+   $$IF_PATH_SN
+
+      // Create a new snapshot
+
+      if(snpath->is_there != 1){
+         ret = -EFAULT; // "Bad address" if wrong path was used
+      }else if($sn_create(fsdata, fpath) != 0){
+         ret = -EIO; // If error occurred while trying to create snapshot; check logs.
+      }else{
+         ret = 0;
+      }
+
+   $$ELIF_PATH_MAIN
 
       log_msg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
@@ -63,20 +74,6 @@ int $mkdir(const char *path, mode_t mode)
 
       if(mkdir(fpath, mode) == 0){ return 0; }
       return -errno;
-
-   $$ELIF_PATH_SN
-
-      // Create a new snapshot
-
-      if(snpath->is_there != 1){
-         ret = -EFAULT; // "Bad address" if wrong path was used
-      }else if($sn_id_to_fpath(newsnpath, snpath->id, fsdata) != 0){
-         ret = -ENAMETOOLONG;  // if path gets too long
-      }else if($sn_create(fsdata, newsnpath) != 0){
-         ret = -EIO; // If error occurred while trying to create snapshot; check logs.
-      }else{
-         ret = 0;
-      }
 
    $$FI_PATH
 }
@@ -86,11 +83,23 @@ int $mkdir(const char *path, mode_t mode)
 //   int (*rmdir) (const char *);
 int $rmdir(const char *path)
 {
-   // log_msg("rmdir(path=\"%s\")\n", path);
-   $$IF_PATH_MAIN_ONLY // TODO implement deleting snapshot (rm -r); push change to snapshot
+   $$IF_PATH_SN
 
-   if(rmdir(fpath) == 0){ return 0; }
-   return -errno;
+      // Remove the latest snapshot
+
+      if(snpath->is_there != 0){
+         ret = -EFAULT;
+      }
+
+      ret = $sn_destroy(fsdata);
+
+   $$ELIF_PATH_MAIN
+
+      // log_msg("rmdir(path=\"%s\")\n", path);
+      if(rmdir(fpath) == 0){ return 0; }
+      return -errno;
+
+   $$FI_PATH
 }
 
 

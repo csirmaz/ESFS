@@ -54,6 +54,7 @@
 // setlinebuf() later in consequence.
 // pwrite needs >= 500
 // pselect needs >= 600
+// nftw needs >= 500
 #define _XOPEN_SOURCE 600
 
 // Needed to get utimensat and AT_FDCWD

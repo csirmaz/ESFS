@@ -60,6 +60,7 @@
 #include <sys/stat.h> // utimens
 #include <sys/select.h> // pselect
 #include <pthread.h> // mutexes
+#include <ftw.h> // nftw
 
 #include "types_c.h"
 

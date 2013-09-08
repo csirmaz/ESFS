@@ -53,15 +53,17 @@
 #define $$DFSDATA struct $fsdata_t *fsdata; fsdata = $$FSDATA;
 
 
+// Checks if (virtual) path is in the snapshot space
+#define $$_IS_PATH_IN_SN(path) (unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == $$DIRSEPCH || path[$$SNDIR_LEN] == '\0')))
+
+
 // Use this when the command writes - we don't allow that in the snapshot dir, only in the main space.
 // Uses path; Defines fpath, fsdata
 #define $$IF_PATH_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
    $$DFSDATA \
-   switch($cmpath(fpath, path, fsdata)){ \
-      case -ENAMETOOLONG : return -ENAMETOOLONG; \
-      case -EACCES : return -EACCES; \
-   }
+   if($$_IS_PATH_IN_SN(path)){ return -EACCES; } \
+   if($map_path(fpath, path, fsdata) != 0){ return -ENAMETOOLONG; }
 
 
 // Use this when there are two paths, path and newpath, and the command writes.
@@ -70,44 +72,38 @@
    char fpath[$$PATH_MAX]; \
    char fnewpath[$$PATH_MAX]; \
    $$DFSDATA \
-   switch($cmpath(fpath, path, fsdata)){ \
-      case -ENAMETOOLONG : return -ENAMETOOLONG; \
-      case -EACCES : return -EACCES; \
-   } \
-   switch($cmpath(fnewpath, newpath, fsdata)){ \
-      case -ENAMETOOLONG : return -ENAMETOOLONG; \
-      case -EACCES : return -EACCES; \
-   }
+   if($$_IS_PATH_IN_SN(path)){ return -EACCES; } \
+   if($map_path(fpath, path, fsdata) != 0){ return -ENAMETOOLONG; } \
+   if($$_IS_PATH_IN_SN(newpath)){ return -EACCES; } \
+   if($map_path(fnewpath, newpath, fsdata) != 0){ return -ENAMETOOLONG; }
 
 
 // Use these when there are different things to do in the two spaces
 // Uses path; Defines fpath, fsdata, snpath, ret
+// First branch: in snapshot space. fpath contains the mapped path; snpath the decomposed paths.
+// DO NOT RETURN FROM THE FOLLOWING BLOCK! SET 'ret' INSTEAD!
 // ! For performance, we only allocate memory for snpath when needed, but because of this,
 // one cannot return in the SN branch.
-#define $$IF_PATH_MAIN \
+#define $$IF_PATH_SN \
    char fpath[$$PATH_MAX]; \
    struct $snpath_t *snpath; \
    int ret = -EBADE; \
    $$DFSDATA \
-   switch($cmpath(fpath, path, fsdata)){ \
-      case 0 :
+   if($map_path(fpath, path, fsdata) != 0){ return -ENAMETOOLONG; } \
+   if($$_IS_PATH_IN_SN(path)){ \
+      snpath = malloc(sizeof(struct $snpath_t)); \
+      if(snpath == NULL){ return -ENOMEM; } \
+      $decompose_sn_path(snpath, path);
 
-// Uses snpath, path
-// DO NOT RETURN FROM THE FOLLOWING BLOCK! SET 'ret' INSTEAD!
-#define $$ELIF_PATH_SN \
-      case -EACCES : \
-         snpath = malloc(sizeof(struct $snpath_t)); \
-         if(snpath == NULL){ return -ENOMEM; } \
-         $decompose_sn_path(snpath, path);
+// Second branch: in main space. fpath contains the mapped path.
+#define $$ELIF_PATH_MAIN \
+      free(snpath); \
+      return ret; \
+   }
 
 // Uses ret
 #define $$FI_PATH \
-         free(snpath); \
-         return ret; \
-      case -ENAMETOOLONG : return -ENAMETOOLONG; \
-   } \
    return -EFAULT;
-
 
 
 // Use this to allow the operation everywhere.
@@ -126,7 +122,7 @@
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
-#define $$ADDNSUFFIX_RET(newpath, olpdath, fix, fixlen) \
+#define $$ADDNSUFFIX_RET(newpath, oldpdath, fix, fixlen) \
    if(likely(strlen(oldpath) < $$PATH_MAX - fixlen)){ \
       strcpy(newpath, oldpath); \
       strncat(newpath, fix, fixlen); \
@@ -174,11 +170,11 @@
    strncat(newpath2, suffix2, suffixlen);
 
 
-// Adds "hidden" suffix to a path
+// Adds the "hidden" suffix to a path
 // Returns:
 // 0 - success
 // -ENAMETOOLONG - if the new path is too long
-static int $get_hid_path(char *newpath, const char *oldpath)
+static inline int $get_hid_path(char *newpath, const char *oldpath)
 {
    $$ADDNSUFFIX_RET(newpath, oldpath, $$EXT_HID, $$EXT_LEN)
 }
@@ -188,33 +184,16 @@ static int $get_hid_path(char *newpath, const char *oldpath)
 // Puts the mapped path in fpath and returns
 // 0 - if the path is in the main space
 // -ENAMETOOLONG - if the mapped path is too long
-static int $map_path(char *fpath, const char *path, const struct $fsdata_t *fsdata)
+static inline int $map_path(char *fpath, const char *path, const struct $fsdata_t *fsdata)
 {
    $$ADDNPREFIX_RET(fpath, path, fsdata->rootdir, fsdata->rootdir_len)
-}
-
-
-// Checks and maps path (path into fpath)
-// Puts the mapped path in fpath and returns
-// 0 - if the path is in the main space
-// -EACCES - if the path is in the snapshot space
-// -ENAMETOOLONG - if the mapped path is too long
-static int $cmpath(char *fpath, const char *path, const struct $fsdata_t *fsdata)
-{
-   // If path starts with the snapshot folder
-   if(unlikely(strncmp(path, $$SNDIR, $$SNDIR_LEN) == 0 && (path[$$SNDIR_LEN] == $$DIRSEPCH || path[$$SNDIR_LEN] == '\0'))){
-      return -EACCES;
-   }
-
-   // Add prefix of root folder to map to underlying file
-   return $map_path(fpath, path, fsdata); // TODO copy code here to ensure optimisation?
 }
 
 
 // Breaks up a VIRTUAL path in the snapshots space into a struct $snpath_t
 // "/snapshots/ID/dir/dir/file"
 // Returns snpath->is_there:
-// 0 - if the string is "/snapshots" or "/snapshots?" (from $cmpath we'll know that ?='/') or "/snapshots//"
+// 0 - if the string is "/snapshots" or "/snapshots?" (from $$_IS_PATH_IN_SN we'll know that ?='/') or "/snapshots//"
 // 1 - if the string is "/snapshots/ID($|/)"
 // 2 - if the string is "/snapshots/ID/..."
 static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
@@ -263,13 +242,64 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 }
 
 
-// Map snapshot ID ("/ID") into a real path
-// Returns:
-// 0 - success
-// -ENAMETOOLONG - if the new path is too long
-static int $sn_id_to_fpath(char *fpath, const char *id, const struct $fsdata_t *fsdata)
+// Implementation of rm -r
+// $recursive_remove returns 0 or -errno.
+// The helper function, $_univ_rm returns 0 or errno.
+int $_univ_rm(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
 {
-   $$ADDNPREFIX_RET(fpath, id, fsdata->sn_dir, strlen(fsdata->sn_dir)) // TODO cache length?
+   if(typeflag == FTW_DP || typeflag == FTW_D || typeflag == FTW_DNR){
+      if(rmdir(fpath) != 0){ return errno; }
+      return 0;
+   }
+
+   if(unlink(fpath) != 0){ return errno; }
+   return 0;
+}
+
+static inline int $recursive_remove(const char *path)
+{
+   int ret;
+   ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS);
+   if(ret >= 0){ return -ret; } // success or errno
+   return ENOMEM; // generic error encountered by nftw
+}
+
+
+// Read a snapshot dir path from a file
+// Returns:
+// length of path - on success
+// 0 - if the file does not exist
+// -errno - on other failure
+static int $get_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_MAX], const char *filepath)
+{
+   int fd;
+   int ret;
+
+   if((fd = open(filepath, O_RDONLY)) == -1){
+      fd = errno;
+      if(fd == ENOENT){
+         return 0;
+      }
+      $dlogi("get_path_from_file: opening %s failed with %d = %s\n", filepath, fd, strerror(fd));
+      return -fd;
+   }
+
+   ret = pread(fd, buf, $$PATH_MAX, 0);
+   if(ret == -1){
+      ret = errno;
+      $dlogi("get_path_from_file: reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
+      return -ret;
+   }
+   if(ret == 0 || buf[ret] != '\0'){
+      $dlogi("get_path_from_file: reading from %s returned 0 bytes or string is not 0-terminated.\n", filepath);
+      return -EIO;
+   }
+
+   close(fd);
+
+   // TODO check if the directory really exists before returning success
+
+   return (ret - 1);
 }
 
 
