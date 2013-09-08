@@ -86,12 +86,13 @@ int $rmdir(const char *path)
    $$IF_PATH_SN
 
       // Remove the latest snapshot
+      $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
 
       if(snpath->is_there != 0){
          ret = -EFAULT;
+      } else {
+         ret = $sn_destroy(fsdata);
       }
-
-      ret = $sn_destroy(fsdata);
 
    $$ELIF_PATH_MAIN
 

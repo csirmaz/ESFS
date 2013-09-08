@@ -118,19 +118,6 @@
    }
 
 
-// Adds a suffix to a path (STANDALONE - ALWAYS RETURNS!)
-// Returns:
-// 0 - success
-// -ENAMETOOLONG - if the new path is too long
-#define $$ADDNSUFFIX_RET(newpath, oldpdath, fix, fixlen) \
-   if(likely(strlen(oldpath) < $$PATH_MAX - fixlen)){ \
-      strcpy(newpath, oldpath); \
-      strncat(newpath, fix, fixlen); \
-      return 0; \
-   } \
-   return -ENAMETOOLONG;
-
-
 // Adds a prefix to a path (MAY RETURN)
 // Needs $$PATH_LEN_T plen
 // Returns:
@@ -176,7 +163,28 @@
 // -ENAMETOOLONG - if the new path is too long
 static inline int $get_hid_path(char *newpath, const char *oldpath)
 {
-   $$ADDNSUFFIX_RET(newpath, oldpath, $$EXT_HID, $$EXT_LEN)
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)){
+      strcpy(newpath, oldpath);
+      strncat(newpath, $$EXT_HID, $$EXT_LEN);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
+
+
+// Adds a DIRSEP and the "hidden" suffix to a path, to get the main snapshot pointer
+// Returns:
+// 0 - success
+// -ENAMETOOLONG - if the new path is too long
+static inline int $get_dir_hid_path(char *newpath, const char *oldpath)
+{
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - 1)){
+      strcpy(newpath, oldpath);
+      strncat(newpath, $$DIRSEP, 1);
+      strncat(newpath, $$EXT_HID, $$EXT_LEN);
+      return 0;
+   }
+   return -ENAMETOOLONG;
 }
 
 

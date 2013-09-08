@@ -93,14 +93,14 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
 static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_MAX], char prevpointerpath[$$PATH_MAX])
 {
    int ret;
-   int p = 2;
+   int p = 0;
    char pointerpath[$$PATH_MAX];
 
    if(fsdata->sn_is_any == 0){ return 1; } // no snapshots at all
 
    strcpy(snpath, fsdata->sn_lat_dir);
 
-   while(1){
+   while(p < $$MAX_SNAPSHOTS){
 
       ret = $get_hid_path(pointerpath, snpath);
       if(ret != 0){ return ret; }
@@ -108,15 +108,17 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
       ret = $get_sndir_from_file(fsdata, snpath, pointerpath);
 
       if(ret == 0){ // no pointer to a previous snapshot; we've found the earliest one
-         return p;
+         return (p == 0 ? 2 : 0);
       }
 
       if(ret < 0){ return ret; } // error
 
       strcpy(prevpointerpath, pointerpath);
-      p = 0;
-      // TODO: check for infinite loops here?
+      p++;
    }
+
+   $dlogi("Error: too many snapshots or there is an infinite loop in the %s/ID%s files (probably caused by a bug). Sorry.\n", $$SNDIR, $$EXT_HID);
+   return -EIO;
 
 }
 
@@ -133,13 +135,7 @@ static int $sn_get_latest(struct $fsdata_t *fsdata)
    int ret;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
-   // We could store the path to the pointer instead of recreating it here and in $sn_set_latest
-   if(unlikely(strlen(fsdata->sn_dir) >= $$PATH_MAX - $$EXT_LEN - 1)){
-      return -ENAMETOOLONG;
-   }
-   strcpy(path, fsdata->sn_dir);
-   strncat(path, $$DIRSEP, 1);
-   strncat(path, $$EXT_HID, $$EXT_LEN);
+   if((ret = $get_dir_hid_path(path, fsdata->sn_dir)) != 0){ return ret; }
 
    ret = $get_sndir_from_file(fsdata, fsdata->sn_lat_dir, path);
 
@@ -172,12 +168,7 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
    int len;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
-   if(unlikely(strlen(fsdata->sn_dir) >= $$PATH_MAX - $$EXT_LEN - 1)){
-      return -ENAMETOOLONG;
-   }
-   strcpy(path, fsdata->sn_dir);
-   strncat(path, $$DIRSEP, 1);
-   strncat(path, $$EXT_HID, $$EXT_LEN);
+   if((ret = $get_dir_hid_path(path, fsdata->sn_dir)) != 0){ return ret; }
 
    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
    if(fd == -1){
@@ -315,7 +306,7 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
    ret = $sn_get_earliest(fsdata, snpath, prevpointerpath);
 
    if(ret < 0){ // internal error
-      $dlogdbg("sn_destroy: sn_get_earliest returned error %d = %s\n", ret, strerror(ret));
+      $dlogdbg("sn_destroy: sn_get_earliest returned error %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
 
@@ -328,7 +319,11 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
 
       $dlogi("Removing the last remaining snapshot '%s'\n", snpath);
 
-      // Remove the earliest snapshot
+      // Remove the pointer to the latest snapshot (snapshots/ID/.hid)
+      if((ret = $get_dir_hid_path(prevpointerpath, fsdata->sn_dir)) != 0){ return ret; }
+      if(unlink(prevpointerpath) != 0){ return -errno; }
+      
+      // Remove the snapshot
       if((ret = $recursive_remove(snpath)) != 0){ return ret; }
 
       fsdata->sn_is_any = 0;

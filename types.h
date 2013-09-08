@@ -61,14 +61,16 @@
  * simplest solution under these circumstances, even though incoming paths
  * can be of any length.
  */
-#define $$PATH_MAX PATH_MAX
+#define $$PATH_MAX PATH_MAX // we regularly use strings of this length
 #define $$PATH_LEN_T size_t // type to store path lengths in
 #define $$FILESIZE_T unsigned long // type to store file size in
 
-#define $$BL_S 131072 // blocksize in bytes. 128K = 2^17 TODO Determine this based on stat.st_blksize
+#define $$BL_S 131072 // blocksize in bytes. 128K = 2^17 // TODO Determine this based on stat.st_blksize
 #define $$BL_SLOG 17 // log2(blocksize)
 #define $$BLP_T size_t // block pointer type. Note: filesizes are stored in off_t
 #define $$BLP_S (sizeof($$BLP_T)) // block pointer size in bytes
+
+#define $$MAX_SNAPSHOTS 1024*1024 // this is currently only used to detect infinite loops // TODO Review this
 
 // The snapshots directory
 //                  0123456789
@@ -88,7 +90,7 @@
 #define $$LOCK_NUM 64 // Number of locks; this determines the number of concurrent files that can be written
 #define $$LOCKLABEL_T ino_t // ==, & used on it. 0 is a special value
 
-#define $$RECURSIVE_RM_FDS 3 // number of filehandles used when traversing tree
+#define $$RECURSIVE_RM_FDS 3 // number of filehandles to use when traversing directories
 
 // File-based locking
 // ------------------
