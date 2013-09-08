@@ -78,13 +78,13 @@ int $open(const char *path, struct fuse_file_info *fi)
 
       if((flags & O_WRONLY) == 0 && (flags & O_RDWR) == 0){ // opening for read-only
 
-         $n_open_rdonly(mfd);
+         $mfd_open_sn_rdonly(mfd);
 
       }else{ // opening for writing
 
          // Save the current status of the file by initialising the map file.
          // We don't delete this even if the subsequent operation fails.
-         fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
+         fd = $mfd_open_sn(mfd, path, fpath, fsdata); // fd only stores a success flag here
          if(fd < 0){
             waserror = -fd; // converting -errno to +errno
             break;
@@ -110,7 +110,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
             // We need to store the inode no of the file.
             // We can only do that here after the open as it's possibly new
-            // TODO but if it's not (see mapheader.exists), we could get the inode from $n_open!
+            // TODO but if it's not (see mapheader.exists), we could get the inode from $mfd_open_sn!
             if(fstat(fd, &mystat) == -1){
                waserror = errno;
                break;
@@ -127,7 +127,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
       if(waserror != 0){
          // TODO CLEAN UP MAP/DAT FILES if they have just been created?
-         $n_close(mfd);
+         $mfd_close_sn(mfd);
          break;
       }
 
@@ -176,7 +176,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
    do{
       // Save the current status of the file by initialising the map file.
       // We don't delete this even if the subsequent operation fails.
-      fd = $n_open(mfd, path, fpath, fsdata); // fd only stores a success flag here
+      fd = $mfd_open_sn(mfd, path, fpath, fsdata); // fd only stores a success flag here
       if(fd < 0){
          waserror = -fd; // Converting -errno to +errno;
          break;
@@ -210,7 +210,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
       if(waserror != 0){
          // TODO CLEAN UP MAP/DAT FILES
-         $n_close(mfd);
+         $mfd_close_sn(mfd);
          break;
       }
 
@@ -268,7 +268,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
 
    mfd = &myfd;
 
-   if(unlikely((ret = $n_open(mfd, path, fpath, fsdata)) != 0)){
+   if(unlikely((ret = $mfd_open_sn(mfd, path, fpath, fsdata)) != 0)){
       return ret;
    }
 
@@ -304,8 +304,8 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
    }while(0);
 
    // TODO CLEAN UP MAP/DAT FILES unnecessarily created?
-   if(unlikely((ret = $n_close(mfd)) != 0)){
-      $dlogdbg("_open_truncate_close(%s): n_close failed err %d = %s\n", fpath, -ret, strerror(-ret));
+   if(unlikely((ret = $mfd_close_sn(mfd)) != 0)){
+      $dlogdbg("_open_truncate_close(%s): mfd_close_sn failed err %d = %s\n", fpath, -ret, strerror(-ret));
       return ret;
    }
 

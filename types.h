@@ -152,9 +152,9 @@ struct $mfd_t {
    int mainfd; // filehandle to the main file
    struct $mapheader_t mapheader; // The whole mapheader loaded into memory
    ino_t main_inode; // the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking
-   int mapfd; // filehandle to the map file*. See $n_open
-   int datfd; // filehandle to the dat file* **. See $n_open
-   int is_renamed; // 0 or 1 if we have followed a write directive. See $n_open
+   int mapfd; // filehandle to the map file*. See $mfd_open_sn
+   int datfd; // filehandle to the dat file* **. See $mfd_open_sn
+   int is_renamed; // 0 or 1 if we have followed a write directive. See $mfd_open_sn
 };
 
 // CAST

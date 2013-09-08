@@ -95,7 +95,7 @@ int $release(const char *path, struct fuse_file_info *fi)
    log_msg("release(path=\"%s\", fi=0x%08x, mainfd=%d)\n", path, fi, $$MFD->mainfd);
 
    if(mfd->is_main == 1){
-      ret = $n_close(mfd);
+      ret = $mfd_close_sn(mfd);
       if(unlikely(close(mfd->mainfd) != 0)){ ret = errno; }
    }
 

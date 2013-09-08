@@ -131,7 +131,8 @@
  */
 
 
-/* Opens (and initialises, if necessary) the .map and .dat files.
+/* Opens (and initialises) the snapshot part of an MFD by
+ * opening (and creating and initialising, if necessary) the .map and .dat files.
  * Call this before modifying any file, including renaming it.
  *   vpath is the virtual path to the file in the main space.
  * Sets
@@ -147,7 +148,7 @@
 
 // breaks below are not errors, but we want to skip opening/creating the dat file
 // if the file was empty or nonexistent when the snapshot was taken
-#define $$N_OPEN_DAT_FILE \
+#define $$MFD_OPEN_DAT_FILE \
             if(maphead->exists == 0){ \
                mfd->datfd = -3; \
                break; \
@@ -159,14 +160,14 @@
             fd_dat = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
             if(fd_dat == -1){ \
                fd_dat = errno; \
-               $dlogi("n_open: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd_dat, strerror(fd_dat)); \
+               $dlogi("mfd_open_sn: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd_dat, strerror(fd_dat)); \
                waserror = fd_dat; \
                break; \
             } \
-            $dlogdbg("n_open: Opened dat file at %s FD %d\n", fdat, fd_dat); \
+            $dlogdbg("mfd_open_sn: Opened dat file at %s FD %d\n", fdat, fd_dat); \
             mfd->datfd = fd_dat;
 
-static int $n_open(
+static int $mfd_open_sn(
    struct $mfd_t *mfd,
    const char *vpath,
    const char *fpath,
@@ -191,7 +192,7 @@ static int $n_open(
 
    // No snapshots?
    if(fsdata->sn_is_any == 0){
-      $dlogdbg("n_open: no snapshots found, so returning\n");
+      $dlogdbg("mfd_open_sn: no snapshots found, so returning\n");
       mfd->mapfd = -1;
       mfd->datfd = -1;
       return 0;
@@ -216,10 +217,10 @@ static int $n_open(
          fd = open(fmap, O_RDWR);
          if(unlikely(fd == -1)){
             fd = errno;
-            $dlogi("n_open: Failed to open .map again at %s, error %d = %s\n", fmap, fd, strerror(fd));
+            $dlogi("mfd_open_sn: Failed to open .map again at %s, error %d = %s\n", fmap, fd, strerror(fd));
             return -fd;
          }
-         $dlogdbg("n_open: Managed to open .map file again at %s, FD %d\n", fmap, fd);
+         $dlogdbg("mfd_open_sn: Managed to open .map file again at %s, FD %d\n", fmap, fd);
 
          mfd->mapfd = fd;
 
@@ -229,18 +230,18 @@ static int $n_open(
             ret = pread(fd, maphead, sizeof(struct $mapheader_t), 0);
             if(unlikely(ret == -1)){
                waserror = errno;
-               $dlogi("n_open: Failed to read .map at %s, error %d = %s\n", fmap, waserror, strerror(waserror));
+               $dlogi("mfd_open_sn: Failed to read .map at %s, error %d = %s\n", fmap, waserror, strerror(waserror));
                break;
             }
             if(unlikely(ret != sizeof(struct $mapheader_t))){
-               $dlogi("n_open: Only read %d bytes instead of %ld from .map at %s. Broken FS?\n", ret, sizeof(struct $mapheader_t), fmap);
+               $dlogi("mfd_open_sn: Only read %d bytes instead of %ld from .map at %s. Broken FS?\n", ret, sizeof(struct $mapheader_t), fmap);
                waserror = EIO;
                break;
             }
 
             // Check the version and the signature
             if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0){
-               $dlogi("n_open: version or signature bad in map file %s. Broken FS?\n", fmap);
+               $dlogi("mfd_open_sn: version or signature bad in map file %s. Broken FS?\n", fmap);
                waserror = EFAULT;
                break;
             }
@@ -248,7 +249,7 @@ static int $n_open(
             // We need to check if there is a "write" directive in here.
             if(maphead->write_v[0] != '\0'){
                // Found a write directive, which we need to follow. This is a virtual path.
-               $dlogdbg("n_open: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, maphead->write_v);
+               $dlogdbg("mfd_open_sn: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, maphead->write_v);
                mfd->is_renamed = 1;
                waserror = -1;
                break;
@@ -258,7 +259,7 @@ static int $n_open(
 
             // Read information about the file as it was at the time of the snapshot
             // and open or create the dat file if necessary
-            $$N_OPEN_DAT_FILE
+            $$MFD_OPEN_DAT_FILE
 
          }while(0);
 
@@ -267,7 +268,7 @@ static int $n_open(
             if(waserror == -1){ // Follow the write directive
                // Get the full path in fmap
                $$ADDNPREFIX_CONT(fmap, maphead->write_v, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len)
-               return $n_open(mfd, maphead->write_v, fmap, fsdata);
+               return $mfd_open_sn(mfd, maphead->write_v, fmap, fsdata);
             }
             return -waserror;
          }
@@ -275,7 +276,7 @@ static int $n_open(
          // Continue below
 
       } else { // Other error
-         $dlogi("n_open: Failed to open .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
+         $dlogi("mfd_open_sn: Failed to open .map at %s, error %d = %s\n", fmap, fd, strerror(fd));
          return -fd;
       }
 
@@ -283,7 +284,7 @@ static int $n_open(
 
       do{
          // We've created the .map file; let's save data about the main file.
-         $dlogdbg("n_open: created a new map file at %s FD %d\n", fmap, fd);
+         $dlogdbg("mfd_open_sn: created a new map file at %s FD %d\n", fmap, fd);
 
          mfd->mapfd = fd;
 
@@ -301,7 +302,7 @@ static int $n_open(
                // WARNING In this case, mfd.mapheader.fstat remains uninitialised!
                maphead->exists = 0;
             }else{ // some other error
-               $dlogi("n_open: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
+               $dlogi("mfd_open_sn: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
                waserror = ret;
                break;
             }
@@ -310,19 +311,19 @@ static int $n_open(
          // write into the map file
          ret = pwrite(fd, maphead, sizeof(struct $mapheader_t), 0);
          if(unlikely(ret == -1)){
-            $dlogi("n_open: Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
+            $dlogi("mfd_open_sn: Failed to write .map header at %s, error %d = %s\n", fmap, ret, strerror(ret));
             waserror = errno;
             break;
          }
          if(unlikely(ret != sizeof(struct $mapheader_t))){
-            $dlogi("n_open: Failed: only written %d bytes into .map header at %s\n", ret, fmap);
+            $dlogi("mfd_open_sn: Failed: only written %d bytes into .map header at %s\n", ret, fmap);
             waserror = EIO;
             break;
          }
 
          // Read information about the file as it was at the time of the snapshot
          // and open or create the dat file if necessary
-         $$N_OPEN_DAT_FILE
+         $$MFD_OPEN_DAT_FILE
 
       }while(0);
 
@@ -338,19 +339,19 @@ static int $n_open(
 }
 
 
-// Marks main FD as read-only
-static inline void $n_open_rdonly(struct $mfd_t *mfd)
+// Marks an MFD as read-only
+static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
    mfd->datfd = -2;
 }
 
 
-// Close a main MFD
+// Close the snapshot part of an MFD
 // Returns
 // 0 on success
 // -errno on error (the last errno)
-static inline int $n_close(struct $mfd_t *mfd){
+static inline int $mfd_close_sn(struct $mfd_t *mfd){
    int waserror = 0;
 
    if(mfd->datfd >= 0){
