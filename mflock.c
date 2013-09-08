@@ -147,7 +147,7 @@
  * 0 on success
  * -errno on error
  */
-static int $flock_init(struct $fsdata_t *fsdata){
+static int $mflock_init(struct $fsdata_t *fsdata){
    int i;
    pthread_mutexattr_t mutexattr;
 
@@ -170,7 +170,7 @@ static int $flock_init(struct $fsdata_t *fsdata){
 }
 
 
-static int $flock_destroy(struct $fsdata_t *fsdata){
+static int $mflock_destroy(struct $fsdata_t *fsdata){
    int i;
 
    for(i=0; i<$$LOCK_NUM; i++){
@@ -187,7 +187,7 @@ static int $flock_destroy(struct $fsdata_t *fsdata){
  * lock number on success (>=0)
  * -errno on error
  */
-static int $flock_lock(struct $fsdata_t *fsdata, ino_t inode){
+static int $mflock_lock(struct $fsdata_t *fsdata, ino_t inode){
    int i;
    int ret;
    int ml = -1;
@@ -279,7 +279,7 @@ static int $flock_lock(struct $fsdata_t *fsdata, ino_t inode){
  * 0 on success
  * -errno on error
  */
-static int $flock_unlock(struct $fsdata_t *fsdata, int lockid){
+static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid){
    int ret;
    struct $mflock_t *mylock;
    pthread_mutex_t *modmutex;

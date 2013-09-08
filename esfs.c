@@ -68,7 +68,7 @@
 #include "util_c.c"
 #include "snapshot_c.c"
 #include "mfd_c.c"
-#include "mutex_c.c"
+#include "mflock_c.c"
 #include "block_c.c"
 #include "stat_c.c"
 #include "fuse_fd_close_c.c"
@@ -151,7 +151,7 @@ void $destroy(void *privdata)
 
    fsdata = ((struct $fsdata_t *) privdata );
 
-   $flock_destroy(fsdata);
+   $mflock_destroy(fsdata);
 
    $dlogi("Bye!\n");
 
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
       return 1;
    }
 
-   if($flock_init(fsdata) != 0){
+   if($mflock_init(fsdata) != 0){
       fprintf(stderr, "Failed to initialise mutexes. Aborting.\n");
       return 1;
    }

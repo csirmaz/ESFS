@@ -124,8 +124,9 @@ struct $snpath_t {
 
 // MAP file header
 // ---------------
-
+// The data saved in the .map file
 // TODO To make FS files portable, the types used here should be reviewed. and proper (de)serialisation implemented.
+
 struct $mapheader_t {
    int $version;
    int exists; // whether the file exists, 0 or 1
@@ -148,7 +149,7 @@ struct $mapheader_t {
 
 struct $mfd_t {
    int is_main; // 1 if this is a main file; 0 otherwise
-   // MAIN FILE FD:
+   // MAIN FILE PART: (used when dealing with a file in the main space)
    int mainfd; // filehandle to the main file
    struct $mapheader_t mapheader; // The whole mapheader loaded into memory
    ino_t main_inode; // the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking
