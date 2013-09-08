@@ -87,11 +87,13 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
 //     and prevpointerpath to the real path of the pointer file of the second earliest snapshot.
 // Returns
 //   1 - if there are no snapshots
+//   2 - if there is only one snapshot: snpath is set, but prevpointerpath is invalid
 //   0 - on success
 //   -errno - on internal error
 static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_MAX], char prevpointerpath[$$PATH_MAX])
 {
    int ret;
+   int p = 2;
    char pointerpath[$$PATH_MAX];
 
    if(fsdata->sn_is_any == 0){ return 1; } // no snapshots at all
@@ -106,12 +108,13 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
       ret = $get_sndir_from_file(fsdata, snpath, pointerpath);
 
       if(ret == 0){ // no pointer to a previous snapshot; we've found the earliest one
-         return 0;
+         return p;
       }
 
       if(ret < 0){ return ret; } // error
 
       strcpy(prevpointerpath, pointerpath);
+      p = 0;
       // TODO: check for infinite loops here?
    }
 
@@ -299,6 +302,7 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
 
 
 // Destroy the earliest snapshot
+//   May set fsdata->sn_is_any
 // Returns
 // 0 - on success
 // -errno - on failure
@@ -310,8 +314,27 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
 
    ret = $sn_get_earliest(fsdata, snpath, prevpointerpath);
 
-   if(ret == 1){ return -ENOENT; } // there are no snapshots at all
-   if(ret != 0){ return ret; } // internal error
+   if(ret < 0){ // internal error
+      $dlogdbg("sn_destroy: sn_get_earliest returned error %d = %s\n", ret, strerror(ret));
+      return ret;
+   }
+
+   if(ret == 1){ // there are no snapshots at all
+      $dlogi("Cannot remove snapshot as there are no snapshots.\n");
+      return -ENOENT;
+   }
+
+   if(ret == 2){ // removing the only snapshot
+
+      $dlogi("Removing the last remaining snapshot '%s'\n", snpath);
+
+      // Remove the earliest snapshot
+      if((ret = $recursive_remove(snpath)) != 0){ return ret; }
+
+      fsdata->sn_is_any = 0;
+
+      return 0;
+   }
 
    $dlogi("Removing snapshot '%s' and pointer '%s'\n", snpath, prevpointerpath);
 
