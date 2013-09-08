@@ -87,7 +87,7 @@ int $flush(const char *path, struct fuse_file_info *fi)
 //   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
 {
-   struct $fd_t *mfd;
+   struct $mfd_t *mfd;
    int ret = 0;
 
    mfd = $$MFD;

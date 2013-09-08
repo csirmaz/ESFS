@@ -59,12 +59,12 @@ int $open(const char *path, struct fuse_file_info *fi)
    int fd;
    int flags;
    int waserror = 0;
-   struct $fd_t *mfd;
+   struct $mfd_t *mfd;
    struct stat mystat;
 
    $$IF_PATH_MAIN_ONLY // TODO need to open files in snapshots (for reading)
 
-   mfd = malloc(sizeof(struct $fd_t));
+   mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL){ return -ENOMEM; }
 
    do{
@@ -163,14 +163,14 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
    int fd;
    int waserror = 0;
-   struct $fd_t *mfd;
+   struct $mfd_t *mfd;
    struct stat mystat;
 
    $$IF_PATH_MAIN_ONLY
 
    log_msg("  create(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
 
-   mfd = malloc(sizeof(struct $fd_t));
+   mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL){ return -ENOMEM; }
 
    do{
@@ -261,8 +261,8 @@ int $opendir(const char *path, struct fuse_file_info *fi)
  */
 static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *path, const char *fpath, off_t newsize)
 {
-   struct $fd_t myfd;
-   struct $fd_t *mfd;
+   struct $mfd_t myfd;
+   struct $mfd_t *mfd;
    int ret;
    int waserror = 0;
 

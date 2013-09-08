@@ -4,7 +4,7 @@ my $m = <<THEEND
 esfs : esfs_c.o log_c.o
 	gcc -O3 -o esfs esfs_c.o log_c.o `pkg-config fuse --libs`
 
-esfs_c.o : esfs_c.c log_c.h params_c.h types_c.h snapshot_c.c node_c.c block_c.c util_c.c mutex_c.c stat_c.c fuse_fd_close_c.c fuse_fd_read_c.c fuse_fd_write_c.c fuse_path_open_c.c fuse_path_read_c.c fuse_path_write_c.c
+esfs_c.o : esfs_c.c log_c.h params_c.h types_c.h snapshot_c.c mfd_c.c block_c.c util_c.c mutex_c.c stat_c.c fuse_fd_close_c.c fuse_fd_read_c.c fuse_fd_write_c.c fuse_path_open_c.c fuse_path_read_c.c fuse_path_write_c.c
 	gcc -O3 -Wall `pkg-config fuse --cflags` -c esfs_c.c
 
 log_c.o : log_c.c log_c.h params_c.h
@@ -14,7 +14,7 @@ THEEND
 ;
 
 
-foreach my $f (qw( esfs.c params.h types.h log.c log.h snapshot.c node.c block.c util.c mutex.c stat.c fuse_fd_close.c fuse_fd_read.c fuse_fd_write.c fuse_path_open.c fuse_path_read.c fuse_path_write.c )){
+foreach my $f (qw( esfs.c params.h types.h log.c log.h snapshot.c mfd.c block.c util.c mutex.c stat.c fuse_fd_close.c fuse_fd_read.c fuse_fd_write.c fuse_path_open.c fuse_path_read.c fuse_path_write.c )){
 my $fdest = $f;
 $fdest =~ s/\./_c./;
 $m .= <<THEEND

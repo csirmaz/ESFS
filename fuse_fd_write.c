@@ -87,7 +87,7 @@ int $write(
 //   int (*ftruncate) (const char *, off_t, struct fuse_file_info *);
 int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 {
-   struct $fd_t *mfd;
+   struct $mfd_t *mfd;
    int ret;
    $$DFSDATA
 

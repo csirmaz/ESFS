@@ -146,7 +146,7 @@ struct $mapheader_t {
 // -3 = if the file didn't exist when the snapshot was taken
 // -4 = if the file was 0 length when the snapshot was taken
 
-struct $fd_t {
+struct $mfd_t {
    int is_main; // 1 if this is a main file; 0 otherwise
    // MAIN FILE FD:
    int mainfd; // filehandle to the main file
@@ -159,6 +159,6 @@ struct $fd_t {
 
 // CAST
 // TODO Are repeated accesses fast enough, or should we store this in a variable?
-#define $$MFD ((struct $fd_t *) fi->fh)
+#define $$MFD ((struct $mfd_t *) fi->fh)
 
 #endif

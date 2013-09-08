@@ -167,7 +167,7 @@
             mfd->datfd = fd_dat;
 
 static int $n_open(
-   struct $fd_t *mfd,
+   struct $mfd_t *mfd,
    const char *vpath,
    const char *fpath,
    const struct $fsdata_t *fsdata
@@ -339,7 +339,7 @@ static int $n_open(
 
 
 // Marks main FD as read-only
-static inline void $n_open_rdonly(struct $fd_t *mfd)
+static inline void $n_open_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
    mfd->datfd = -2;
@@ -350,7 +350,7 @@ static inline void $n_open_rdonly(struct $fd_t *mfd)
 // Returns
 // 0 on success
 // -errno on error (the last errno)
-static inline int $n_close(struct $fd_t *mfd){
+static inline int $n_close(struct $mfd_t *mfd){
    int waserror = 0;
 
    if(mfd->datfd >= 0){

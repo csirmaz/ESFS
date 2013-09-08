@@ -96,7 +96,7 @@
  */
 static inline int $b_write(
    struct $fsdata_t *fsdata, // not const as locks are written
-   struct $fd_t *mfd,
+   struct $mfd_t *mfd,
    size_t writesize,
    off_t writeoffset
 )
@@ -245,7 +245,7 @@ static inline int $b_write(
 /* Saves the truncated part of a file
  * Returns 0 or -errno
  */
-static inline int $b_truncate(struct $fsdata_t *fsdata, struct $fd_t *mfd, off_t newsize)
+static inline int $b_truncate(struct $fsdata_t *fsdata, struct $mfd_t *mfd, off_t newsize)
 {
    int ret;
 
