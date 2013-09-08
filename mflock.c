@@ -44,16 +44,16 @@
  * if it's opened with O_APPEND.
  *
  * We set up a limited number of locks here to save the overhead of a hash
- * storage (from files(inodes) to a mutex). Mutexes here are organised in a table
- * and can be labelled with an inode. We need to protect changes to the table
+ * storage (from files(e.g. inodes) to a mutex). Mutexes here are organised in a table
+ * and can be labelled. We need to protect changes to the table
  * so that a label and a mutex would function as a unit, but instead of
  * locking the whole table whenever it changes, we use MOD mutexes
- * which only lock changes related to certain inodes. There are $$LOCK_NUM
- * MOD mutexes, and MOD mutex i is used when inode%$$LOCK_NUM==i.
+ * which only lock changes related to certain labels. There are $$LOCK_NUM
+ * MOD mutexes, and MOD mutex i is used when label % $$LOCK_NUM == i.
  *
  * Moreover, to save the overhead or re-labelling mutexes, there is a system
  * where mutexes can be handed over to other threads if they are waiting
- * for the mutex on the same inode. This is done using the 'want' member.
+ * for the mutex on the same label. This is done using the 'want' member.
  *
  * Rules of thumb:
  * - Reverse procedures should be symmetrical
@@ -64,24 +64,24 @@
 /* GET LOCK:
  *
  * START:
- * if(inode is in table -> i){
+ * if(label is in table -> i){
  *    want i++
  *    get mutex i
  *    want i--
- *    recheck: if(label i != inode){
+ *    recheck: if(label i != label){
  *       goto START
  *    }
  *    return i
  * }
  *
- * // inode is not in table
+ * // label is not in table
  * get MOD mutex
- * recheck if(inode is in table -> i){
+ * recheck if(label is in table -> i){
  *    release MOD mutex
  *    want i++
  *    get mutex i
  *    want i--
- *    recheck: if(label i != inode){
+ *    recheck: if(label i != label){
  *       goto START
  *    }
  *    return i
@@ -94,7 +94,7 @@
  *    release mutex i
  *    goto FIND: - OR - release MOD mutex; goto START:
  * }
- * label := inode
+ * label := new label
  * release MOD mutex
  * return i
  *
@@ -114,7 +114,7 @@
  *
  *
  * Consequences:
- * - an inode can only be added to / removed from the table if its MOD mutex is held,
+ * - an label can only be added to / removed from the table if its MOD mutex is held,
  *    AND the mutex being labelled is held
  *
  * A labels the mutex and hands it over to B:
@@ -131,7 +131,7 @@
  * MUTEX ---------AAAAAAAAAA|AAAAAAAA--------
  * WANT  -------------------|----------111---
  *
- * A and B try to add the same inode, but A gets the MOD mutex first,
+ * A and B try to add the same label, but A gets the MOD mutex first,
  * so it becomes a handover:
  *
  * MOD    --AAAAAAAAAA--BB-----------
@@ -161,7 +161,7 @@ static int $mflock_init(struct $fsdata_t *fsdata){
    for(i=0; i<$$LOCK_NUM; i++){
       pthread_mutex_init(&(fsdata->mflocks[i].mutex), &mutexattr);
       pthread_mutex_init(&(fsdata->mflocks[i].mod_mutex), &mutexattr);
-      fsdata->mflocks[i].inode = 0;
+      fsdata->mflocks[i].label = 0;
       fsdata->mflocks[i].want = 0;
    }
 
@@ -182,12 +182,12 @@ static int $mflock_destroy(struct $fsdata_t *fsdata){
 }
 
 
-/* Get a lock on a particular inode
+/* Get a lock on a particular file
  * Returns:
  * lock number on success (>=0)
  * -errno on error
  */
-static int $mflock_lock(struct $fsdata_t *fsdata, ino_t inode){
+static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
    int i;
    int ret;
    int ml = -1;
@@ -199,14 +199,14 @@ static int $mflock_lock(struct $fsdata_t *fsdata, ino_t inode){
 
       mylock = NULL;
       for(i=0; i<$$LOCK_NUM; i++){
-         if(fsdata->mflocks[i].inode == inode){
+         if(fsdata->mflocks[i].label == label){
             ml = i;
             mylock = &(fsdata->mflocks[i]);
             break;
          }
       }
 
-      if(mylock != NULL){ // if inode is in the table
+      if(mylock != NULL){ // if label is in the table
          if(unlikely(modmutex != NULL)){
             // recheck failed; release the modmutex and carry on as usual
             pthread_mutex_unlock(modmutex);
@@ -215,8 +215,8 @@ static int $mflock_lock(struct $fsdata_t *fsdata, ino_t inode){
          (mylock->want)++; // request handover
          pthread_mutex_lock(&(mylock->mutex));
          (mylock->want)--;
-         if(likely(mylock->inode == inode)){ // recheck
-            // We have (successfully taken over) the mutex and it's labelled with the inode
+         if(likely(mylock->label == label)){ // recheck
+            // We have (successfully taken over) the mutex and it's labelled with the label
             return ml;
          }
          // If recheck fails, retry from start
@@ -224,21 +224,21 @@ static int $mflock_lock(struct $fsdata_t *fsdata, ino_t inode){
          continue;
       }
 
-      // inode is not in the table:
-      // get the modmutes and re-check that the inode is still not in the table
+      // label is not in the table:
+      // get the modmutes and re-check that the label is still not in the table
 
       if(modmutex == NULL){ // If we don't yet have the modmutex
-         modmutex = &(fsdata->mflocks[inode & ($$LOCK_NUM - 1)].mod_mutex);
+         modmutex = &(fsdata->mflocks[label & ($$LOCK_NUM - 1)].mod_mutex);
          if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)){ return -ret; }
          continue; // Start over for a re-check.
       }
 
-      // We have the modmutex and inode is not in the table
+      // We have the modmutex and label is not in the table
       // try all non-labelled locks in the table
       while(1){ // FIND:
          ml = -1;
          for(i=0; i<$$LOCK_NUM; i++){
-            if(likely(fsdata->mflocks[i].inode == 0)){
+            if(likely(fsdata->mflocks[i].label == 0)){
                ret = pthread_mutex_trylock(&(fsdata->mflocks[i].mutex));
                if(likely(ret == 0)){ // got the lock
                   ml = i;
@@ -253,9 +253,9 @@ static int $mflock_lock(struct $fsdata_t *fsdata, ino_t inode){
 
          if(ml>-1){ // managed to get a mutex
             // recheck if the mutex is still unlabelled
-            if(likely(fsdata->mflocks[ml].inode == 0)){
+            if(likely(fsdata->mflocks[ml].label == 0)){
                // Success
-               fsdata->mflocks[ml].inode = inode;
+               fsdata->mflocks[ml].label = label;
                if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
                return ml;
             }
@@ -287,10 +287,10 @@ static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid){
    mylock = &(fsdata->mflocks[lockid]);
 
    if(mylock->want == 0){ // no one wants a handover
-      modmutex = &(fsdata->mflocks[mylock->inode & ($$LOCK_NUM - 1)].mod_mutex);
+      modmutex = &(fsdata->mflocks[mylock->label & ($$LOCK_NUM - 1)].mod_mutex);
       if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)){ return -ret; }
       if(mylock->want == 0){ // recheck
-         mylock->inode = 0;
+         mylock->label = 0;
          if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)){ return -ret; }
          if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
          return 0;

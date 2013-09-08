@@ -86,12 +86,13 @@
 
 // Locking
 #define $$LOCK_NUM 64 // Number of locks; this determines the number of concurrent files that can be written
+#define $$LOCKLABEL_T ino_t // ==, & used on it. 0 is a special value
 
 // File-based locking
 // ------------------
 
 struct $mflock_t {
-   ino_t inode; // label
+   $$LOCKLABEL_T label; // label
    pthread_mutex_t mutex;
    pthread_mutex_t mod_mutex;
    unsigned int want;
