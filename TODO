@@ -1,5 +1,5 @@
 
-* Implement mkdir -p, rm -r
+* Add locking around recursive remove
 
 * Add plan to list directories in snapshots
 

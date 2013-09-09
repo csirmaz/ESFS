@@ -267,9 +267,65 @@ int $_univ_rm(const char *fpath, const struct stat *sb, int typeflag, struct FTW
 static inline int $recursive_remove(const char *path)
 {
    int ret;
-   ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS);
+   ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS); // TODO nftw is not thread safe -- LOCK!
    if(ret >= 0){ return -ret; } // success or errno
    return ENOMEM; // generic error encountered by nftw
+}
+
+
+// Implementation of mkdir -p
+// Creates the directory at *the parent of* path and any parent directories as needed
+//   If firstcreated != NULL, it is set to be the top directory created
+// Returns:
+//   0 if the directory already exists
+//   1 if a directory has been created
+//   -errno on failure.
+// NOTE: dirname() and basename() are not thread safe
+static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
+{
+   int p;
+   char prepath[$$PATH_MAX];
+   struct stat mystat;
+
+   // find previous slash
+   p = strlen(path) - 1;
+   while(p >= 0 && path[p] != $$DIRSEPCH){ p--; }
+   if(p > 0){ // found one -- call $mkpath on parent
+      strncpy(prepath, path, p);
+      prepath[p] = '\0';
+   } else { // no slash or slash is first character
+      return -EBADE;
+   }
+
+   // $dlogdbg("mkpath: %s <- %s\n", path, prepath);
+
+   if(lstat(prepath, &mystat) != 0){
+      p = errno;
+      if(p == ENOENT){ // the parent node does not exist
+
+         p = $mkpath(prepath, firstcreated, mode);
+         // $dlogdbg("mkpath: recursion returned with %d\n", p);
+         if(p < 0){ return p; } // error
+
+         // attempt to create the directory
+         if(mkdir(prepath, mode) != 0){
+            // $dlogdbg("mkpath: mkdir %s failed with %d = %s\n", prepath, errno, strerror(errno));
+            return -errno;
+         }
+
+         // save first directory created
+         if(p == 0 && firstcreated != NULL){ strcpy(firstcreated, prepath); }
+
+         return 1;
+      }
+      return -p;
+   }
+
+   if(S_ISDIR(mystat.st_mode)){
+      return 0; // node exists and is a directory
+   }
+
+   return -ENOTDIR; // found a node but it isn't a directory
 }
 
 
