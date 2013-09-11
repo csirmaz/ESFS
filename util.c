@@ -283,16 +283,19 @@ static inline int $recursive_remove(const char *path)
 // NOTE: dirname() and basename() are not thread safe
 static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
 {
-   int p;
+   int slashpos;
+   int statret;
+   int mkpathret;
+   int mkdirret;
    char prepath[$$PATH_MAX];
    struct stat mystat;
 
    // find previous slash
-   p = strlen(path) - 1;
-   while(p >= 0 && path[p] != $$DIRSEPCH){ p--; }
-   if(p > 0){ // found one -- call $mkpath on parent
-      strncpy(prepath, path, p);
-      prepath[p] = '\0';
+   slashpos = strlen(path) - 1;
+   while(slashpos >= 0 && path[slashpos] != $$DIRSEPCH){ slashpos--; }
+   if(slashpos > 0){ // found one
+      strncpy(prepath, path, slashpos);
+      prepath[slashpos] = '\0';
    } else { // no slash or slash is first character
       return -EBADE;
    }
@@ -300,25 +303,29 @@ static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
    // $dlogdbg("mkpath: %s <- %s\n", path, prepath);
 
    if(lstat(prepath, &mystat) != 0){
-      p = errno;
-      if(p == ENOENT){ // the parent node does not exist
+      statret = errno;
+      if(statret == ENOENT){ // the parent node does not exist
 
-         p = $mkpath(prepath, firstcreated, mode);
+         mkpathret = $mkpath(prepath, firstcreated, mode);
          // $dlogdbg("mkpath: recursion returned with %d\n", p);
-         if(p < 0){ return p; } // error
+         if(mkpathret < 0){ return mkpathret; } // error
 
          // attempt to create the directory
          if(mkdir(prepath, mode) != 0){
-            // $dlogdbg("mkpath: mkdir %s failed with %d = %s\n", prepath, errno, strerror(errno));
-            return -errno;
+            mkdirret = errno;
+            // Don't abort on EEXIST as another thread might be busy creating
+            // the same directories. Simply assume success.
+            if(mkdirret != EEXIST){
+               return -mkdirret;
+            }
          }
 
          // save first directory created
-         if(p == 0 && firstcreated != NULL){ strcpy(firstcreated, prepath); }
+         if(mkpathret == 0 && firstcreated != NULL){ strcpy(firstcreated, prepath); }
 
          return 1;
       }
-      return -p;
+      return -statret;
    }
 
    if(S_ISDIR(mystat.st_mode)){

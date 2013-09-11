@@ -176,7 +176,6 @@ static int $mfd_open_sn(
 {
    char fmap[$$PATH_MAX];
    char fdat[$$PATH_MAX];
-   char firstcreated[$$PATH_MAX]; // the first directory created when initialising the map/dat files
    int fd; // map file FD
    int fd_dat; // dat file FD
    int ret;
@@ -203,18 +202,14 @@ static int $mfd_open_sn(
    $$ADDNPSFIX_CONT(fmap, fdat, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_DAT, $$EXT_LEN)
 
    // Create path
-   ret = $mkpath(fmap, firstcreated, S_IRWXU);
+   ret = $mkpath(fmap, NULL, S_IRWXU); // TODO 1: this is almost thread safe, so decide where to lock
    if(ret < 0){ // error
       $dlogdbg("mfd_open_sn: mkpath failed with %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
-   if(ret == 0){ // no directory needed to be created
-      firstcreated[0] = '\0';
-   }
-   $dlogdbg("mfd_open_sn: mkpath created directories under '%s' (or none)\n", firstcreated);
 
    // Open or create the map file
-   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU); // TODO add O_NOATIME
+   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU); // TODO 2: add O_NOATIME
 
    if(fd == -1){
 
@@ -337,13 +332,10 @@ static int $mfd_open_sn(
 
       if(waserror != 0){ // Cleanup
          close(fd);
-         if(firstcreated[0] == '\0'){
-            $dlogdbg("mfd_open_sn: cleanup: removing file %s\n", fmap);
-            unlink(fmap);
-         } else {
-            $dlogdbg("mfd_open_sn: cleanup: removing directory %s\n", firstcreated);
-            $recursive_remove(firstcreated);
-         }
+         // TODO 2: Clean up directories created by $mkpath based on the 'firstcreated' it can return.
+         // However, be aware that other files being opened might already be using the directories
+         // created, so using $recursive_remove here is not a safe option.
+         unlink(fmap);
          return -waserror;
       }
 
