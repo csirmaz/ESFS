@@ -135,11 +135,12 @@ int $rename(const char *path, const char *newpath)
 // unaltered, but insert the link into the mounted directory.
 int $symlink(const char *dest, const char *path)
 {
+   int ret;
    $$IF_PATH_MAIN_ONLY
 
    log_msg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
 
-   // TODO push to snapshot
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
    if(symlink(dest, fpath) == 0){ return 0; }
    return -errno;
@@ -150,10 +151,12 @@ int $symlink(const char *dest, const char *path)
 //   int (*chmod) (const char *, mode_t);
 int $chmod(const char *path, mode_t mode)
 {
-   // log_msg("\nchmod(fpath=\"%s\", mode=0%03o)\n", path, mode);
+   int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // TODO push to snapshot
+   $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
+
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
    if(chmod(fpath, mode) == 0){ return 0; }
    return -errno;
@@ -164,10 +167,12 @@ int $chmod(const char *path, mode_t mode)
 //   int (*chown) (const char *, uid_t, gid_t);
 int $chown(const char *path, uid_t uid, gid_t gid)
 {
-   // log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
+   int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // TODO only root can do this - should we support this?
+   // log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
+
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
    if(chown(fpath, uid, gid) == 0){ return 0; }
    return -errno;
@@ -195,7 +200,7 @@ int $unlink(const char *path)
    $dlogdbg("unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
-   // TODO add optimisation: move file to snapshot if feasible
+   // TODO 2 Add optimisation: move file to snapshot if feasible
 }
 
 
@@ -220,7 +225,7 @@ int $truncate(const char *path, off_t newsize)
    $dlogdbg("truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
-   // TODO add optimisation: copy file to snapshot if that's faster?
+   // TODO 2 Add optimisation: copy file to snapshot if that's faster?
 }
 
 
@@ -242,16 +247,7 @@ int $utimens(const char *path, const struct timespec tv[2])
 {
    $$IF_PATH_MAIN_ONLY
 
-   // TODO push to snapshot?
-
-   // TODO from fusexmp.c:
-   /* don't use utime/utimes since they follow symlinks */
-   /*
-        res = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
-        if (res == -1)
-                return -errno;
-   */
-   
+   // TODO 1 push to snapshot?
 
    /*
     int utimensat(int dirfd, const char *pathname,
@@ -271,14 +267,9 @@ int $utimens(const char *path, const struct timespec tv[2])
 
        The flags field is a bit mask that may be 0, or include the following
        constant, defined in <fcntl.h>:
-
-       AT_SYMLINK_NOFOLLOW
-              If pathname specifies a symbolic link, then update the
-              timestamps of the link, rather than the file to which it
-              refers.
    */
 
-   if(utimensat(AT_FDCWD, fpath, tv, 0) == 0){ // TODO For now, we fall back to AT_FDCWD
+   if(utimensat(AT_FDCWD, fpath, tv, AT_SYMLINK_NOFOLLOW) == 0){
       return 0;
    }
    return -errno;

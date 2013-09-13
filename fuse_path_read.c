@@ -71,6 +71,7 @@ int $readlink(const char *path, char *link, size_t size)
    int ret;
    $$IF_PATH_MAIN_ONLY
 
+   // TODO How to save links?
    log_msg("  readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
 
    ret = readlink(fpath, link, size - 1);

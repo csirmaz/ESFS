@@ -216,7 +216,9 @@ static int $mfd_open_sn(
       fd = errno;
       if(fd == EEXIST){
          // The .map file already exists, which means that the main file is already dirty.
-         // We open the .map file again.
+         // TODO 2 If we aren't actually to set up an mfd, just return here
+
+         // Otherwise, we open the .map file again.
          fd = open(fmap, O_RDWR);
          if(unlikely(fd == -1)){
             fd = errno;
@@ -335,6 +337,7 @@ static int $mfd_open_sn(
          // TODO 2: Clean up directories created by $mkpath based on the 'firstcreated' it can return.
          // However, be aware that other files being opened might already be using the directories
          // created, so using $recursive_remove here is not a safe option.
+         // TODO 2: Clean up the dat file?
          unlink(fmap);
          return -waserror;
       }
@@ -353,7 +356,7 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 }
 
 
-// Close the snapshot part of an MFD
+// Closes the snapshot part of an MFD
 // Returns
 // 0 on success
 // -errno on error (the last errno)
@@ -369,4 +372,27 @@ static inline int $mfd_close_sn(struct $mfd_t *mfd){
    }
 
    return -waserror;
+}
+
+
+// Initialises the map (and dat) files without leaving them open
+// Returns
+// 0 on success
+// -errno on error
+static inline int $mfd_init_sn(
+   const char *vpath,
+   const char *fpath,
+   const struct $fsdata_t *fsdata
+)
+{
+   struct $mfd_t mymfd;
+   int ret;
+
+   // It's somewhat wasteful to allocate a whole mfd here,
+   // but we need the mapheader, which is included in it, anyway.
+
+   if((ret = $mfd_open_sn(&mymfd, vpath, fpath, fsdata)) == 0){
+      ret = $mfd_close_sn(&mymfd);
+   }
+   return ret;
 }
