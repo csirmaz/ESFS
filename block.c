@@ -89,10 +89,11 @@
       if(ret == 0){ pointer = 0; } \
       $dlogdbg("b_write: Read %zu as pointer from fd %d offs %td for main FD %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
-/* Saves the overwritten part of a file
+/** Saves the overwritten part of a file
+ *
  * Returns:
- * 0 - on success
- * -errno - on failure
+ * * 0 - on success
+ * * -errno - on failure
  */
 static inline int $b_write(
    struct $fsdata_t *fsdata, // not const as locks are written
@@ -242,8 +243,11 @@ static inline int $b_write(
 }
 
 
-/* Saves the truncated part of a file
- * Returns 0 or -errno
+/** Saves the truncated part of a file
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on failure
  */
 static inline int $b_truncate(struct $fsdata_t *fsdata, struct $mfd_t *mfd, off_t newsize)
 {

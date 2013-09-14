@@ -40,18 +40,19 @@
  * SPECIAL COMMANDS
  * ================
  *
- * Issuing "mkdir /snapshots/<ID>" creates a new snapshot.
- * Issuing "rmdir /snapshots" removes the earliest snapshot. // TODO not implemented yet
+ * Issuing `mkdir /snapshots/[ID]` creates a new snapshot.
+ * Issuing `rmdir /snapshots` removes the earliest snapshot.
  */
 
 
-   /** Create a directory
-    *
-    * Note that the mode argument may not have the type specification
-    * bits set, i.e. S_ISDIR(mode) can be false.  To obtain the
-    * correct directory type bits use  mode|S_IFDIR
-    * */
-//   int (*mkdir) (const char *, mode_t);
+/** Create a directory or a snapshot
+ *
+ * Issuing `mkdir /snapshots/[ID]` creates a new snapshot.
+ *
+ * Note that the mode argument may not have the type specification
+ * bits set, i.e. S_ISDIR(mode) can be false.  To obtain the
+ * correct directory type bits use  mode|S_IFDIR
+ */
 int $mkdir(const char *path, mode_t mode)
 {
    $$IF_PATH_SN
@@ -79,8 +80,10 @@ int $mkdir(const char *path, mode_t mode)
 }
 
 
-   /** Remove a directory */
-//   int (*rmdir) (const char *);
+/** Remove a directory or a snapshot
+ *
+ * Issuing `rmdir /snapshots` removes the earliest snapshot.
+ */
 int $rmdir(const char *path)
 {
    $$IF_PATH_SN
@@ -127,18 +130,19 @@ int $rename(const char *path, const char *newpath)
 }
 
 
-   /** Create a symbolic link */
-//   int (*symlink) (const char *, const char *);
-// The parameters here are a little bit confusing, but do correspond
-// to the symlink() system call.  (1) is where the link points,
-// while (2) is the link itself.  So we need to leave (1)
-// unaltered, but insert the link into the mounted directory.
+/** Create a symbolic link
+ *
+ * The parameters here are a little bit confusing, but do correspond
+ * to the symlink() system call.  (1) is where the link points,
+ * while (2) is the link itself.  So we need to leave (1)
+ * unaltered, but insert the link into the mounted directory.
+ */
 int $symlink(const char *dest, const char *path)
 {
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
+   $dlogdbg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
 
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
@@ -147,8 +151,7 @@ int $symlink(const char *dest, const char *path)
 }
 
 
-   /** Change the permission bits of a file */
-//   int (*chmod) (const char *, mode_t);
+/** Change the permission bits of a file */
 int $chmod(const char *path, mode_t mode)
 {
    int ret;
@@ -163,8 +166,7 @@ int $chmod(const char *path, mode_t mode)
 }
 
 
-   /** Change the owner and group of a file */
-//   int (*chown) (const char *, uid_t, gid_t);
+/** Change the owner and group of a file */
 int $chown(const char *path, uid_t uid, gid_t gid)
 {
    int ret;
@@ -179,8 +181,7 @@ int $chown(const char *path, uid_t uid, gid_t gid)
 }
 
 
-   /** Remove a file */
-//   int (*unlink) (const char *);
+/** Remove a file */
 int $unlink(const char *path)
 {
    int ret;
@@ -204,8 +205,7 @@ int $unlink(const char *path)
 }
 
 
-   /** Change the size of a file */
-//   int (*truncate) (const char *, off_t);
+/** Change the size of a file */
 int $truncate(const char *path, off_t newsize)
 {
    int ret;
@@ -280,29 +280,29 @@ int $utimens(const char *path, const struct timespec tv[2])
  ***********************************************/
 
 
-   /** Create a hard link to a file */
-//   int (*link) (const char *, const char *);
+/** Create a hard link to a file
+ *
+ * This is not allowed in ESFS.
+ */
 int $link(const char *path, const char *newpath)
 {
-   // This is not allowed in ESFS.
    return -EOPNOTSUPP;
 
    // To pass the request on, call link(fpath, fnewpath);
 }
 
 
-   /** Create a file node
-    *
-    * This is called for creation of all non-directory, non-symlink
-    * nodes.  If the filesystem defines a create() method, then for
-    * regular files that will be called instead.
-    */
-   // Regular files - for example, not a FIFO
-//   int (*mknod) (const char *, mode_t, dev_t);
+/** Create a file node
+ *
+ * This is called for creation of all non-directory, non-symlink
+ * nodes.  If the filesystem defines a create() method, then for
+ * regular files that will be called instead.
+ *
+ * Special files are not allowed in ESFS.
+ * As create() is defined, we can return here with an error.
+ */
 int $mknod(const char *path, mode_t mode, dev_t dev)
 {
-   // Special files are not allowed in ESFS.
-   // As create() is defined, we can return here with an error.
    return -EOPNOTSUPP;
 
    // Original code from BBFS:
@@ -330,11 +330,12 @@ int $mknod(const char *path, mode_t mode, dev_t dev)
 }
 
 
-   /** Set extended attributes */
-//   int (*setxattr) (const char *, const char *, const char *, size_t, int);
+/** Set extended attributes
+ *
+ * Xattr is not supported by ext4; for now, we disable it.
+ */
 int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
-   // Xattr is not supported by ext4; for now, we disable it.
    return -EOPNOTSUPP;
 
    /*
@@ -357,11 +358,12 @@ int $setxattr(const char *path, const char *name, const char *value, size_t size
 }
 
 
-   /** Remove extended attributes */
-//   int (*removexattr) (const char *, const char *);
+/** Remove extended attributes
+ *
+ * Xattr is not supported by ext4; for now, we disable it.
+ */
 int $removexattr(const char *path, const char *name)
 {
-   // Xattr is not supported by ext4; for now, we disable it.
    return -EOPNOTSUPP;
 
    /*

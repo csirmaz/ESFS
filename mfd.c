@@ -131,21 +131,6 @@
  */
 
 
-/* Opens (and initialises) the snapshot part of an MFD by
- * opening (and creating and initialising, if necessary) the .map and .dat files.
- * Call this before modifying any file, including renaming it.
- *   vpath is the virtual path to the file in the main space.
- * Sets
- *   mfd->mapfd, the map file opened for RDWR or a negative value if unused -- see types.h
- *   mfd->datfd, the dat file opened for WR|APPEND or a negative value if unused -- see types.h
- *   mfd->is_renamed, 0 or 1
- * Saves
- *   stats of the file into the map file, unless the map file already exists.
- * Returns
- *   0 - on success
- *  -errno - on failure
- */
-
 // breaks below are not errors, but we want to skip opening/creating the dat file
 // if the file was empty or nonexistent when the snapshot was taken
 #define $$MFD_OPEN_DAT_FILE \
@@ -167,9 +152,28 @@
             $dlogdbg("mfd_open_sn: Opened dat file at %s FD %d\n", fdat, fd_dat); \
             mfd->datfd = fd_dat;
 
+
+/** Opens (and initialises) the snapshot part of an MFD
+ *
+ * This is done by
+ * opening (and creating and initialising, if necessary) the .map and .dat files.
+ * Call this before modifying any file, including renaming it.
+ *
+ * Sets:
+ * * mfd->mapfd, the map file opened for RDWR or a negative value if unused -- see types.h
+ * * mfd->datfd, the dat file opened for WR|APPEND or a negative value if unused -- see types.h
+ * * mfd->is_renamed, 0 or 1
+ *
+ * Saves:
+ * * stats of the file into the map file, unless the map file already exists.
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on failure
+ */
 static int $mfd_open_sn(
    struct $mfd_t *mfd,
-   const char *vpath,
+   const char *vpath, /**< the virtual path in the main space */
    const char *fpath,
    const struct $fsdata_t *fsdata
 )
@@ -348,7 +352,7 @@ static int $mfd_open_sn(
 }
 
 
-// Marks an MFD as read-only
+/** Marks an MFD as read-only */
 static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
@@ -356,10 +360,12 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 }
 
 
-// Closes the snapshot part of an MFD
-// Returns
-// 0 on success
-// -errno on error (the last errno)
+/** Closes the snapshot part of an MFD
+ *
+ * Returns:
+ * * 0 on success
+ * * -errno on error (the last errno)
+ */
 static inline int $mfd_close_sn(struct $mfd_t *mfd){
    int waserror = 0;
 
@@ -375,10 +381,12 @@ static inline int $mfd_close_sn(struct $mfd_t *mfd){
 }
 
 
-// Initialises the map (and dat) files without leaving them open
-// Returns
-// 0 on success
-// -errno on error
+/** Initialises the map (and dat) files without leaving them open
+ *
+ * Returns:
+ * * 0 on success
+ * * -errno on error
+ */
 static inline int $mfd_init_sn(
    const char *vpath,
    const char *fpath,
