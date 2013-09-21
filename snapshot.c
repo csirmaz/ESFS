@@ -47,11 +47,13 @@
  * All these pointers contain the real paths to the snapshot roots: ROOT/snapshots/<ID>
  */
 
-// Create the snapshot dir if necessary.
-// Returns
-// 0 - on success
-// -errno - if lstat or mkdir fails
-// 1 - if the node exists but is not a directory
+/** Creates the snapshot dir if necessary.
+ *
+ * Returns
+ * * 0 - on success
+ * * -errno - if lstat or mkdir fails
+ * * 1 - if the node exists but is not a directory
+ */
 static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
 {
    struct stat mystat;
@@ -81,15 +83,19 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
 }
 
 
-// Get the earliest snapshot
-//   reads fsdata ->sn_is_any, sn_lat_dir
-//   Sets snpath to the real path of the earliest snapshot (".../snapshots/ID")
-//     and prevpointerpath to the real path of the pointer file of the second earliest snapshot.
-// Returns
-//   1 - if there are no snapshots
-//   2 - if there is only one snapshot: snpath is set, but prevpointerpath is invalid
-//   0 - on success
-//   -errno - on internal error
+/** Gets the earliest snapshot
+ *
+ * Reads fsdata ->sn_is_any, sn_lat_dir
+ *
+ * Sets snpath to the real path of the earliest snapshot (".../snapshots/ID")
+ * and prevpointerpath to the real path of the pointer file of the second earliest snapshot.
+ *
+ * Returns
+ * * 1 - if there are no snapshots
+ * * 2 - if there is only one snapshot: snpath is set, but prevpointerpath is invalid
+ * * 0 - on success
+ * * -errno - on internal error
+ */
 static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_MAX], char prevpointerpath[$$PATH_MAX])
 {
    int ret;
@@ -123,13 +129,16 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
 }
 
 
-// Gets the path to the root of the latest snapshot:
-//   reads .../snapshots/.hid
-//   sets fsdata->sn_is_any
-//   sets fsdata->sn_lat_dir
-// Returns:
-// 0 - on success
-// -errno - on failure
+/** Gets the path to the root of the latest snapshot
+ *
+ * * reads .../snapshots/.hid
+ * * sets fsdata->sn_is_any
+ * * sets fsdata->sn_lat_dir
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on failure
+ */
 static int $sn_get_latest(struct $fsdata_t *fsdata)
 {
    int ret;
@@ -154,13 +163,16 @@ static int $sn_get_latest(struct $fsdata_t *fsdata)
 }
 
 
-// Sets the path to the root of the latest snapshot:
-//   writes .../snapshots/.hid
-//   sets fsdata->sn_is_any
-//   sets fsdata->sn_lat_dir
-// Returns:
-//   0 - on success
-//   -errno - on failure
+/** Sets the path to the root of the latest snapshot
+ *
+ * * writes .../snapshots/.hid
+ * * sets fsdata->sn_is_any
+ * * sets fsdata->sn_lat_dir
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on failure
+ */
 static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 {
    int fd;
@@ -199,12 +211,16 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 }
 
 
-// Initialises a new snapshot
-//   path is a real path in the form .../snapshots/ID
-// Returns:
-// 0 - on success
-// -1 - on failure
-int $sn_create(struct $fsdata_t *fsdata, char *path)
+/** Initialises a new snapshot
+ *
+ * Returns:
+ * * 0 - on success
+ * * -1 - on failure
+ */
+int $sn_create(
+   struct $fsdata_t *fsdata,
+   char *path /**< path is a real path in the form .../snapshots/ID */
+)
 {
    int fd;
    int ret;
@@ -292,11 +308,14 @@ int $sn_create(struct $fsdata_t *fsdata, char *path)
 }
 
 
-// Destroy the earliest snapshot
-//   May set fsdata->sn_is_any
-// Returns
-// 0 - on success
-// -errno - on failure
+/** Destroys the earliest snapshot
+ *
+ * May set fsdata->sn_is_any
+ *
+ * Returns
+ * * 0 - on success
+ * * -errno - on failure
+ */
 static int $sn_destroy(struct $fsdata_t *fsdata)
 {
    char snpath[$$PATH_MAX];
@@ -343,12 +362,15 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
 }
 
 
-// Check if xattrs are suppored by the underlying filesystem
-// They are not supported by ext4
-// Returns
-// 0 on success
-// -errno on any failure
-// 1 on unexpected value
+/** Checks if xattrs are suppored by the underlying filesystem
+ *
+ * They are not supported by ext4
+ *
+ * Returns
+ * * 0 on success
+ * * -errno on any failure
+ * * 1 on unexpected value
+ */
 static int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to locate the log file
 {
    int ret;

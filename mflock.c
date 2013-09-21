@@ -142,10 +142,11 @@
  *
  */
 
-/* Allocate memory and initialise the mutexes.
+/** Allocates memory and initialises the mutexes.
+ *
  * Returns
- * 0 on success
- * -errno on error
+ * * 0 on success
+ * * -errno on error
  */
 static int $mflock_init(struct $fsdata_t *fsdata){
    int i;
@@ -182,10 +183,11 @@ static int $mflock_destroy(struct $fsdata_t *fsdata){
 }
 
 
-/* Get a lock on a particular file
+/** Gets a lock on a particular file
+ *
  * Returns:
- * lock number on success (>=0)
- * -errno on error
+ * * lock number on success (>=0)
+ * * -errno on error
  */
 static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
    int i;
@@ -274,10 +276,11 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
 }
 
 
-/* Release a lock
+/** Release a lock
+ *
  * Returns:
- * 0 on success
- * -errno on error
+ * * 0 on success
+ * * -errno on error
  */
 static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid){
    int ret;

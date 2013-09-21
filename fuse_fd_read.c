@@ -46,9 +46,10 @@
     *
     * Changed in version 2.2
     */
+// TODO Implement snapshots
 //   int (*read) (const char *, char *, size_t, off_t,
 //           struct fuse_file_info *);
-// I don't fully understand the documentation above -- it doesn't
+// BBFS: I don't fully understand the documentation above -- it doesn't
 // match the documentation for the read() system call which says it
 // can return with anything up to the amount of data requested. nor
 // with the fusexmp code which returns the amount of data also
@@ -87,6 +88,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
     *
     * Introduced in version 2.3
     */
+// TODO Implement snapshots
 //   int (*readdir) (const char *, void *, fuse_fill_dir_t, off_t,
 //         struct fuse_file_info *);
 int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
@@ -141,6 +143,7 @@ int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
     *
     * Introduced in version 2.5
     */
+// TODO Implement snapshots
 //   int (*fgetattr) (const char *, struct stat *, struct fuse_file_info *);
 // Since it's currently only called after bb_create(), and bb_create()
 // opens the file, I ought to be able to just use the fd and ignore

@@ -41,6 +41,7 @@
    * ignored.  The 'st_ino' field is ignored except if the 'use_ino'
    * mount option is given.
    */
+// TODO Implement snapshots
 //   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
 {
@@ -61,7 +62,7 @@ int $getattr(const char *path, struct stat *statbuf)
    * buffer, it should be truncated.  The return value should be 0
    * for success.
    */
-//   int (*readlink) (const char *, char *, size_t);
+// TODO Implement snapshots
 // Note the system readlink() will truncate and lose the terminating
 // null.  So, the size passed to to the system readlink() must be one
 // less than the size passed to bb_readlink()
@@ -94,6 +95,7 @@ int $readlink(const char *path, char *link, size_t size)
     *
     * Introduced in version 2.5
     */
+// TODO Implement snapshots
 //   int (*access) (const char *, int);
 int $access(const char *path, int mask)
 {
@@ -110,7 +112,7 @@ int $access(const char *path, int mask)
  ***********************************************/
 
 
-/** Get extended attributes */
+/** Get extended attributes (unsupported) */
 int $getxattr(const char *path, const char *name, char *value, size_t size)
 {
    // Xattr is not supported by ext4; for now, we disable it.
@@ -125,7 +127,7 @@ int $getxattr(const char *path, const char *name, char *value, size_t size)
 }
 
 
-/** List extended attributes */
+/** List extended attributes (unsupported) */
 int $listxattr(const char *path, char *list, size_t size)
 {
    // Xattr is not supported by ext4; for now, we disable it.

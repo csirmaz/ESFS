@@ -52,8 +52,7 @@
     *
     * Changed in version 2.2
     */
-// TODO Use (-o atomic_o_trunc) and provide support for atomic_o_trunc (see above) for greater efficiency
-//   int (*open) (const char *, struct fuse_file_info *);
+// TODO 2 Use (-o atomic_o_trunc) and provide support for atomic_o_trunc (see above) for greater efficiency
 int $open(const char *path, struct fuse_file_info *fi)
 {
    int fd;
@@ -62,7 +61,7 @@ int $open(const char *path, struct fuse_file_info *fi)
    struct $mfd_t *mfd;
    struct stat mystat;
 
-   $$IF_PATH_MAIN_ONLY // TODO need to open files in snapshots (for reading)
+   $$IF_PATH_MAIN_ONLY // TODO 1 need to open files in snapshots (for reading)
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL){ return -ENOMEM; }
@@ -158,7 +157,6 @@ int $open(const char *path, struct fuse_file_info *fi)
     *
     * Introduced in version 2.5
     */
-//   int (*create) (const char *, mode_t, struct fuse_file_info *);
 int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
    int fd;
@@ -168,7 +166,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
    $$IF_PATH_MAIN_ONLY
 
-   log_msg("  create(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
+   $dlogdbg("  create(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL){ return -ENOMEM; }
@@ -237,6 +235,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
     *
     * Introduced in version 2.3
     */
+// TODO Implement snapshots
 //   int (*opendir) (const char *, struct fuse_file_info *);
 int $opendir(const char *path, struct fuse_file_info *fi)
 {

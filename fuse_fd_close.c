@@ -58,6 +58,7 @@
     *
     * Changed in version 2.2
     */
+// TODO Implement snapshots
 //   int (*flush) (const char *, struct fuse_file_info *);
 int $flush(const char *path, struct fuse_file_info *fi)
 {
@@ -84,6 +85,7 @@ int $flush(const char *path, struct fuse_file_info *fi)
     *
     * Changed in version 2.2
     */
+// TODO Implement snapshots
 //   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
 {
@@ -114,6 +116,7 @@ int $release(const char *path, struct fuse_file_info *fi)
     *
     * Changed in version 2.2
     */
+// TODO implement
 //   int (*fsync) (const char *, int, struct fuse_file_info *);
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
@@ -138,6 +141,7 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
     *
     * Introduced in version 2.3
     */
+// TODO Implement snapshots
 //   int (*releasedir) (const char *, struct fuse_file_info *);
 int $releasedir(const char *path, struct fuse_file_info *fi)
 {
@@ -156,6 +160,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
     *
     * Introduced in version 2.3
     */
+// TODO Implement snapshots
 //   int (*fsyncdir) (const char *, int, struct fuse_file_info *);
 // when exactly is this called?  when a user calls fsync and it
 // happens to be a directory? ???

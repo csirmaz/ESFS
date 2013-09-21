@@ -37,16 +37,15 @@
 
    /** Write data to an open file
     *
-    * Write should return exactly the number of bytes requested
+    * FUSE: Write should return exactly the number of bytes requested
     * except on error.   An exception to this is when the 'direct_io'
     * mount option is specified (see read operation).
     *
     * Changed in version 2.2
+    *
+    * BBFS: As  with read(), the documentation above is inconsistent
+    * with the documentation for the write() system call.
     */
-//   int (*write) (const char *, const char *, size_t, off_t,
-//            struct fuse_file_info *);
-// As  with read(), the documentation above is inconsistent with the
-// documentation for the write() system call.
 int $write(
    const char *path,
    const char *buf,
@@ -55,18 +54,21 @@ int $write(
    struct fuse_file_info *fi
 )
 {
+   struct $mfd_t *mfd;
    int ret;
    $$DFSDATA
 
-   // Only allow writes on main FDs
-   if($$MFD->is_main != 1){ return -EACCES; }
+   mfd = $$MFD;
 
-   $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, $$MFD->mainfd);
+   // Only allow writes on main FDs
+   if(mfd->is_main != 1){ return -EACCES; }
+
+   $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, mfd->mainfd);
 
    // Save blocks into snapshot
-   if(unlikely((ret = $b_write(fsdata, $$MFD, size, offset)) != 0)){ return ret; }
+   if(unlikely((ret = $b_write(fsdata, mfd, size, offset)) != 0)){ return ret; }
 
-   ret = pwrite($$MFD->mainfd, buf, size, offset);
+   ret = pwrite(mfd->mainfd, buf, size, offset);
    if(ret >= 0){ return ret; }
    return -errno;
 }
@@ -84,7 +86,6 @@ int $write(
     *
     * Introduced in version 2.5
     */
-//   int (*ftruncate) (const char *, off_t, struct fuse_file_info *);
 int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 {
    struct $mfd_t *mfd;
@@ -93,11 +94,11 @@ int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 
    mfd = $$MFD;
 
-   log_msg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
+   $dlogdbg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
 
    if(unlikely((ret = $b_truncate(fsdata, mfd, newsize)) != 0)){ return ret; }
 
-   if(ftruncate($$MFD->mainfd, newsize) == 0){ return 0; }
+   if(ftruncate(mfd->mainfd, newsize) == 0){ return 0; }
    return -errno;
 }
 
