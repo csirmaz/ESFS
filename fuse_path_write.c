@@ -108,25 +108,135 @@ int $rmdir(const char *path)
 
 
 
-   /** Rename a file */
-//   int (*rename) (const char *, const char *);
+/** Rename a file
+ *
+ * See mfd.c for a detailed description of read and write directives.
+ */
+// TODO Do we need locking for the rename operations?
 int $rename(const char *path, const char *newpath)
 {
+   struct $mfd_t mymfd; // The mfd of path, with follow
+   struct $mfd_t mydirectmfd; // The mfd of path, without follow
+   struct $mfd_t mynewmfd; // The mfd of newpath, with follow
+   int ret;
+   int waserror = 0; // negative on error
    $$IF_MULTI_PATHS_MAIN_ONLY
-   log_msg("  rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
-   /* TODO
-    * - remove write directive from our own direct map (with nofollow) (for current name)
-    *    This may be the same as our current map if the file hasn't been renamed. See is_renamed
-    * - add/overwrite write directive in map file for new name
-    *    to point to snapshot name
-    *    This might not exist in which case it needs to be marked as nonexistent
-    * - Add/overwrite read directive in our normal map file (for name in snapshot - this is what has been opened)
-    *    to point to new name
-    * 
-    * TODO Renaming directories? Maybe that shouldn't be allowed.
-    */
-   if(rename(fpath, fnewpath) == 0){ return 0; }
-   return -errno;
+
+   $dlogdbg("  rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+
+   if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)){
+      $dlogdbg("Rename: mfd_open_sn failed on %s with %d = %s\n", path, ret, strerror(-ret));
+      // We do not allow moving/renaming directories,
+      // to save the complexity of saving the file change of everything under them.
+      if(ret == -EISDIR){
+         return -EOPNOTSUPP;
+      }
+      return ret;
+   }
+
+   do{
+      
+      // If path is a file, newpath is a file as well (even if the command was to move a file under a directory).
+      // Get the mfd for newpath.
+      if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS)) != 0)){
+         $dlogdbg("Rename: mfd_open_sn failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
+         waserror = ret;
+         break;
+      }
+
+      do{
+
+         // If newpath exists, it will be replaced, so we need to save it.
+         if(mynewmfd.mapheader.exists != 0){
+            if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0)) != 0)){
+               $dlogi("Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
+               waserror = ret;
+               break;
+            }
+         }
+
+         // Before we modify the read and write directives, we do the actual rename.
+         /* If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
+          * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.  
+          */
+         if(unlikely(rename(fpath, fnewpath) != 0)){
+            waserror = -errno;
+            break;
+         }
+
+         // Add a write directive to the new path so that subsequently, data would be written
+         // to the dat file of the original path.
+         // This may replace an existing write directive, which is the correct behaviour.
+         strcpy(mynewmfd.mapheader.write_v, path);
+         // TODO 2 Skip saving the mapheader wile opening mfd if the map file has just been created here
+         if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)){
+            $dlogi("Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
+            // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
+            waserror = ret;
+            break;
+         }
+
+         // If the old file has already been removed, we have followed a write directive
+         // when opening mymfd.
+         // That write directive needs to be removed, as writing oldpath no longer functions
+         // like writing the old file.
+         if(mymfd.is_renamed != 0){
+
+            if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW)) != 0)){
+               $dlogi("Rename: mfd_open_sn(nofollow) failed on %s with %d = %s\n", path, ret, strerror(-ret));
+               waserror = ret;
+               break;
+            }
+
+            mydirectmfd.mapheader.write_v[0] = '\0';
+
+            if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)){
+               $dlogi("Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
+               waserror = ret;
+               // DO NOT break here as we want to close mydirectmfd anyway
+            }
+
+            if(unlikely((ret = $mfd_close_sn(&mydirectmfd)) != 0)){
+               $dlogi("Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
+               waserror = ret;
+            }
+
+            if(waserror != 0){
+               break;
+            }
+
+         }
+
+         // mymfd.is_renamed = 1;
+         // There's no need to set the is_renamed flag as it's in-memory only, and we'll close
+         // the mfd's anyway.
+
+         // Add a read directive to the old path so that when we step to the next snapshot,
+         // we know to search the new path.
+         strcpy(mymfd.mapheader.read_v, newpath);
+         if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)){
+            $dlogi("Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
+            // We could restore mynewmfd.mapheader & mydirectmfd.mapheader here.
+            waserror = ret;
+            break;
+         }
+
+      }while(0);
+
+      if((ret = $mfd_close_sn(&mynewmfd)) != 0){
+         $dlogi("Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
+         waserror = ret;
+         break;
+      }
+
+   }while(0);
+
+   if((ret = $mfd_close_sn(&mymfd)) != 0){
+      $dlogi("Rename: mfd_close_sn(mymfd) failed with %d = %s\n", ret, strerror(-ret));
+      waserror = ret;
+   }
+
+   return waserror;
 }
 
 
@@ -157,7 +267,7 @@ int $chmod(const char *path, mode_t mode)
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
+   // $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
 
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
@@ -172,7 +282,7 @@ int $chown(const char *path, uid_t uid, gid_t gid)
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // log_msg("\nchown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
+   // $dlogdbg("  chown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
 
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
@@ -188,7 +298,7 @@ int $unlink(const char *path)
 
    $$IF_PATH_MAIN_ONLY
 
-   $dlogdbg("  unlink(path=\"%s\")\n", path);
+   // $dlogdbg("  unlink(path=\"%s\")\n", path);
 
    if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)){
       return ret;
@@ -229,25 +339,26 @@ int $truncate(const char *path, off_t newsize)
 }
 
 
-   /**
-    * Change the access and modification times of a file with
-    * nanosecond resolution
-    *
-    * This supersedes the old utime() interface.  New applications
-    * should use this.
-    *
-    * See the utimensat(2) man page for details.
-    * @param path is the path to the file
-    * @param tv An array of two struct timespec.  The first member is atime, the second is mtime.
-    *
-    * Introduced in version 2.6
-    */
-//   int (*utimens) (const char *, const struct timespec tv[2]);
+/**
+ * Change the access and modification times of a file with
+ * nanosecond resolution
+ *
+ * This supersedes the old utime() interface.  New applications
+ * should use this.
+ *
+ * See the utimensat(2) man page for details.
+ * @param path is the path to the file
+ * @param tv An array of two struct timespec.  The first member is atime, the second is mtime.
+ *
+ * Introduced in version 2.6
+ */
 int $utimens(const char *path, const struct timespec tv[2])
 {
+   int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // TODO 1 push to snapshot?
+   // TODO 2: for performance reasons, maybe we don't want to trigger a save here
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
 
    /*
     int utimensat(int dirfd, const char *pathname,

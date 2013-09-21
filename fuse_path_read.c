@@ -44,9 +44,9 @@
 //   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
 {
-   $$ALL_PATHS
+   $$ALL_PATHS // TODO
 
-   log_msg("  getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
+   // log_msg("  getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
 
    if(lstat(fpath, statbuf) == 0){ return 0; }
    return -errno;
@@ -97,9 +97,9 @@ int $readlink(const char *path, char *link, size_t size)
 //   int (*access) (const char *, int);
 int $access(const char *path, int mask)
 {
-   $$ALL_PATHS
+   $$ALL_PATHS // TODO
 
-   log_msg("  access(path=\"%s\", mask=0%o)\n", path, mask);
+   // log_msg("  access(path=\"%s\", mask=0%o)\n", path, mask);
 
    if(access(fpath, mask) == 0){ return 0; }
    return -errno;
@@ -110,8 +110,7 @@ int $access(const char *path, int mask)
  ***********************************************/
 
 
-   /** Get extended attributes */
-//   int (*getxattr) (const char *, const char *, char *, size_t);
+/** Get extended attributes */
 int $getxattr(const char *path, const char *name, char *value, size_t size)
 {
    // Xattr is not supported by ext4; for now, we disable it.
@@ -126,8 +125,7 @@ int $getxattr(const char *path, const char *name, char *value, size_t size)
 }
 
 
-   /** List extended attributes */
-//   int (*listxattr) (const char *, char *, size_t);
+/** List extended attributes */
 int $listxattr(const char *path, char *list, size_t size)
 {
    // Xattr is not supported by ext4; for now, we disable it.

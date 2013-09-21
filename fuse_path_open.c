@@ -84,7 +84,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
          // Save the current status of the file by initialising the map file.
          // We don't delete this even if the subsequent operation fails.
-         fd = $mfd_open_sn(mfd, path, fpath, fsdata); // fd only stores a success flag here
+         fd = $mfd_open_sn(mfd, path, fpath, fsdata, $$MFD_DEFAULTS); // fd only stores a success flag here
          if(fd < 0){
             waserror = -fd; // converting -errno to +errno
             break;
@@ -176,7 +176,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
    do{
       // Save the current status of the file by initialising the map file.
       // We don't delete this even if the subsequent operation fails.
-      fd = $mfd_open_sn(mfd, path, fpath, fsdata); // fd only stores a success flag here
+      fd = $mfd_open_sn(mfd, path, fpath, fsdata, $$MFD_DEFAULTS); // fd only stores a success flag here
       if(fd < 0){
          waserror = -fd; // Converting -errno to +errno;
          break;
@@ -268,7 +268,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
 
    mfd = &myfd;
 
-   if(unlikely((ret = $mfd_open_sn(mfd, path, fpath, fsdata)) != 0)){
+   if(unlikely((ret = $mfd_open_sn(mfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)){
       return ret;
    }
 

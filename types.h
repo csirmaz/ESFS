@@ -92,6 +92,10 @@
 
 #define $$RECURSIVE_RM_FDS 3 // number of filehandles to use when traversing directories
 
+// MFD open flags
+#define $$MFD_DEFAULTS 0
+#define $$MFD_NOFOLLOW 1
+
 
 /** An element in the table used for file-based locking
  */
@@ -132,8 +136,8 @@ struct $snpath_t {
  */
 struct $mapheader_t {
    int $version;
-   int exists; // whether the file exists, 0 or 1
-   struct stat fstat; // saved parameters of the file (only if exists==1)
+   int exists; /**< whether the file exists, 0 or 1 */
+   struct stat fstat; /**< saved parameters of the file (only if exists==1) */
    char read_v[$$PATH_MAX]; // the read directive: going forward, read the dest instead. Contains a virtual path or an empty string.
    char write_v[$$PATH_MAX]; // the write directive: in this snapshot, write the dest instead. Contains a virtual path or an empty string.
    char signature[4];
@@ -154,14 +158,14 @@ struct $mapheader_t {
  * * -4 - if the file was 0 length when the snapshot was taken
  */
 struct $mfd_t {
-   int is_main; /**< 1 if this is a main file; 0 otherwise */
+   int is_main; /**< bool; 1 if this is a main file; 0 otherwise */
    // MAIN FILE PART: (used when dealing with a file in the main space)
    int mainfd; /**< filehandle to the main file */
    struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory */
    ino_t main_inode; /**< the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking */
    int mapfd; /**< filehandle to the map file[A]. See $mfd_open_sn */
    int datfd; /**< filehandle to the dat file[A,B]. See $mfd_open_sn */
-   int is_renamed; /**< 0 or 1 if we have followed a write directive. See $mfd_open_sn */
+   int is_renamed; /**< bool; 0 or 1 if we have followed a write directive. See $mfd_open_sn */
 };
 
 // CAST
