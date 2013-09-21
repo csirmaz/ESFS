@@ -57,24 +57,24 @@ int $mkdir(const char *path, mode_t mode)
 {
    $$IF_PATH_SN
 
-      // Create a new snapshot
+   // Create a new snapshot
 
-      if(snpath->is_there != 1){
-         ret = -EFAULT; // "Bad address" if wrong path was used
-      }else if($sn_create(fsdata, fpath) != 0){
-         ret = -EIO; // If error occurred while trying to create snapshot; check logs.
-      }else{
-         ret = 0;
-      }
+   if(snpath->is_there != 1) {
+      ret = -EFAULT; // "Bad address" if wrong path was used
+   } else if($sn_create(fsdata, fpath) != 0) {
+      ret = -EIO; // If error occurred while trying to create snapshot; check logs.
+   } else {
+      ret = 0;
+   }
 
    $$ELIF_PATH_MAIN
 
-      log_msg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+   log_msg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
-      // TODO mark dir as nonexistend in snapshot
+   // TODO mark dir as nonexistend in snapshot
 
-      if(mkdir(fpath, mode) == 0){ return 0; }
-      return -errno;
+   if(mkdir(fpath, mode) == 0) { return 0; }
+   return -errno;
 
    $$FI_PATH
 }
@@ -88,20 +88,20 @@ int $rmdir(const char *path)
 {
    $$IF_PATH_SN
 
-      // Remove the latest snapshot
-      $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
+   // Remove the latest snapshot
+   $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
 
-      if(snpath->is_there != 0){
-         ret = -EFAULT;
-      } else {
-         ret = $sn_destroy(fsdata);
-      }
+   if(snpath->is_there != 0) {
+      ret = -EFAULT;
+   } else {
+      ret = $sn_destroy(fsdata);
+   }
 
    $$ELIF_PATH_MAIN
 
-      // log_msg("rmdir(path=\"%s\")\n", path);
-      if(rmdir(fpath) == 0){ return 0; }
-      return -errno;
+   // log_msg("rmdir(path=\"%s\")\n", path);
+   if(rmdir(fpath) == 0) { return 0; }
+   return -errno;
 
    $$FI_PATH
 }
@@ -124,31 +124,31 @@ int $rename(const char *path, const char *newpath)
 
    $dlogdbg("  rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
 
-   if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)){
+   if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)) {
       $dlogdbg("Rename: mfd_open_sn failed on %s with %d = %s\n", path, ret, strerror(-ret));
       // We do not allow moving/renaming directories,
       // to save the complexity of saving the file change of everything under them.
-      if(ret == -EISDIR){
+      if(ret == -EISDIR) {
          return -EOPNOTSUPP;
       }
       return ret;
    }
 
-   do{
-      
+   do {
+
       // If path is a file, newpath is a file as well (even if the command was to move a file under a directory).
       // Get the mfd for newpath.
-      if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS)) != 0)){
+      if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS)) != 0)) {
          $dlogdbg("Rename: mfd_open_sn failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
          waserror = ret;
          break;
       }
 
-      do{
+      do {
 
          // If newpath exists, it will be replaced, so we need to save it.
-         if(mynewmfd.mapheader.exists != 0){
-            if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0)) != 0)){
+         if(mynewmfd.mapheader.exists != 0) {
+            if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0)) != 0)) {
                $dlogi("Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
                waserror = ret;
                break;
@@ -157,9 +157,9 @@ int $rename(const char *path, const char *newpath)
 
          // Before we modify the read and write directives, we do the actual rename.
          /* If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
-          * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.  
+          * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.
           */
-         if(unlikely(rename(fpath, fnewpath) != 0)){
+         if(unlikely(rename(fpath, fnewpath) != 0)) {
             waserror = -errno;
             break;
          }
@@ -169,7 +169,7 @@ int $rename(const char *path, const char *newpath)
          // This may replace an existing write directive, which is the correct behaviour.
          strcpy(mynewmfd.mapheader.write_v, path);
          // TODO 2 Skip saving the mapheader wile opening mfd if the map file has just been created here
-         if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)){
+         if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
             $dlogi("Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
             // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
             waserror = ret;
@@ -180,9 +180,9 @@ int $rename(const char *path, const char *newpath)
          // when opening mymfd.
          // That write directive needs to be removed, as writing oldpath no longer functions
          // like writing the old file.
-         if(mymfd.is_renamed != 0){
+         if(mymfd.is_renamed != 0) {
 
-            if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW)) != 0)){
+            if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW)) != 0)) {
                $dlogi("Rename: mfd_open_sn(nofollow) failed on %s with %d = %s\n", path, ret, strerror(-ret));
                waserror = ret;
                break;
@@ -190,18 +190,18 @@ int $rename(const char *path, const char *newpath)
 
             mydirectmfd.mapheader.write_v[0] = '\0';
 
-            if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)){
+            if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)) {
                $dlogi("Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
                waserror = ret;
                // DO NOT break here as we want to close mydirectmfd anyway
             }
 
-            if(unlikely((ret = $mfd_close_sn(&mydirectmfd)) != 0)){
+            if(unlikely((ret = $mfd_close_sn(&mydirectmfd)) != 0)) {
                $dlogi("Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
                waserror = ret;
             }
 
-            if(waserror != 0){
+            if(waserror != 0) {
                break;
             }
 
@@ -214,24 +214,24 @@ int $rename(const char *path, const char *newpath)
          // Add a read directive to the old path so that when we step to the next snapshot,
          // we know to search the new path.
          strcpy(mymfd.mapheader.read_v, newpath);
-         if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)){
+         if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)) {
             $dlogi("Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
             // We could restore mynewmfd.mapheader & mydirectmfd.mapheader here.
             waserror = ret;
             break;
          }
 
-      }while(0);
+      } while(0);
 
-      if((ret = $mfd_close_sn(&mynewmfd)) != 0){
+      if((ret = $mfd_close_sn(&mynewmfd)) != 0) {
          $dlogi("Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
          waserror = ret;
          break;
       }
 
-   }while(0);
+   } while(0);
 
-   if((ret = $mfd_close_sn(&mymfd)) != 0){
+   if((ret = $mfd_close_sn(&mymfd)) != 0) {
       $dlogi("Rename: mfd_close_sn(mymfd) failed with %d = %s\n", ret, strerror(-ret));
       waserror = ret;
    }
@@ -254,9 +254,9 @@ int $symlink(const char *dest, const char *path)
 
    $dlogdbg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
 
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
-   if(symlink(dest, fpath) == 0){ return 0; }
+   if(symlink(dest, fpath) == 0) { return 0; }
    return -errno;
 }
 
@@ -269,9 +269,9 @@ int $chmod(const char *path, mode_t mode)
 
    // $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
 
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
-   if(chmod(fpath, mode) == 0){ return 0; }
+   if(chmod(fpath, mode) == 0) { return 0; }
    return -errno;
 }
 
@@ -284,9 +284,9 @@ int $chown(const char *path, uid_t uid, gid_t gid)
 
    // $dlogdbg("  chown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
 
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
-   if(chown(fpath, uid, gid) == 0){ return 0; }
+   if(chown(fpath, uid, gid) == 0) { return 0; }
    return -errno;
 }
 
@@ -300,12 +300,12 @@ int $unlink(const char *path)
 
    // $dlogdbg("  unlink(path=\"%s\")\n", path);
 
-   if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)){
+   if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)) {
       return ret;
    }
 
    // Actually do the unlink
-   if(unlink(fpath) == 0){ return 0; }
+   if(unlink(fpath) == 0) { return 0; }
 
    ret = errno;
    $dlogdbg("unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
@@ -324,12 +324,12 @@ int $truncate(const char *path, off_t newsize)
 
    $dlogdbg("  trunc(path=\"%s\" size=%zu)\n", path, newsize);
 
-   if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, newsize)) != 0)){
+   if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, newsize)) != 0)) {
       return ret;
    }
 
    // Actually do the truncate
-   if(truncate(fpath, newsize) == 0){ return 0; }
+   if(truncate(fpath, newsize) == 0) { return 0; }
 
    ret = errno;
    $dlogdbg("truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
@@ -358,7 +358,7 @@ int $utimens(const char *path, const struct timespec tv[2])
    $$IF_PATH_MAIN_ONLY
 
    // TODO 2: for performance reasons, maybe we don't want to trigger a save here
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0){ return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
    /*
     int utimensat(int dirfd, const char *pathname,
@@ -380,7 +380,7 @@ int $utimens(const char *path, const struct timespec tv[2])
        constant, defined in <fcntl.h>:
    */
 
-   if(utimensat(AT_FDCWD, fpath, tv, AT_SYMLINK_NOFOLLOW) == 0){
+   if(utimensat(AT_FDCWD, fpath, tv, AT_SYMLINK_NOFOLLOW) == 0) {
       return 0;
    }
    return -errno;
