@@ -35,29 +35,29 @@
  */
 
 
-   /** Possibly flush cached data
-    *
-    * BIG NOTE: This is not equivalent to fsync().  It's not a
-    * request to sync dirty data.
-    *
-    * Flush is called on each close() of a file descriptor.  So if a
-    * filesystem wants to return write errors in close() and the file
-    * has cached dirty data, this is a good place to write back data
-    * and return any errors.  Since many applications ignore close()
-    * errors this is not always useful.
-    *
-    * NOTE: The flush() method may be called more than once for each
-    * open().  This happens if more than one file descriptor refers
-    * to an opened file due to dup(), dup2() or fork() calls.  It is
-    * not possible to determine if a flush is final, so each flush
-    * should be treated equally.  Multiple write-flush sequences are
-    * relatively rare, so this shouldn't be a problem.
-    *
-    * Filesystems shouldn't assume that flush will always be called
-    * after some writes, or that if will be called at all.
-    *
-    * Changed in version 2.2
-    */
+/** Possibly flush cached data
+ *
+ * BIG NOTE: This is not equivalent to fsync().  It's not a
+ * request to sync dirty data.
+ *
+ * Flush is called on each close() of a file descriptor.  So if a
+ * filesystem wants to return write errors in close() and the file
+ * has cached dirty data, this is a good place to write back data
+ * and return any errors.  Since many applications ignore close()
+ * errors this is not always useful.
+ *
+ * NOTE: The flush() method may be called more than once for each
+ * open().  This happens if more than one file descriptor refers
+ * to an opened file due to dup(), dup2() or fork() calls.  It is
+ * not possible to determine if a flush is final, so each flush
+ * should be treated equally.  Multiple write-flush sequences are
+ * relatively rare, so this shouldn't be a problem.
+ *
+ * Filesystems shouldn't assume that flush will always be called
+ * after some writes, or that if will be called at all.
+ *
+ * Changed in version 2.2
+ */
 // TODO Implement snapshots
 //   int (*flush) (const char *, struct fuse_file_info *);
 int $flush(const char *path, struct fuse_file_info *fi)
@@ -71,20 +71,20 @@ int $flush(const char *path, struct fuse_file_info *fi)
 }
 
 
-   /** Release an open file
-    *
-    * Release is called when there are no more references to an open
-    * file: all file descriptors are closed and all memory mappings
-    * are unmapped.
-    *
-    * For every open() call there will be exactly one release() call
-    * with the same flags and file descriptor.   It is possible to
-    * have a file opened more than once, in which case only the last
-    * release will mean, that no more reads/writes will happen on the
-    * file.  The return value of release is ignored.
-    *
-    * Changed in version 2.2
-    */
+/** Release an open file
+ *
+ * Release is called when there are no more references to an open
+ * file: all file descriptors are closed and all memory mappings
+ * are unmapped.
+ *
+ * For every open() call there will be exactly one release() call
+ * with the same flags and file descriptor.   It is possible to
+ * have a file opened more than once, in which case only the last
+ * release will mean, that no more reads/writes will happen on the
+ * file.  The return value of release is ignored.
+ *
+ * Changed in version 2.2
+ */
 // TODO Implement snapshots
 //   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
@@ -96,9 +96,9 @@ int $release(const char *path, struct fuse_file_info *fi)
 
    log_msg("release(path=\"%s\", fi=0x%08x, mainfd=%d)\n", path, fi, $$MFD->mainfd);
 
-   if(mfd->is_main == 1){
+   if(mfd->is_main == 1) {
       ret = $mfd_close_sn(mfd);
-      if(unlikely(close(mfd->mainfd) != 0)){ ret = errno; }
+      if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
    }
 
    // TODO close non-main fds
@@ -109,13 +109,13 @@ int $release(const char *path, struct fuse_file_info *fi)
 }
 
 
-   /** Synchronize file contents
-    *
-    * If the datasync parameter is non-zero, then only the user data
-    * should be flushed, not the meta data.
-    *
-    * Changed in version 2.2
-    */
+/** Synchronize file contents
+ *
+ * If the datasync parameter is non-zero, then only the user data
+ * should be flushed, not the meta data.
+ *
+ * Changed in version 2.2
+ */
 // TODO implement
 //   int (*fsync) (const char *, int, struct fuse_file_info *);
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
@@ -123,24 +123,24 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 
    log_msg("fsync(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
 
-   if(datasync){
-      if(fdatasync($$MFD->mainfd) == 0){ return 0; } // TODO sync other files
+   if(datasync) {
+      if(fdatasync($$MFD->mainfd) == 0) { return 0; } // TODO sync other files
       return -errno;
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed
    }
 
-   if(fsync($$MFD->mainfd) == 0){ return 0; } // TODO sync other files
+   if(fsync($$MFD->mainfd) == 0) { return 0; } // TODO sync other files
    return -errno;
-      // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for)
-      // the file referred to by the file descriptor fd to the disk device
+   // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for)
+   // the file referred to by the file descriptor fd to the disk device
 
 }
 
 
-   /** Release directory
-    *
-    * Introduced in version 2.3
-    */
+/** Release directory
+ *
+ * Introduced in version 2.3
+ */
 // TODO Implement snapshots
 //   int (*releasedir) (const char *, struct fuse_file_info *);
 int $releasedir(const char *path, struct fuse_file_info *fi)
@@ -148,18 +148,18 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 
    log_msg("releasedir(path=\"%s\", fi=0x%08x)\n", path, fi);
 
-   if(closedir((DIR *) (uintptr_t) fi->fh) == 0){ return 0; }
+   if(closedir((DIR *)(uintptr_t) fi->fh) == 0) { return 0; }
    return -errno;
 }
 
 
-   /** Synchronize directory contents
-    *
-    * If the datasync parameter is non-zero, then only the user data
-    * should be flushed, not the meta data
-    *
-    * Introduced in version 2.3
-    */
+/** Synchronize directory contents
+ *
+ * If the datasync parameter is non-zero, then only the user data
+ * should be flushed, not the meta data
+ *
+ * Introduced in version 2.3
+ */
 // TODO Implement snapshots
 //   int (*fsyncdir) (const char *, int, struct fuse_file_info *);
 // when exactly is this called?  when a user calls fsync and it

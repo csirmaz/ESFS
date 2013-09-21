@@ -143,13 +143,13 @@ static inline int $mfd_save_mapheader(const struct $mfd_t *mfd, const struct $fs
    int ret;
 
    ret = pwrite(mfd->mapfd, &(mfd->mapheader), sizeof(struct $mapheader_t), 0);
-   if(unlikely(ret == -1)){
+   if(unlikely(ret == -1)) {
       ret = errno;
       $dlogi("mfd_open_sn: Failed to write .map header, error %d = %s\n", ret, strerror(ret));
       return -ret;
    }
 
-   if(unlikely(ret != sizeof(struct $mapheader_t))){
+   if(unlikely(ret != sizeof(struct $mapheader_t))) {
       $dlogi("mfd_open_sn: Failed: only written %d bytes into .map header\n", ret);
       return -EIO;
    }
@@ -223,7 +223,7 @@ static int $mfd_open_sn(
    mfd->is_main = 1;
 
    // No snapshots?
-   if(fsdata->sn_is_any == 0){
+   if(fsdata->sn_is_any == 0) {
       $dlogdbg("mfd_open_sn: no snapshots found, so returning\n");
       mfd->mapfd = -1;
       mfd->datfd = -1;
@@ -235,7 +235,7 @@ static int $mfd_open_sn(
 
    // Create path
    ret = $mkpath(fmap, NULL, S_IRWXU); // TODO 1: this is almost thread safe, so decide where to lock
-   if(ret < 0){ // error
+   if(ret < 0) {  // error
       $dlogdbg("mfd_open_sn: mkpath failed with %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
@@ -243,16 +243,16 @@ static int $mfd_open_sn(
    // Open or create the map file
    fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU); // TODO 2: add O_NOATIME
 
-   if(fd == -1){
+   if(fd == -1) {
 
       fd = errno;
-      if(fd == EEXIST){
+      if(fd == EEXIST) {
          // The .map file already exists, which means that the main file is already dirty.
          // TODO 2 If we aren't actually to set up an mfd, just return here
 
          // Otherwise, we open the .map file again.
          fd = open(fmap, O_RDWR);
-         if(unlikely(fd == -1)){
+         if(unlikely(fd == -1)) {
             fd = errno;
             $dlogi("mfd_open_sn: Failed to open .map again at %s, error %d = %s\n", fmap, fd, strerror(fd));
             return -fd;
@@ -261,30 +261,30 @@ static int $mfd_open_sn(
 
          mfd->mapfd = fd;
 
-         do{ // From here we either return with a positive errno, or -1 if we need to try again
+         do { // From here we either return with a positive errno, or -1 if we need to try again
 
             // Read the mapheader
             ret = pread(fd, maphead, sizeof(struct $mapheader_t), 0);
-            if(unlikely(ret == -1)){
+            if(unlikely(ret == -1)) {
                waserror = errno;
                $dlogi("mfd_open_sn: Failed to read .map at %s, error %d = %s\n", fmap, waserror, strerror(waserror));
                break;
             }
-            if(unlikely(ret != sizeof(struct $mapheader_t))){
+            if(unlikely(ret != sizeof(struct $mapheader_t))) {
                $dlogi("mfd_open_sn: Only read %d bytes instead of %ld from .map at %s. Broken FS?\n", ret, sizeof(struct $mapheader_t), fmap);
                waserror = EIO;
                break;
             }
 
             // Check the version and the signature
-            if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0){
+            if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0) {
                $dlogi("mfd_open_sn: version or signature bad in map file %s. Broken FS?\n", fmap);
                waserror = EFAULT;
                break;
             }
 
             // We need to check if there is a "write" directive in here.
-            if(maphead->write_v[0] != '\0' && (!(flags & $$MFD_NOFOLLOW))){
+            if(maphead->write_v[0] != '\0' && (!(flags & $$MFD_NOFOLLOW))) {
                // Found a write directive, which we need to follow. This is a virtual path.
                $dlogdbg("mfd_open_sn: Found a write directive from %s (map: %s) to %s\n", vpath, fmap, maphead->write_v);
                mfd->is_renamed = 1;
@@ -298,11 +298,11 @@ static int $mfd_open_sn(
             // and open or create the dat file if necessary
             $$MFD_OPEN_DAT_FILE
 
-         }while(0);
+         } while(0);
 
-         if(waserror != 0){ // Cleanup & follow
+         if(waserror != 0) {  // Cleanup & follow
             close(fd);
-            if(waserror == -1){ // Follow the write directive
+            if(waserror == -1) {  // Follow the write directive
                // Get the full path in fmap
                $$ADDNPREFIX_CONT(fmap, maphead->write_v, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len)
                return $mfd_open_sn(mfd, maphead->write_v, fmap, fsdata, flags);
@@ -319,7 +319,7 @@ static int $mfd_open_sn(
 
    } else { // ----- We've created a new .map file -----
 
-      do{
+      do {
          // We've created the .map file; let's save data about the main file.
          $dlogdbg("mfd_open_sn: created a new map file at %s FD %d\n", fmap, fd);
 
@@ -333,9 +333,9 @@ static int $mfd_open_sn(
          maphead->write_v[0] = '\0';
 
          // stat the main file
-         if(lstat(fpath, &(maphead->fstat)) != 0){
+         if(lstat(fpath, &(maphead->fstat)) != 0) {
             ret = errno;
-            if(ret == ENOENT){ // main file does not exist (yet?)
+            if(ret == ENOENT) {  // main file does not exist (yet?)
                // WARNING In this case, mfd.mapheader.fstat remains uninitialised!
                maphead->exists = 0;
             } else { // some other error
@@ -347,13 +347,13 @@ static int $mfd_open_sn(
 
          // mfd's are not currently allowed for directories.
          // We rely on this return value to disallow moving/renaming directories
-         if(unlikely(S_ISDIR(maphead->fstat.st_mode))){
+         if(unlikely(S_ISDIR(maphead->fstat.st_mode))) {
             waserror = EISDIR;
             break;
          }
 
          // write into the map file
-         if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)){
+         if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)) {
             waserror = -ret;
             break;
          }
@@ -362,9 +362,9 @@ static int $mfd_open_sn(
          // and open or create the dat file if necessary
          $$MFD_OPEN_DAT_FILE
 
-      }while(0);
+      } while(0);
 
-      if(waserror != 0){ // Cleanup
+      if(waserror != 0) {  // Cleanup
          close(fd);
          // TODO 2: Clean up directories created by $mkpath based on the 'firstcreated' it can return.
          // However, be aware that other files being opened might already be using the directories
@@ -394,15 +394,16 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
  * * 0 on success
  * * -errno on error (the last errno)
  */
-static inline int $mfd_close_sn(struct $mfd_t *mfd){
+static inline int $mfd_close_sn(struct $mfd_t *mfd)
+{
    int waserror = 0;
 
-   if(mfd->datfd >= 0){
-      if(unlikely(close(mfd->datfd) != 0)){ waserror = errno; }
+   if(mfd->datfd >= 0) {
+      if(unlikely(close(mfd->datfd) != 0)) { waserror = errno; }
    }
 
-   if(mfd->mapfd >= 0){
-      if(unlikely(close(mfd->mapfd) != 0)){ waserror = errno; }
+   if(mfd->mapfd >= 0) {
+      if(unlikely(close(mfd->mapfd) != 0)) { waserror = errno; }
    }
 
    return -waserror;
@@ -427,7 +428,7 @@ static inline int $mfd_init_sn(
    // It's somewhat wasteful to allocate a whole mfd here,
    // but we need the mapheader, which is included in it, anyway.
 
-   if((ret = $mfd_open_sn(&mymfd, vpath, fpath, fsdata, $$MFD_DEFAULTS)) == 0){
+   if((ret = $mfd_open_sn(&mymfd, vpath, fpath, fsdata, $$MFD_DEFAULTS)) == 0) {
       ret = $mfd_close_sn(&mymfd);
    }
    return ret;

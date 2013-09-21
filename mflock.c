@@ -148,7 +148,8 @@
  * * 0 on success
  * * -errno on error
  */
-static int $mflock_init(struct $fsdata_t *fsdata){
+static int $mflock_init(struct $fsdata_t *fsdata)
+{
    int i;
    pthread_mutexattr_t mutexattr;
 
@@ -157,9 +158,9 @@ static int $mflock_init(struct $fsdata_t *fsdata){
    // TODO Later switch to the default by using NULL instead of mutexattr below
 
    fsdata->mflocks = malloc(sizeof(struct $mflock_t) * $$LOCK_NUM);
-   if(fsdata->mflocks == NULL){ return -ENOMEM; }
+   if(fsdata->mflocks == NULL) { return -ENOMEM; }
 
-   for(i=0; i<$$LOCK_NUM; i++){
+   for(i = 0; i < $$LOCK_NUM; i++) {
       pthread_mutex_init(&(fsdata->mflocks[i].mutex), &mutexattr);
       pthread_mutex_init(&(fsdata->mflocks[i].mod_mutex), &mutexattr);
       fsdata->mflocks[i].label = 0;
@@ -171,10 +172,11 @@ static int $mflock_init(struct $fsdata_t *fsdata){
 }
 
 
-static int $mflock_destroy(struct $fsdata_t *fsdata){
+static int $mflock_destroy(struct $fsdata_t *fsdata)
+{
    int i;
 
-   for(i=0; i<$$LOCK_NUM; i++){
+   for(i = 0; i < $$LOCK_NUM; i++) {
       pthread_mutex_destroy(&(fsdata->mflocks[i].mutex));
       pthread_mutex_destroy(&(fsdata->mflocks[i].mod_mutex));
    }
@@ -189,7 +191,8 @@ static int $mflock_destroy(struct $fsdata_t *fsdata){
  * * lock number on success (>=0)
  * * -errno on error
  */
-static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
+static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label)
+{
    int i;
    int ret;
    int ml = -1;
@@ -197,19 +200,19 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
    pthread_mutex_t *modmutex = NULL;
    struct timespec delay = { 0, 10000000 }; // nanoseconds: 1 000 000 000
 
-   while(1){ // START:
+   while(1) { // START:
 
       mylock = NULL;
-      for(i=0; i<$$LOCK_NUM; i++){
-         if(fsdata->mflocks[i].label == label){
+      for(i = 0; i < $$LOCK_NUM; i++) {
+         if(fsdata->mflocks[i].label == label) {
             ml = i;
             mylock = &(fsdata->mflocks[i]);
             break;
          }
       }
 
-      if(mylock != NULL){ // if label is in the table
-         if(unlikely(modmutex != NULL)){
+      if(mylock != NULL) { // if label is in the table
+         if(unlikely(modmutex != NULL)) {
             // recheck failed; release the modmutex and carry on as usual
             pthread_mutex_unlock(modmutex);
             modmutex = NULL;
@@ -217,7 +220,7 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
          (mylock->want)++; // request handover
          pthread_mutex_lock(&(mylock->mutex));
          (mylock->want)--;
-         if(likely(mylock->label == label)){ // recheck
+         if(likely(mylock->label == label)) { // recheck
             // We have (successfully taken over) the mutex and it's labelled with the label
             return ml;
          }
@@ -229,41 +232,41 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
       // label is not in the table:
       // get the modmutes and re-check that the label is still not in the table
 
-      if(modmutex == NULL){ // If we don't yet have the modmutex
+      if(modmutex == NULL) { // If we don't yet have the modmutex
          modmutex = &(fsdata->mflocks[label & ($$LOCK_NUM - 1)].mod_mutex);
-         if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)){ return -ret; }
+         if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)) { return -ret; }
          continue; // Start over for a re-check.
       }
 
       // We have the modmutex and label is not in the table
       // try all non-labelled locks in the table
-      while(1){ // FIND:
+      while(1) { // FIND:
          ml = -1;
-         for(i=0; i<$$LOCK_NUM; i++){
-            if(likely(fsdata->mflocks[i].label == 0)){
+         for(i = 0; i < $$LOCK_NUM; i++) {
+            if(likely(fsdata->mflocks[i].label == 0)) {
                ret = pthread_mutex_trylock(&(fsdata->mflocks[i].mutex));
-               if(likely(ret == 0)){ // got the lock
+               if(likely(ret == 0)) { // got the lock
                   ml = i;
                   break;
-               }else if(ret == EBUSY){ // lock is busy
+               } else if(ret == EBUSY) { // lock is busy
                   continue;
-               }else{ // error
+               } else { // error
                   return -ret;
                }
             }
          }
 
-         if(ml>-1){ // managed to get a mutex
+         if(ml > -1) { // managed to get a mutex
             // recheck if the mutex is still unlabelled
-            if(likely(fsdata->mflocks[ml].label == 0)){
+            if(likely(fsdata->mflocks[ml].label == 0)) {
                // Success
                fsdata->mflocks[ml].label = label;
-               if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
+               if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)) { return -ret; }
                return ml;
             }
             // if recheck fails, release the mutex and continue from FIND
             // (this must be the middle of a handover)
-            if(unlikely((ret = pthread_mutex_unlock(&(fsdata->mflocks[i].mutex))) != 0)){ return -ret; }
+            if(unlikely((ret = pthread_mutex_unlock(&(fsdata->mflocks[i].mutex))) != 0)) { return -ret; }
          }
 
          $$SLEEP
@@ -282,26 +285,27 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label){
  * * 0 on success
  * * -errno on error
  */
-static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid){
+static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid)
+{
    int ret;
    struct $mflock_t *mylock;
    pthread_mutex_t *modmutex;
 
    mylock = &(fsdata->mflocks[lockid]);
 
-   if(mylock->want == 0){ // no one wants a handover
+   if(mylock->want == 0) { // no one wants a handover
       modmutex = &(fsdata->mflocks[mylock->label & ($$LOCK_NUM - 1)].mod_mutex);
-      if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)){ return -ret; }
-      if(mylock->want == 0){ // recheck
+      if(unlikely((ret = pthread_mutex_lock(modmutex)) != 0)) { return -ret; }
+      if(mylock->want == 0) { // recheck
          mylock->label = 0;
-         if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)){ return -ret; }
-         if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
+         if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)) { return -ret; }
+         if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)) { return -ret; }
          return 0;
       }
       // oops - they want a handover
-      if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)){ return -ret; }
+      if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)) { return -ret; }
    }
    // handover - release lock without removing label
-   if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)){ return -ret; }
+   if(unlikely((ret = pthread_mutex_unlock(&(mylock->mutex))) != 0)) { return -ret; }
    return 0;
 }

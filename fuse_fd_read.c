@@ -35,17 +35,17 @@
  */
 
 
-   /** Read data from an open file
-    *
-    * Read should return exactly the number of bytes requested except
-    * on EOF or error, otherwise the rest of the data will be
-    * substituted with zeroes.    An exception to this is when the
-    * 'direct_io' mount option is specified, in which case the return
-    * value of the read system call will reflect the return value of
-    * this operation.
-    *
-    * Changed in version 2.2
-    */
+/** Read data from an open file
+ *
+ * Read should return exactly the number of bytes requested except
+ * on EOF or error, otherwise the rest of the data will be
+ * substituted with zeroes.    An exception to this is when the
+ * 'direct_io' mount option is specified, in which case the return
+ * value of the read system call will reflect the return value of
+ * this operation.
+ *
+ * Changed in version 2.2
+ */
 // TODO Implement snapshots
 //   int (*read) (const char *, char *, size_t, off_t,
 //           struct fuse_file_info *);
@@ -62,44 +62,44 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
    // TODO Check if path is null, as expected
 
    ret = pread($$MFD->mainfd, buf, size, offset);
-   if(ret >= 0){ return ret; }
+   if(ret >= 0) { return ret; }
    return -errno;
 }
 
 
-   /** Read directory
-    *
-    * This supersedes the old getdir() interface.  New applications
-    * should use this.
-    *
-    * The filesystem may choose between two modes of operation:
-    *
-    * 1) The readdir implementation ignores the offset parameter, and
-    * passes zero to the filler function's offset.  The filler
-    * function will not return '1' (unless an error happens), so the
-    * whole directory is read in a single readdir operation.  This
-    * works just like the old getdir() method.
-    *
-    * 2) The readdir implementation keeps track of the offsets of the
-    * directory entries.  It uses the offset parameter and always
-    * passes non-zero offset to the filler function.  When the buffer
-    * is full (or an error happens) the filler function will return
-    * '1'.
-    *
-    * Introduced in version 2.3
-    */
+/** Read directory
+ *
+ * This supersedes the old getdir() interface.  New applications
+ * should use this.
+ *
+ * The filesystem may choose between two modes of operation:
+ *
+ * 1) The readdir implementation ignores the offset parameter, and
+ * passes zero to the filler function's offset.  The filler
+ * function will not return '1' (unless an error happens), so the
+ * whole directory is read in a single readdir operation.  This
+ * works just like the old getdir() method.
+ *
+ * 2) The readdir implementation keeps track of the offsets of the
+ * directory entries.  It uses the offset parameter and always
+ * passes non-zero offset to the filler function.  When the buffer
+ * is full (or an error happens) the filler function will return
+ * '1'.
+ *
+ * Introduced in version 2.3
+ */
 // TODO Implement snapshots
 //   int (*readdir) (const char *, void *, fuse_fill_dir_t, off_t,
 //         struct fuse_file_info *);
 int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
-            struct fuse_file_info *fi)
+             struct fuse_file_info *fi)
 {
    DIR *dp;
    struct dirent *de;
 
    log_msg("readdir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n", path, buf, filler, offset, fi);
    // note that I need to cast fi->fh
-   dp = (DIR *) (uintptr_t) fi->fh;
+   dp = (DIR *)(uintptr_t) fi->fh;
 
    /* TODO
     * If
@@ -113,7 +113,7 @@ int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
    // error; near as I can tell, that's the only condition under
    // which I can get an error from readdir()
    de = readdir(dp);
-   if (de == NULL) {
+   if(de == NULL) {
       return -errno;
    }
 
@@ -122,27 +122,27 @@ int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
    // returns something non-zero.  The first case just means I've
    // read the whole directory; the second means the buffer is full.
    do {
-      if (filler(buf, de->d_name, NULL, 0) != 0) {
+      if(filler(buf, de->d_name, NULL, 0) != 0) {
          return -ENOMEM;
       }
-   } while ((de = readdir(dp)) != NULL);
+   } while((de = readdir(dp)) != NULL);
 
    return 0;
 }
 
 
-   /**
-    * Get attributes from an open file
-    *
-    * This method is called instead of the getattr() method if the
-    * file information is available.
-    *
-    * Currently this is only called after the create() method if that
-    * is implemented (see above).  Later it may be called for
-    * invocations of fstat() too.
-    *
-    * Introduced in version 2.5
-    */
+/**
+ * Get attributes from an open file
+ *
+ * This method is called instead of the getattr() method if the
+ * file information is available.
+ *
+ * Currently this is only called after the create() method if that
+ * is implemented (see above).  Later it may be called for
+ * invocations of fstat() too.
+ *
+ * Introduced in version 2.5
+ */
 // TODO Implement snapshots
 //   int (*fgetattr) (const char *, struct stat *, struct fuse_file_info *);
 // Since it's currently only called after bb_create(), and bb_create()
@@ -153,7 +153,7 @@ int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 
    // log_msg("fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
 
-   if(fstat($$MFD->mainfd, statbuf) == 0){ return 0; }
+   if(fstat($$MFD->mainfd, statbuf) == 0) { return 0; }
    return -errno;
 }
 

@@ -139,7 +139,7 @@
    } \
    strcpy(newpath, fix); \
    strncat(newpath, oldpath, plen); \
-
+ 
 
 /** Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)
  *
@@ -178,7 +178,7 @@
 // -ENAMETOOLONG - if the new path is too long
 static inline int $get_hid_path(char *newpath, const char *oldpath)
 {
-   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)){
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)) {
       strcpy(newpath, oldpath);
       strncat(newpath, $$EXT_HID, $$EXT_LEN);
       return 0;
@@ -195,7 +195,7 @@ static inline int $get_hid_path(char *newpath, const char *oldpath)
  */
 static inline int $get_dir_hid_path(char *newpath, const char *oldpath)
 {
-   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - 1)){
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - 1)) {
       strcpy(newpath, oldpath);
       strncat(newpath, $$DIRSEP, 1);
       strncat(newpath, $$EXT_HID, $$EXT_LEN);
@@ -235,7 +235,7 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 
    len = strlen(path);
    // we know the string starts with "/snapshots"
-   if(len <= $$SNDIR_LEN + 1){ // the string is "/snapshots" or "/snapshots?"
+   if(len <= $$SNDIR_LEN + 1) { // the string is "/snapshots" or "/snapshots?"
       snpath->is_there = 0;
       return 0;
    }
@@ -243,18 +243,18 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
    idstart = $$SNDIR_LEN + path; // points to the slash at the end of "/snapshots/"
    nextslash = strchr(idstart + 1, $$DIRSEPCH);
 
-   if(nextslash == NULL){ // there's no next '/', so the string must be "/snapshots/ID"
+   if(nextslash == NULL) { // there's no next '/', so the string must be "/snapshots/ID"
       snpath->is_there = 1;
       strcpy(snpath->id, idstart);
       return 1;
    }
 
-   if(nextslash == idstart + 1){ // the string must be "/snapshots//"
+   if(nextslash == idstart + 1) { // the string must be "/snapshots//"
       snpath->is_there = 0;
       return 0;
    }
 
-   if(nextslash == path + len - 1){ // the next slash the last character, so "/snapshots/ID/"
+   if(nextslash == path + len - 1) { // the next slash the last character, so "/snapshots/ID/"
       snpath->is_there = 1;
       idlen = len - $$SNDIR_LEN - 1;
       strncpy(snpath->id, idstart, idlen);
@@ -278,12 +278,12 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
  */
 int $_univ_rm(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
 {
-   if(typeflag == FTW_DP || typeflag == FTW_D || typeflag == FTW_DNR){
-      if(rmdir(fpath) != 0){ return errno; }
+   if(typeflag == FTW_DP || typeflag == FTW_D || typeflag == FTW_DNR) {
+      if(rmdir(fpath) != 0) { return errno; }
       return 0;
    }
 
-   if(unlink(fpath) != 0){ return errno; }
+   if(unlink(fpath) != 0) { return errno; }
    return 0;
 }
 
@@ -295,7 +295,7 @@ static inline int $recursive_remove(const char *path)
 {
    int ret;
    ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS); // TODO nftw is not thread safe -- LOCK!
-   if(ret >= 0){ return -ret; } // success or errno
+   if(ret >= 0) { return -ret; } // success or errno
    return ENOMEM; // generic error encountered by nftw
 }
 
@@ -323,8 +323,8 @@ static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
 
    // find previous slash
    slashpos = strlen(path) - 1;
-   while(slashpos >= 0 && path[slashpos] != $$DIRSEPCH){ slashpos--; }
-   if(slashpos > 0){ // found one
+   while(slashpos >= 0 && path[slashpos] != $$DIRSEPCH) { slashpos--; }
+   if(slashpos > 0) { // found one
       strncpy(prepath, path, slashpos);
       prepath[slashpos] = '\0';
    } else { // no slash or slash is first character
@@ -333,33 +333,33 @@ static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
 
    // $dlogdbg("mkpath: %s <- %s\n", path, prepath);
 
-   if(lstat(prepath, &mystat) != 0){
+   if(lstat(prepath, &mystat) != 0) {
       statret = errno;
-      if(statret == ENOENT){ // the parent node does not exist
+      if(statret == ENOENT) { // the parent node does not exist
 
          mkpathret = $mkpath(prepath, firstcreated, mode);
          // $dlogdbg("mkpath: recursion returned with %d\n", p);
-         if(mkpathret < 0){ return mkpathret; } // error
+         if(mkpathret < 0) { return mkpathret; } // error
 
          // attempt to create the directory
-         if(mkdir(prepath, mode) != 0){
+         if(mkdir(prepath, mode) != 0) {
             mkdirret = errno;
             // Don't abort on EEXIST as another thread might be busy creating
             // the same directories. Simply assume success.
-            if(mkdirret != EEXIST){
+            if(mkdirret != EEXIST) {
                return -mkdirret;
             }
          }
 
          // save first directory created
-         if(mkpathret == 0 && firstcreated != NULL){ strcpy(firstcreated, prepath); }
+         if(mkpathret == 0 && firstcreated != NULL) { strcpy(firstcreated, prepath); }
 
          return 1;
       }
       return -statret;
    }
 
-   if(S_ISDIR(mystat.st_mode)){
+   if(S_ISDIR(mystat.st_mode)) {
       return 0; // node exists and is a directory
    }
 
@@ -379,9 +379,9 @@ static int $get_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_
    int fd;
    int ret;
 
-   if((fd = open(filepath, O_RDONLY)) == -1){
+   if((fd = open(filepath, O_RDONLY)) == -1) {
       fd = errno;
-      if(fd == ENOENT){
+      if(fd == ENOENT) {
          return 0;
       }
       $dlogi("get_path_from_file: opening %s failed with %d = %s\n", filepath, fd, strerror(fd));
@@ -389,12 +389,12 @@ static int $get_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_
    }
 
    ret = pread(fd, buf, $$PATH_MAX, 0);
-   if(ret == -1){
+   if(ret == -1) {
       ret = errno;
       $dlogi("get_path_from_file: reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
       return -ret;
    }
-   if(ret == 0 || buf[ret] != '\0'){
+   if(ret == 0 || buf[ret] != '\0') {
       $dlogi("get_path_from_file: reading from %s returned 0 bytes or string is not 0-terminated.\n", filepath);
       return -EIO;
    }
@@ -413,19 +413,20 @@ static int $get_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_
  * * 0 on success
  * * <0 on failure
  */
-int $check_params(void){
+int $check_params(void)
+{
    // Check string lengths
-   if(strlen($$SNDIR) != $$SNDIR_LEN){ return -51; }
-   if(strlen($$EXT_DAT) != $$EXT_LEN){ return -52; }
-   if(strlen($$EXT_HID) != $$EXT_LEN){ return -53; }
-   if(strlen($$DIRSEP) != 1){ return -54; }
+   if(strlen($$SNDIR) != $$SNDIR_LEN) { return -51; }
+   if(strlen($$EXT_DAT) != $$EXT_LEN) { return -52; }
+   if(strlen($$EXT_HID) != $$EXT_LEN) { return -53; }
+   if(strlen($$DIRSEP) != 1) { return -54; }
 
    // Check if the block and block pointer sizes make it possible to store files off_t large.
    // The max file size + 1 on the system is 2^( sizeof(off_t)*8 ) bytes.
    // The max file size + 1 in ESFS is $$BL_S * 2^($$BLP_S*8) = 2^( log($$BL_S) + $$BLP_S*8 ) bytes.
-   if(sizeof($$BLP_T) != $$BLP_S){ return -10; }
-   if( sizeof(off_t) * 8.0 > ( $$BL_SLOG + ((double)$$BLP_S)*8.0) ){ return -11; }
-   if( (1 << $$BL_SLOG) != $$BL_S ){ return -12; }
+   if(sizeof($$BLP_T) != $$BLP_S) { return -10; }
+   if(sizeof(off_t) * 8.0 > ($$BL_SLOG + ((double)$$BLP_S) * 8.0)) { return -11; }
+   if((1 << $$BL_SLOG) != $$BL_S) { return -12; }
 
    return 0;
 }

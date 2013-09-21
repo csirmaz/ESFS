@@ -61,16 +61,16 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
 
    $dlogi("Init: checking the snapshots dir '%s'\n", fsdata->sn_dir);
 
-   if(lstat(fsdata->sn_dir, &mystat) == 0){
+   if(lstat(fsdata->sn_dir, &mystat) == 0) {
       // Check if it is a directory
-      if(S_ISDIR(mystat.st_mode)){ return 0; }
+      if(S_ISDIR(mystat.st_mode)) { return 0; }
       $dlogi("Init error: found something else than a directory at '%s'\n", fsdata->sn_dir);
       return 1;
    } else {
       ret = errno;
-      if(ret == ENOENT){
+      if(ret == ENOENT) {
          $dlogi("Init: creating the snapshots dir\n");
-         if(mkdir(fsdata->sn_dir, 0700) == 0){ return 0; }
+         if(mkdir(fsdata->sn_dir, 0700) == 0) { return 0; }
          ret = errno;
          $dlogi("Init error: mkdir on '%s' failed with '%s'\n", fsdata->sn_dir, strerror(ret));
          return -ret;
@@ -102,22 +102,22 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
    int p = 0;
    char pointerpath[$$PATH_MAX];
 
-   if(fsdata->sn_is_any == 0){ return 1; } // no snapshots at all
+   if(fsdata->sn_is_any == 0) { return 1; } // no snapshots at all
 
    strcpy(snpath, fsdata->sn_lat_dir);
 
-   while(p < $$MAX_SNAPSHOTS){
+   while(p < $$MAX_SNAPSHOTS) {
 
       ret = $get_hid_path(pointerpath, snpath);
-      if(ret != 0){ return ret; }
+      if(ret != 0) { return ret; }
 
       ret = $get_sndir_from_file(fsdata, snpath, pointerpath);
 
-      if(ret == 0){ // no pointer to a previous snapshot; we've found the earliest one
+      if(ret == 0) { // no pointer to a previous snapshot; we've found the earliest one
          return (p == 0 ? 2 : 0);
       }
 
-      if(ret < 0){ return ret; } // error
+      if(ret < 0) { return ret; } // error
 
       strcpy(prevpointerpath, pointerpath);
       p++;
@@ -144,17 +144,17 @@ static int $sn_get_latest(struct $fsdata_t *fsdata)
    int ret;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
-   if((ret = $get_dir_hid_path(path, fsdata->sn_dir)) != 0){ return ret; }
+   if((ret = $get_dir_hid_path(path, fsdata->sn_dir)) != 0) { return ret; }
 
    ret = $get_sndir_from_file(fsdata, fsdata->sn_lat_dir, path);
 
-   if(ret == 0){
+   if(ret == 0) {
       fsdata->sn_is_any = 0;
       $dlogi("Get latest sn: %s not found, so there must be no snapshots\n", path);
       return 0;
    }
 
-   if(ret < 0){ return ret; }
+   if(ret < 0) { return ret; }
 
    fsdata->sn_is_any = 1;
    fsdata->sn_lat_dir_len = ret;
@@ -180,10 +180,10 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
    int len;
    char path[$$PATH_MAX]; // the pointer file, .../snapshots/.hid
 
-   if((ret = $get_dir_hid_path(path, fsdata->sn_dir)) != 0){ return ret; }
+   if((ret = $get_dir_hid_path(path, fsdata->sn_dir)) != 0) { return ret; }
 
    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
-   if(fd == -1){
+   if(fd == -1) {
       fd = errno;
       $dlogi("Set latest sn: opening %s failed with %d = %s\n", path, fd, strerror(fd));
       return -fd;
@@ -191,12 +191,12 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
 
    len = strlen(newpath) + 1;
    ret = pwrite(fd, newpath, len, 0);
-   if(ret == -1){
+   if(ret == -1) {
       ret = errno;
       $dlogi("Set latest sn: writing to %s failed with %d = %s\n", path, ret, strerror(ret));
       return -ret;
    }
-   if(ret != len){
+   if(ret != len) {
       $dlogi("Set latest sn: writing to %s returned %d bytes instead of %d\n", path, ret, len);
       return -EIO;
    }
@@ -231,74 +231,74 @@ int $sn_create(
    $dlogi("Creating new snapshot at '%s'\n", path);
 
    // Create root of snapshot
-   if(unlikely(mkdir(path, S_IRWXU) != 0)){
+   if(unlikely(mkdir(path, S_IRWXU) != 0)) {
       ret = errno;
       $dlogi("Creating sn: creating %s failed with %d = %s\n", path, ret, strerror(ret));
       return -1;
    }
 
-   do{
-      if(fsdata->sn_is_any != 0){
+   do {
+      if(fsdata->sn_is_any != 0) {
 
          // Set up pointer file to previos snapshot
          ret = $get_hid_path(hid, path);
-         if(ret < 0){
+         if(ret < 0) {
             $dlogi("Creating sn: creating %s failed when getting hid path\n", path);
             waserror = 1;
             break;
          }
 
          fd = open(hid, O_WRONLY | O_CREAT | O_EXCL, S_IRWXU);
-         if(fd == -1){
+         if(fd == -1) {
             fd = errno;
             $dlogi("Creating sn: opening %s failed with %d = %s\n", hid, fd, strerror(fd));
             waserror = 1;
             break;
          }
 
-         do{
+         do {
             // Write into pointer file
             len = strlen(fsdata->sn_lat_dir) + 1;
             ret = pwrite(fd, fsdata->sn_lat_dir, len, 0);
-            if(ret == -1){
+            if(ret == -1) {
                ret = errno;
                $dlogi("Creating sn: writing to %s failed with %d = %s\n", hid, ret, strerror(ret));
                waserror = 1;
                break;
             }
-            if(ret != len){
+            if(ret != len) {
                $dlogi("Creating sn: writing to %s returned %d bytes instead of %d\n", hid, ret, len);
                waserror = 1;
                break;
             }
 
             // Save latest sn
-            if($sn_set_latest(fsdata, path) != 0){
+            if($sn_set_latest(fsdata, path) != 0) {
                waserror = 1;
                break;
             }
 
-         }while(0);
+         } while(0);
 
          close(fd);
 
-         if(unlikely(waserror == 1)){
+         if(unlikely(waserror == 1)) {
             $dlogi("Creating sn: Cleanup: removing %s\n", hid);
             unlink(hid);
          }
 
       } else { // else: no snapshots yet
 
-            // Save latest sn
-            if($sn_set_latest(fsdata, path) != 0){
-               waserror = 1;
-               break;
-            }
+         // Save latest sn
+         if($sn_set_latest(fsdata, path) != 0) {
+            waserror = 1;
+            break;
+         }
 
       }
-   }while(0);
+   } while(0);
 
-   if(unlikely(waserror == 1)){
+   if(unlikely(waserror == 1)) {
       $dlogi("Creating sn: Cleanup: removing %s\n", path);
       rmdir(path);
       return -1;
@@ -324,26 +324,26 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
 
    ret = $sn_get_earliest(fsdata, snpath, prevpointerpath);
 
-   if(ret < 0){ // internal error
+   if(ret < 0) { // internal error
       $dlogdbg("sn_destroy: sn_get_earliest returned error %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
 
-   if(ret == 1){ // there are no snapshots at all
+   if(ret == 1) { // there are no snapshots at all
       $dlogi("Cannot remove snapshot as there are no snapshots.\n");
       return -ENOENT;
    }
 
-   if(ret == 2){ // removing the only snapshot
+   if(ret == 2) { // removing the only snapshot
 
       $dlogi("Removing the last remaining snapshot '%s'\n", snpath);
 
       // Remove the pointer to the latest snapshot (snapshots/ID/.hid)
-      if((ret = $get_dir_hid_path(prevpointerpath, fsdata->sn_dir)) != 0){ return ret; }
-      if(unlink(prevpointerpath) != 0){ return -errno; }
-      
+      if((ret = $get_dir_hid_path(prevpointerpath, fsdata->sn_dir)) != 0) { return ret; }
+      if(unlink(prevpointerpath) != 0) { return -errno; }
+
       // Remove the snapshot
-      if((ret = $recursive_remove(snpath)) != 0){ return ret; }
+      if((ret = $recursive_remove(snpath)) != 0) { return ret; }
 
       fsdata->sn_is_any = 0;
 
@@ -353,10 +353,10 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
    $dlogi("Removing snapshot '%s' and pointer '%s'\n", snpath, prevpointerpath);
 
    // Remove the "previous" pointer from the second earliest snapshot
-   if(unlink(prevpointerpath) != 0){ return -errno; }
+   if(unlink(prevpointerpath) != 0) { return -errno; }
 
    // Remove the earliest snapshot
-   if((ret = $recursive_remove(snpath)) != 0){ return ret; }
+   if((ret = $recursive_remove(snpath)) != 0) { return ret; }
 
    return 0;
 }
@@ -381,30 +381,30 @@ static int $sn_check_xattr(struct $fsdata_t *fsdata) // $dlogi needs this to loc
    $dlogi("Init: checking xattr support\n");
 
    ret = lremovexattr(fsdata->sn_dir, $$XA_TEST);
-   if(ret != 0){
+   if(ret != 0) {
       ret = errno;
-      if(ret != ENODATA){
+      if(ret != ENODATA) {
          $dlogi("Init: removing xattr on %s failed with %d = %s\n", fsdata->sn_dir, ret, strerror(ret));
          return -ret;
       }
    }
    ret = lsetxattr(fsdata->sn_dir, $$XA_TEST, "A", 2, 0);
-   if(ret != 0){
+   if(ret != 0) {
       ret = errno;
       $dlogi("Init: setting xattr on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
    ret = lgetxattr(fsdata->sn_dir, $$XA_TEST, value, 2);
-   if(ret != 0){
+   if(ret != 0) {
       $dlogi("Init: getting xattr on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;
    }
-   if(strcmp(value, "A") != 0){
+   if(strcmp(value, "A") != 0) {
       $dlogi("Init: got unexpected value from xattr on %s\n", fsdata->sn_dir);
       return 1;
    }
    ret = lremovexattr(fsdata->sn_dir, $$XA_TEST);
-   if(ret != 0){
+   if(ret != 0) {
       ret = errno;
       $dlogi("Init: removing xattr on %s failed with %s\n", fsdata->sn_dir, strerror(ret));
       return -ret;

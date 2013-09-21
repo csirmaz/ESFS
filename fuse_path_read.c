@@ -35,12 +35,12 @@
  */
 
 
-   /** Get file attributes.
-   *
-   * Similar to stat().  The 'st_dev' and 'st_blksize' fields are
-   * ignored.  The 'st_ino' field is ignored except if the 'use_ino'
-   * mount option is given.
-   */
+/** Get file attributes.
+*
+* Similar to stat().  The 'st_dev' and 'st_blksize' fields are
+* ignored.  The 'st_ino' field is ignored except if the 'use_ino'
+* mount option is given.
+*/
 // TODO Implement snapshots
 //   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
@@ -49,19 +49,19 @@ int $getattr(const char *path, struct stat *statbuf)
 
    // log_msg("  getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
 
-   if(lstat(fpath, statbuf) == 0){ return 0; }
+   if(lstat(fpath, statbuf) == 0) { return 0; }
    return -errno;
 }
 
 
-   /** Read the target of a symbolic link
-   *
-   * The buffer should be filled with a null terminated string.  The
-   * buffer size argument includes the space for the terminating
-   * null character.   If the linkname is too long to fit in the
-   * buffer, it should be truncated.  The return value should be 0
-   * for success.
-   */
+/** Read the target of a symbolic link
+*
+* The buffer should be filled with a null terminated string.  The
+* buffer size argument includes the space for the terminating
+* null character.   If the linkname is too long to fit in the
+* buffer, it should be truncated.  The return value should be 0
+* for success.
+*/
 // TODO Implement snapshots
 // Note the system readlink() will truncate and lose the terminating
 // null.  So, the size passed to to the system readlink() must be one
@@ -76,7 +76,7 @@ int $readlink(const char *path, char *link, size_t size)
    log_msg("  readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
 
    ret = readlink(fpath, link, size - 1);
-   if(unlikely(ret == -1)){
+   if(unlikely(ret == -1)) {
       return -errno;
    }
    link[ret] = '\0';
@@ -84,17 +84,17 @@ int $readlink(const char *path, char *link, size_t size)
 }
 
 
-   /**
-    * Check file access permissions
-    *
-    * This will be called for the access() system call.  If the
-    * 'default_permissions' mount option is given, this method is not
-    * called.
-    *
-    * This method is not called under Linux kernel versions 2.4.x
-    *
-    * Introduced in version 2.5
-    */
+/**
+ * Check file access permissions
+ *
+ * This will be called for the access() system call.  If the
+ * 'default_permissions' mount option is given, this method is not
+ * called.
+ *
+ * This method is not called under Linux kernel versions 2.4.x
+ *
+ * Introduced in version 2.5
+ */
 // TODO Implement snapshots
 //   int (*access) (const char *, int);
 int $access(const char *path, int mask)
@@ -103,7 +103,7 @@ int $access(const char *path, int mask)
 
    // log_msg("  access(path=\"%s\", mask=0%o)\n", path, mask);
 
-   if(access(fpath, mask) == 0){ return 0; }
+   if(access(fpath, mask) == 0) { return 0; }
    return -errno;
 }
 
