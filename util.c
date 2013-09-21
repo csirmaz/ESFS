@@ -64,8 +64,8 @@
 #define $$IF_PATH_MAIN_ONLY \
    char fpath[$$PATH_MAX]; \
    $$DFSDATA \
-   if($$_IS_PATH_IN_SN(path)){ return -EACCES; } \
-   if($map_path(fpath, path, fsdata) != 0){ return -ENAMETOOLONG; }
+   if($$_IS_PATH_IN_SN(path)) { return -EACCES; } \
+   if($map_path(fpath, path, fsdata) != 0) { return -ENAMETOOLONG; }
 
 
 /** Use this when there are two paths, path and newpath, and the command writes.
@@ -76,10 +76,10 @@
    char fpath[$$PATH_MAX]; \
    char fnewpath[$$PATH_MAX]; \
    $$DFSDATA \
-   if($$_IS_PATH_IN_SN(path)){ return -EACCES; } \
-   if($map_path(fpath, path, fsdata) != 0){ return -ENAMETOOLONG; } \
-   if($$_IS_PATH_IN_SN(newpath)){ return -EACCES; } \
-   if($map_path(fnewpath, newpath, fsdata) != 0){ return -ENAMETOOLONG; }
+   if($$_IS_PATH_IN_SN(path)) { return -EACCES; } \
+   if($map_path(fpath, path, fsdata) != 0) { return -ENAMETOOLONG; } \
+   if($$_IS_PATH_IN_SN(newpath)) { return -EACCES; } \
+   if($map_path(fnewpath, newpath, fsdata) != 0) { return -ENAMETOOLONG; }
 
 
 /** Use these when there are different things to do in the two spaces
@@ -96,8 +96,8 @@
    struct $snpath_t *snpath; \
    int ret = -EBADE; \
    $$DFSDATA \
-   if($map_path(fpath, path, fsdata) != 0){ return -ENAMETOOLONG; } \
-   if($$_IS_PATH_IN_SN(path)){ \
+   if($map_path(fpath, path, fsdata) != 0) { return -ENAMETOOLONG; } \
+   if($$_IS_PATH_IN_SN(path)) { \
       snpath = malloc(sizeof(struct $snpath_t)); \
       if(snpath == NULL){ return -ENOMEM; } \
       $decompose_sn_path(snpath, path);
@@ -134,7 +134,7 @@
  */
 #define $$ADDNPREFIX_CONT(newpath, oldpath, fix, fixlen) \
    plen = $$PATH_MAX - fixlen; \
-   if(unlikely(strlen(oldpath) >= plen)){ \
+   if(unlikely(strlen(oldpath) >= plen)) { \
       return -ENAMETOOLONG; \
    } \
    strcpy(newpath, fix); \
@@ -162,7 +162,7 @@
  */
 #define $$ADDNPSFIX_CONT(newpath1, newpath2, oldpath, prefix, prefixlen, suffix1, suffix2, suffixlen) \
    plen = $$PATH_MAX - prefixlen - suffixlen; \
-   if(unlikely(strlen(oldpath) >= plen)){ \
+   if(unlikely(strlen(oldpath) >= plen)) { \
       return -ENAMETOOLONG; \
    } \
    strcpy(newpath1, prefix); \
