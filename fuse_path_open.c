@@ -166,7 +166,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
    $$IF_PATH_MAIN_ONLY
 
-   $dlogdbg("  create(path=\"%s\", mode=0%03o, fi=0x%08x)\n", path, mode, fi);
+   $dlogdbg("  create(path=\"%s\", mode=0%03o)\n", path, mode);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL) { return -ENOMEM; }
