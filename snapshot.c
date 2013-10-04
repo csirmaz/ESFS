@@ -131,21 +131,20 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
 // TODO Invalidate open snapshot files on snapshot creation and deletion
 /** Allocates memory for and compiles a list of paths for each snapshot up to a given one.
  *
- * Allocates memory for sfps->paths and:
- * * Copies the real paths of the snapshot roots ("ROOT/snapshots/[ID]") into sfps->paths
- * starting from the latest (at index 0) back to the one requested (at index 'myindex')
- * * Sets sfps->myindex
+ * Allocates memory for mfd->sn_steps and:
+ * * Copies the real paths of the snapshot roots ("ROOT/snapshots/[ID]") into mfd->sn_steps->path[1..sn_current]
+ * * Sets mfd->sn_current
  *
  * Returns
  * * 0 on success
  * * -errno on error
  */
-static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath_t *snpath, struct $sfps_t *sfps)
+static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath_t *snpath, struct $mfd_t *mfd)
 {
    int ret;
    void *pret = NULL;
    int allocated = 4;
-   int p = 0;
+   int p = 1;
    int waserror = 0; // negative
    char pointerpath[$$PATH_MAX];
    char mysnroot[$$PATH_MAX];
@@ -155,21 +154,21 @@ static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath
    if(snpath->is_there < 1) {return -EFAULT;}
    $$ADDNPREFIX_CONT(mysnroot, snpath->id, fsdata->rootdir, fsdata->rootdir_len)
 
-   sfps->paths = malloc($$PATH_MAX * allocated);
-   if(sfps->paths == NULL) { return -ENOMEM; }
+   mfd->sn_steps = malloc(sizeof(struct $sn_steps_t) * allocated);
+   if(mfd->sn_steps == NULL) { return -ENOMEM; }
 
-   strcpy(sfps->paths[0], fsdata->sn_lat_dir);
+   strcpy(mfd->sn_steps[p].path, fsdata->sn_lat_dir);
 
    while(1) {
 
-      if(strcmp(mysnroot, sfps->paths[p]) == 0) {
+      if(strcmp(mysnroot, mfd->sn_steps[p].path) == 0) {
          // We have found our snapshot ID
          break;
       }
 
       // Go to the previous snapshot
 
-      if((ret = $get_hid_path(pointerpath, sfps->paths[p])) != 0) {
+      if((ret = $get_hid_path(pointerpath, mfd->sn_steps[p].path)) != 0) {
          waserror = ret;
          break;
       }
@@ -177,11 +176,11 @@ static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath
       p++;
       if(p >= allocated) {
          allocated *= 2;
-         if((pret = realloc(sfps->paths, $$PATH_MAX * allocated)) == NULL) {
+         if((pret = realloc(mfd->sn_steps, sizeof(struct $sn_steps_t) * allocated)) == NULL) {
             waserror = -ENOMEM;
             break;
          }
-         sfps->paths = pret;
+         mfd->sn_steps = pret;
       }
 
       if(p >= $$MAX_SNAPSHOTS) { // TODO 2 Use different infinite loop detection
@@ -191,7 +190,7 @@ static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath
          break;
       }
 
-      ret = $get_sndir_from_file(fsdata, sfps->paths[p], pointerpath);
+      ret = $get_sndir_from_file(fsdata, mfd->sn_steps[p].path, pointerpath);
 
       if(ret == 0) { // no pointer found -- this is the earliest snapshot
          // The ID we searched for was not found.
@@ -207,11 +206,11 @@ static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath
    }
 
    if(waserror != 0) {
-      free(sfps->paths);
+      free(mfd->sn_steps);
       return waserror;
    }
 
-   sfps->myindex = p;
+   mfd->sn_current = p;
    return 0;
 }
 

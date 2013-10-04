@@ -111,13 +111,13 @@ struct $mflock_t {
  */
 struct $fsdata_t {
    FILE *logfile;
-   char *rootdir; // the underlying root acting as the source of the FS
-   $$PATH_LEN_T rootdir_len; // length of rootdir string, without terminating NULL
-   char sn_dir[$$PATH_MAX]; // the real path to the snapshot directory
-   char sn_lat_dir[$$PATH_MAX]; // the real path to the root of the latest snapshot
-   $$PATH_LEN_T sn_lat_dir_len; // length of the latest snapshot dir string
-   int sn_is_any; // whether there are any snapshots, 1 or 0
-   struct $mflock_t *mflocks; // Used for file-based locks.
+   char *rootdir; /**< the underlying root acting as the source of the FS */
+   $$PATH_LEN_T rootdir_len; /**< the length of rootdir string, without the terminating NULL */
+   char sn_dir[$$PATH_MAX]; /**< the real path to the snapshot directory */
+   char sn_lat_dir[$$PATH_MAX]; /**< the real path to the root of the latest snapshot */
+   $$PATH_LEN_T sn_lat_dir_len; /**< the length of the latest snapshot dir string */
+   int sn_is_any; /**< whether there are any snapshots, 1 or 0 */
+   struct $mflock_t *mflocks; /**< file-based locks */
 };
 
 
@@ -145,6 +145,24 @@ struct $mapheader_t {
 // TODO 2 To make FS files portable, the types used here should be reviewed, and proper (de)serialisation implemented.
 
 
+/** Filehandle struct extension for files in snapshots
+ *
+ * When dealing with a file in a snapshot:
+ * * mfd->is_main is 0
+ * * The mapheader from the specified snapshot is loaded into mfd->mapheader
+ *
+ * [C] = can also be:
+ * * $$SN_STEPS_NOTOPEN = if the file has not been opened yet
+ * * $$SN_STEPS_UNUSED = if the snapshot has no information about the file
+ */
+struct $sn_steps_t {
+   char path[$$PATH_MAX]; /**< first the real path of the snapshot ID, then the file (or the main file) */
+   int mapfd; /**< filehandle to the map file[C] */
+   int datfd; /**< filehandle to the dat file[C] */
+};
+
+#define $$SN_STEPS_UNUSED -8
+#define $$SN_STEPS_NOTOPEN -9
 
 
 /** Filehandle struct (mfd)
@@ -168,22 +186,13 @@ struct $mfd_t {
    int is_renamed; /**< bool; 0 or 1 if we have followed a write directive. See $mfd_open_sn */
 
    // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)
-
-
+   int sn_current; /**< the largest index in sn_steps, representing the snapshot being read */
+   struct $sn_steps_t *sn_steps; /**< data about each snapshot step, from the main file [0], the first snapshot [1], to the snapshot being read [sn_current] */
 };
 
 // CAST
 // TODO Are repeated accesses fast enough, or should we store this in a variable?
 #define $$MFD ((struct $mfd_t *) fi->fh)
-
-
-/** Snapshot file paths struct
- *
- */
-struct $sfps_t {
-   int myindex; /**< index to the last path stored in paths */
-   char(*paths)[$$PATH_MAX];  /* pointer to a $$PATH_MAX-long string */
-};
 
 
 #endif
