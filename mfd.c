@@ -179,7 +179,7 @@ static inline int $mfd_save_mapheader(const struct $mfd_t *mfd, const struct $fs
             $dlogdbg("mfd_open_sn: Opened dat file at %s FD %d\n", fdat, fd_dat); \
             mfd->datfd = fd_dat;
 
-/** Opens (and initialises) the snapshot part of an MFD
+/** Opens (and initialises) the snapshot-related parts of a main MFD
  *
  * This is done by
  * opening (and creating and initialising, if necessary) the .map and .dat files.
@@ -380,7 +380,7 @@ static int $mfd_open_sn(
 }
 
 
-/** Marks an MFD as read-only */
+/** Marks a main MFD as read-only */
 static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
@@ -388,7 +388,7 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 }
 
 
-/** Closes the snapshot part of an MFD
+/** Closes the snapshot-related parts of a main MFD
  *
  * Returns:
  * * 0 on success
