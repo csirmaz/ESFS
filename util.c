@@ -294,9 +294,9 @@ int $_univ_rm(const char *fpath, const struct stat *sb, int typeflag, struct FTW
 static inline int $recursive_remove(const char *path)
 {
    int ret;
-   ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS); // TODO nftw is not thread safe -- LOCK!
+   ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS); // TODO 1 nftw is not thread safe -- LOCK!
    if(ret >= 0) { return -ret; } // success or errno
-   return ENOMEM; // generic error encountered by nftw
+   return -ENOMEM; // generic error encountered by nftw
 }
 
 
@@ -368,6 +368,9 @@ static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
 
 
 /** Reads a snapshot dir path from a file
+ *
+ * Sets:
+ * * buf
  *
  * Returns:
  * * length of path - on success

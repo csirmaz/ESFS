@@ -44,7 +44,7 @@
  * There's a pointer to the latest snapshot in /snapshots/.hid
  * if there is at least one snapshot.
  * Also, there's a pointer from each snapshot to the earlier one in /snapshots/<ID>.hid
- * All these pointers contain the real paths to the snapshot roots: ROOT/snapshots/<ID>
+ * All these pointers contain the real paths to the snapshot roots: "ROOT/snapshots/<ID>"
  */
 
 /** Creates the snapshot dir if necessary.
@@ -106,14 +106,13 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
 
    strcpy(snpath, fsdata->sn_lat_dir);
 
-   while(p < $$MAX_SNAPSHOTS) {
+   while(p < $$MAX_SNAPSHOTS) { // TODO 2 Use different infinite loop detection
 
-      ret = $get_hid_path(pointerpath, snpath);
-      if(ret != 0) { return ret; }
+      if((ret = $get_hid_path(pointerpath, snpath)) != 0) { return ret; }
 
       ret = $get_sndir_from_file(fsdata, snpath, pointerpath);
 
-      if(ret == 0) { // no pointer to a previous snapshot; we've found the earliest one
+      if(ret == 0) { // no pointer found -- this is the earliest snapshot
          return (p == 0 ? 2 : 0);
       }
 
@@ -126,6 +125,94 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
    $dlogi("Error: too many snapshots or there is an infinite loop in the %s/ID%s files (probably caused by a bug). Sorry.\n", $$SNDIR, $$EXT_HID);
    return -EIO;
 
+}
+
+
+// TODO Invalidate open snapshot files on snapshot creation and deletion
+/** Allocates memory for and compiles a list of paths for each snapshot up to a given one.
+ *
+ * Allocates memory for sfps->paths and:
+ * * Copies the real paths of the snapshot roots ("ROOT/snapshots/[ID]") into sfps->paths
+ * starting from the latest (at index 0) back to the one requested (at index 'myindex')
+ * * Sets sfps->myindex
+ *
+ * Returns
+ * * 0 on success
+ * * -errno on error
+ */
+static int $sn_get_paths_to(const struct $fsdata_t *fsdata, const struct $snpath_t *snpath, struct $sfps_t *sfps)
+{
+   int ret;
+   void *pret = NULL;
+   int allocated = 4;
+   int p = 0;
+   int waserror = 0; // negative
+   char pointerpath[$$PATH_MAX];
+   char mysnroot[$$PATH_MAX];
+   $$PATH_LEN_T plen;
+
+   // Get the real snapshot path we'll be comparing to
+   if(snpath->is_there < 1) {return -EFAULT;}
+   $$ADDNPREFIX_CONT(mysnroot, snpath->id, fsdata->rootdir, fsdata->rootdir_len)
+
+   sfps->paths = malloc($$PATH_MAX * allocated);
+   if(sfps->paths == NULL) { return -ENOMEM; }
+
+   strcpy(sfps->paths[0], fsdata->sn_lat_dir);
+
+   while(1) {
+
+      if(strcmp(mysnroot, sfps->paths[p]) == 0) {
+         // We have found our snapshot ID
+         break;
+      }
+
+      // Go to the previous snapshot
+
+      if((ret = $get_hid_path(pointerpath, sfps->paths[p])) != 0) {
+         waserror = ret;
+         break;
+      }
+
+      p++;
+      if(p >= allocated) {
+         allocated *= 2;
+         if((pret = realloc(sfps->paths, $$PATH_MAX * allocated)) == NULL) {
+            waserror = -ENOMEM;
+            break;
+         }
+         sfps->paths = pret;
+      }
+
+      if(p >= $$MAX_SNAPSHOTS) { // TODO 2 Use different infinite loop detection
+         // Error: possible infinite loop?
+         $dlogi("sn_get_paths_to error: too many snapshots or there is an infinite loop in the %s/ID%s files (probably caused by a bug). Sorry.\n", $$SNDIR, $$EXT_HID);
+         waserror = -EIO;
+         break;
+      }
+
+      ret = $get_sndir_from_file(fsdata, sfps->paths[p], pointerpath);
+
+      if(ret == 0) { // no pointer found -- this is the earliest snapshot
+         // The ID we searched for was not found.
+         $dlogi("sn_get_paths_to error: The requested ID '%s' was not found. Sorry.\n", snpath->id);
+         waserror = -EFAULT;
+         break;
+      }
+      if(ret < 0) { // error
+         waserror = ret;
+         break;
+      }
+
+   }
+
+   if(waserror != 0) {
+      free(sfps->paths);
+      return waserror;
+   }
+
+   sfps->myindex = p;
+   return 0;
 }
 
 

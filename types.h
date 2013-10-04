@@ -110,23 +110,23 @@ struct $mflock_t {
 /** Global filesystem private data
  */
 struct $fsdata_t {
-    FILE *logfile;
-    char *rootdir; // the underlying root acting as the source of the FS
-    $$PATH_LEN_T rootdir_len; // length of rootdir string, without terminating NULL
-    char sn_dir[$$PATH_MAX]; // the real path to the snapshot directory
-    char sn_lat_dir[$$PATH_MAX]; // the real path to the root of the latest snapshot
-    $$PATH_LEN_T sn_lat_dir_len; // length of the latest snapshot dir string
-    int sn_is_any; // whether there are any snapshots, 1 or 0
-    struct $mflock_t *mflocks; // Used for file-based locks.
+   FILE *logfile;
+   char *rootdir; // the underlying root acting as the source of the FS
+   $$PATH_LEN_T rootdir_len; // length of rootdir string, without terminating NULL
+   char sn_dir[$$PATH_MAX]; // the real path to the snapshot directory
+   char sn_lat_dir[$$PATH_MAX]; // the real path to the root of the latest snapshot
+   $$PATH_LEN_T sn_lat_dir_len; // length of the latest snapshot dir string
+   int sn_is_any; // whether there are any snapshots, 1 or 0
+   struct $mflock_t *mflocks; // Used for file-based locks.
 };
 
 
 /** A path inside the snapshots space
  */
 struct $snpath_t {
-   int is_there; // 0=nothing, 1=ID, 2=ID&inpath -- always check this before using the strings
-   char id[$$PATH_MAX]; // e.g. "/ID"
-   char inpath[$$PATH_MAX]; // e.g. "/dir/dir/file"
+   int is_there; /**< 0=nothing, 1=ID, 2=ID&inpath -- always check this before using the strings */
+   char id[$$PATH_MAX]; /**< e.g. "/ID" */
+   char inpath[$$PATH_MAX]; /**< e.g. "/dir/dir/file" */
 };
 
 
@@ -166,10 +166,24 @@ struct $mfd_t {
    int mapfd; /**< filehandle to the map file[A]. See $mfd_open_sn */
    int datfd; /**< filehandle to the dat file[A,B]. See $mfd_open_sn */
    int is_renamed; /**< bool; 0 or 1 if we have followed a write directive. See $mfd_open_sn */
+
+   // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)
+
+
 };
 
 // CAST
 // TODO Are repeated accesses fast enough, or should we store this in a variable?
 #define $$MFD ((struct $mfd_t *) fi->fh)
+
+
+/** Snapshot file paths struct
+ *
+ */
+struct $sfps_t {
+   int myindex; /**< index to the last path stored in paths */
+   char(*paths)[$$PATH_MAX];  /* pointer to a $$PATH_MAX-long string */
+};
+
 
 #endif
