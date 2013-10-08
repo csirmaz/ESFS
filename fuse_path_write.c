@@ -397,7 +397,7 @@ int $utimens(const char *path, const struct timespec tv[2])
  */
 int $link(const char *path, const char *newpath)
 {
-   return -EOPNOTSUPP;
+   return -ENOTSUP;
 
    // To pass the request on, call link(fpath, fnewpath);
 }
@@ -414,7 +414,7 @@ int $link(const char *path, const char *newpath)
  */
 int $mknod(const char *path, mode_t mode, dev_t dev)
 {
-   return -EOPNOTSUPP;
+   return -ENOTSUP;
 
    // Original code from BBFS:
    // On Linux this could just be 'mknod(path, mode, rdev)' but this
@@ -447,7 +447,7 @@ int $mknod(const char *path, mode_t mode, dev_t dev)
  */
 int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
-   return -EOPNOTSUPP;
+   return -ENOTSUP;
 
    /*
    $$IF_PATH_MAIN_ONLY
@@ -475,7 +475,7 @@ int $setxattr(const char *path, const char *name, const char *value, size_t size
  */
 int $removexattr(const char *path, const char *name)
 {
-   return -EOPNOTSUPP;
+   return -ENOTSUP;
 
    /*
    $$IF_PATH_MAIN_ONLY

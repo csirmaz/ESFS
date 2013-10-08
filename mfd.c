@@ -145,12 +145,12 @@ static inline int $mfd_save_mapheader(const struct $mfd_t *mfd, const struct $fs
    ret = pwrite(mfd->mapfd, &(mfd->mapheader), sizeof(struct $mapheader_t), 0);
    if(unlikely(ret == -1)) {
       ret = errno;
-      $dlogi("mfd_open_sn: Failed to write .map header, error %d = %s\n", ret, strerror(ret));
+      $dlogi("mfd_save_mapheader: Failed to write .map header, error %d = %s\n", ret, strerror(ret));
       return -ret;
    }
 
    if(unlikely(ret != sizeof(struct $mapheader_t))) {
-      $dlogi("mfd_open_sn: Failed: only written %d bytes into .map header\n", ret);
+      $dlogi("mfd_save_mapheader: Failed: only written %d bytes into .map header\n", ret);
       return -EIO;
    }
 

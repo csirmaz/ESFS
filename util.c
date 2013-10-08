@@ -291,6 +291,7 @@ int $_univ_rm(const char *fpath, const struct stat *sb, int typeflag, struct FTW
  *
  * Returns 0 or -errno.
  */
+// TODO Make this atomic (and thread safe) by renaming the snapshot first -- see ESBD
 static inline int $recursive_remove(const char *path)
 {
    int ret;

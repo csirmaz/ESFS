@@ -116,7 +116,7 @@ int $access(const char *path, int mask)
 int $getxattr(const char *path, const char *name, char *value, size_t size)
 {
    // Xattr is not supported by ext4; for now, we disable it.
-   return -EOPNOTSUPP;
+   return -ENOTSUP;
 
    /*
    $$IF_PATH_MAIN_ONLY
@@ -131,7 +131,7 @@ int $getxattr(const char *path, const char *name, char *value, size_t size)
 int $listxattr(const char *path, char *list, size_t size)
 {
    // Xattr is not supported by ext4; for now, we disable it.
-   return -EOPNOTSUPP;
+   return -ENOTSUP;
 
    /*
    $$IF_PATH_MAIN_ONLY
