@@ -18,7 +18,7 @@ foreach my $f (qw( esfs.c params.h types.h log.c log.h snapshot.c mfd.c block.c 
 my $fdest = $f;
 $fdest =~ s/\./_c./;
 $m .= <<THEEND
-$fdest : $f
+$fdest : $f compile.pl
 	./compile.pl < $f > $fdest
 
 THEEND
