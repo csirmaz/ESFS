@@ -108,7 +108,7 @@ int $readdir(
 
    mfd = $$MFD;
 
-   if(mfd->is_main){
+   if(mfd->is_main) {
 
       /* TODO
       * If the  end  of  the  directory stream is reached, NULL is returned

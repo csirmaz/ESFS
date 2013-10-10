@@ -245,7 +245,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
    $$IF_PATH_SN
 
-   do{
+   do {
 
       $dlogdbg("opendir:sn(path=\"%s\"\n", path);
 
@@ -255,15 +255,15 @@ int $opendir(const char *path, struct fuse_file_info *fi)
          break;
       }
 
-      do{
+      do {
 
-         if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_OPENDIR)) != 0)){
+         if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_OPENDIR)) != 0)) {
             break;
          }
 
          // No directories found in any snapshot or the main part
-         if(mfd->sn_nonempty == 0){
-            if(unlikely((waserror = $mfd_destroy_sn_steps(mfd, fsdata)) != 0)){
+         if(mfd->sn_nonempty == 0) {
+            if(unlikely((waserror = $mfd_destroy_sn_steps(mfd, fsdata)) != 0)) {
                break;
             }
             waserror = -ENOENT;
@@ -273,13 +273,13 @@ int $opendir(const char *path, struct fuse_file_info *fi)
          mfd->is_main = 0;
          fi->fh = (intptr_t) mfd;
 
-      }while(0);
+      } while(0);
 
-      if(waserror < 0){
+      if(waserror < 0) {
          free(mfd);
       }
 
-   }while(0);
+   } while(0);
 
    snret = waserror;
 

@@ -151,7 +151,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 
    $dlogdbg("releasedir(path=\"%s\")\n", path);
 
-   if(mfd->is_main){
+   if(mfd->is_main) {
       if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
       free(mfd);
       return waserror;
