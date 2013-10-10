@@ -514,6 +514,7 @@ static int $mfd_get_sn_steps(
 
    // Get the roots of the snapshots and the main space
    if(unlikely((ret = $sn_get_paths_to(mfd, snpath, fsdata)) != 0)) {
+      $dlogdbg("sn_get_paths_to failed with %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
 
@@ -556,6 +557,7 @@ static int $mfd_get_sn_steps(
                mfd->sn_steps[i].datfd = $$SN_STEPS_UNUSED;
                continue;
             } else {
+               $dlogdbg("opendir on '%s' failed with %d = %s/n", mfd->sn_steps[i].path, ret, strerror(ret));
                waserror = -ret;
                break;
             }
@@ -576,14 +578,15 @@ static int $mfd_get_sn_steps(
 
          fd = open(mymappath, O_RDONLY);
          if(fd == -1) {
-            fd = errno;
-            if(fd == ENOENT) {
+            ret = errno;
+            if(ret == ENOENT) {
                // This snapshot has no information about this file
                mfd->sn_steps[i].mapfd = $$SN_STEPS_UNUSED;
                mfd->sn_steps[i].datfd = $$SN_STEPS_UNUSED;
                continue;
             } else {
-               waserror = -fd;
+               $dlogdbg("open on '%s' failed with %d = %s/n", mfd->sn_steps[i].path, ret, strerror(ret));
+               waserror = -ret;
                break;
             }
          }

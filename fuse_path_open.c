@@ -137,7 +137,7 @@ int $open(const char *path, struct fuse_file_info *fi)
       return -waserror;
    }
 
-   log_msg("  open success main fd=%d\n", fd);
+   $dlogdbg("  open success main fd=%d\n", fd);
 
    mfd->is_main = 1;
    fi->fh = (intptr_t) mfd;
@@ -247,7 +247,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
    do {
 
-      $dlogdbg("opendir:sn(path=\"%s\"\n", path);
+      $dlogdbg("opendir:sn(path=\"%s\")\n", path);
 
       mfd = malloc(sizeof(struct $mfd_t));
       if(unlikely(mfd == NULL)) {
@@ -258,12 +258,14 @@ int $opendir(const char *path, struct fuse_file_info *fi)
       do {
 
          if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_OPENDIR)) != 0)) {
+            $dlogdbg("get sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
             break;
          }
 
          // No directories found in any snapshot or the main part
          if(mfd->sn_nonempty == 0) {
             if(unlikely((waserror = $mfd_destroy_sn_steps(mfd, fsdata)) != 0)) {
+               $dlogdbg("destroy sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
                break;
             }
             waserror = -ENOENT;
@@ -285,7 +287,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
    $$ELIF_PATH_MAIN
 
-   $dlogdbg("opendir:main(path=\"%s\"\n", path);
+   $dlogdbg("opendir:main(path=\"%s\")\n", path);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(unlikely(mfd == NULL)) {

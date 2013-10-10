@@ -148,11 +148,18 @@ static int $sn_get_paths_to(struct $mfd_t *mfd, const struct $snpath_t *snpath, 
    int waserror = 0; // negative on error
    char pointerpath[$$PATH_MAX];
    char mysnroot[$$PATH_MAX];
-   $$PATH_LEN_T plen;
 
    // Get the real snapshot path we'll be comparing to
-   if(snpath->is_there < 1) {return -EFAULT;}
-   $$ADDNPREFIX_CONT(mysnroot, snpath->id, fsdata->rootdir, fsdata->rootdir_len)
+   if(snpath->is_there < 1) {
+      $dlogdbg("Attempted to list something outside a snapshot\n");
+      return -EFAULT;
+   }
+
+   if(strlen(snpath->id) + strlen(fsdata->sn_dir) >= $$PATH_MAX) {
+      return -ENAMETOOLONG;
+   }
+   strcpy(mysnroot, fsdata->sn_dir);
+   strcat(mysnroot, snpath->id);
 
    mfd->sn_steps = malloc(sizeof(struct $sn_steps_t) * allocated);
    if(mfd->sn_steps == NULL) { return -ENOMEM; }
@@ -161,6 +168,8 @@ static int $sn_get_paths_to(struct $mfd_t *mfd, const struct $snpath_t *snpath, 
    strcpy(mfd->sn_steps[1].path, fsdata->sn_lat_dir); // the root of the latest snapshot
 
    while(1) {
+
+      // $dlogdbg("sn_get_paths_to: searching for '%s' at '%s' (%d)\n", mysnroot, mfd->sn_steps[p].path, p);
 
       if(strcmp(mysnroot, mfd->sn_steps[p].path) == 0) {
          // We have found our snapshot ID
