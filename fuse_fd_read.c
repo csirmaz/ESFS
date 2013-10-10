@@ -88,7 +88,10 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
  *
  * Introduced in version 2.3
  */
-// TODO Implement snapshots
+// TODO Implement snapshots:
+/* Read the directory in all snapshots and the main space, collecting all files.
+ * If a file is marked as nonexistent, ignore it in later snapshots.
+ */
 //   int (*readdir) (const char *, void *, fuse_fill_dir_t, off_t,
 //         struct fuse_file_info *);
 int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,

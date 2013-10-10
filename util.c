@@ -125,6 +125,7 @@
    }
 
 
+// TODO Check where these are used, and simplify them!
 /** Adds a prefix to a path (MAY RETURN)
  *
  * Needs $$PATH_LEN_T plen
@@ -141,6 +142,7 @@
    strncat(newpath, oldpath, plen); \
  
 
+ // TODO Use get_hid_path, get_map_path instead
 /** Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)
  *
  * Returns:
@@ -172,15 +174,34 @@
    strncat(newpath2, suffix2, suffixlen);
 
 
-// Adds the "hidden" suffix to a path
-// Returns:
-// 0 - success
-// -ENAMETOOLONG - if the new path is too long
+/** Adds the "hidden" suffix to a path
+ *
+ * Returns:
+ * * 0 - success
+ * * -ENAMETOOLONG - if the new path is too long
+ */
 static inline int $get_hid_path(char *newpath, const char *oldpath)
 {
    if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)) {
       strcpy(newpath, oldpath);
       strncat(newpath, $$EXT_HID, $$EXT_LEN);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
+
+
+/** Adds the "map" suffix to a path
+ *
+ * Returns:
+ * * 0 - success
+ * * -ENAMETOOLONG - if the new path is too long
+ */
+static inline int $get_map_path(char *newpath, const char *oldpath)
+{
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)) {
+      strcpy(newpath, oldpath);
+      strncat(newpath, $$EXT_MAP, $$EXT_LEN);
       return 0;
    }
    return -ENAMETOOLONG;
@@ -378,7 +399,7 @@ static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
  * * 0 - if the file does not exist
  * * -errno - on other failure
  */
-static int $get_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_MAX], const char *filepath)
+static int $read_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_MAX], const char *filepath)
 {
    int fd;
    int ret;
@@ -388,24 +409,24 @@ static int $get_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH_
       if(fd == ENOENT) {
          return 0;
       }
-      $dlogi("get_path_from_file: opening %s failed with %d = %s\n", filepath, fd, strerror(fd));
+      $dlogi("opening %s failed with %d = %s\n", filepath, fd, strerror(fd));
       return -fd;
    }
 
    ret = pread(fd, buf, $$PATH_MAX, 0);
    if(ret == -1) {
       ret = errno;
-      $dlogi("get_path_from_file: reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
+      $dlogi("reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
       return -ret;
    }
    if(ret == 0 || buf[ret] != '\0') {
-      $dlogi("get_path_from_file: reading from %s returned 0 bytes or string is not 0-terminated.\n", filepath);
+      $dlogi("reading from %s returned 0 bytes or string is not 0-terminated.\n", filepath);
       return -EIO;
    }
 
    close(fd);
 
-   // TODO check if the directory really exists before returning success
+   // TODO check if the directory really exists before returning success?
 
    return (ret - 1);
 }

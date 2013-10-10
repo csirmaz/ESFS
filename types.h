@@ -167,6 +167,8 @@ struct $sn_steps_t {
 
 /** Filehandle struct (mfd)
  *
+ * This is the data associated with an open file.
+ *
  * [A] = can also be:
  * * -1 - if there are no snapshots
  * * -2 - if the main file is opened for read-only
@@ -181,8 +183,8 @@ struct $mfd_t {
    int mainfd; /**< filehandle to the main file */
    struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory */
    ino_t main_inode; /**< the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking */
-   int mapfd; /**< filehandle to the map file[A]. See $mfd_open_sn */
-   int datfd; /**< filehandle to the dat file[A,B]. See $mfd_open_sn */
+   int mapfd; /**< filehandle to the map file[A] in the latest snapshot. See $mfd_open_sn */
+   int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
    int is_renamed; /**< bool; 0 or 1 if we have followed a write directive. See $mfd_open_sn */
 
    // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)

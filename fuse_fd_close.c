@@ -91,10 +91,11 @@ int $release(const char *path, struct fuse_file_info *fi)
 {
    struct $mfd_t *mfd;
    int ret = 0;
+   $$DFSDATA
 
    mfd = $$MFD;
 
-   log_msg("release(path=\"%s\", fi=0x%08x, mainfd=%d)\n", path, fi, $$MFD->mainfd);
+   $dlogdbg("release(path=\"%s\", mainfd=%d)\n", path, $$MFD->mainfd);
 
    if(mfd->is_main == 1) {
       ret = $mfd_close_sn(mfd);
@@ -145,8 +146,9 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 //   int (*releasedir) (const char *, struct fuse_file_info *);
 int $releasedir(const char *path, struct fuse_file_info *fi)
 {
+   $$DFSDATA
 
-   log_msg("releasedir(path=\"%s\", fi=0x%08x)\n", path, fi);
+   $dlogdbg("releasedir(path=\"%s\")\n", path);
 
    if(closedir((DIR *)(uintptr_t) fi->fh) == 0) { return 0; }
    return -errno;

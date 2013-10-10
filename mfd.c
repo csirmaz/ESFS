@@ -158,6 +158,37 @@ static inline int $mfd_save_mapheader(const struct $mfd_t *mfd, const struct $fs
 }
 
 
+/** Load the map header from the map file
+ *
+ * Returns:
+ * * 0 on success
+ * * -errno on error
+ */
+static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, const struct $fsdata_t *fsdata)
+{
+   int ret;
+
+   ret = pread(fd, maphead, sizeof(struct $mapheader_t), 0);
+   if(unlikely(ret == -1)) {
+      ret = errno;
+      $dlogi("Failed to read .map, error %d = %s\n", ret, strerror(ret));
+      return -ret;
+   }
+   if(unlikely(ret != sizeof(struct $mapheader_t))) {
+      $dlogi("Only read %d bytes instead of %ld from .map. Broken FS?\n", ret, sizeof(struct $mapheader_t));
+      return -EIO;
+   }
+
+   // Check the version and the signature
+   if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0) {
+      $dlogi("version or signature bad in map file. Broken FS?\n");
+      return -EFAULT;
+   }
+
+   return 0;
+}
+
+
 // breaks below are not errors, but we want to skip opening/creating the dat file
 // if the file was empty or nonexistent when the snapshot was taken
 #define $$MFD_OPEN_DAT_FILE \
@@ -263,23 +294,9 @@ static int $mfd_open_sn(
 
          do { // From here we either return with a positive errno, or -1 if we need to try again
 
-            // Read the mapheader
-            ret = pread(fd, maphead, sizeof(struct $mapheader_t), 0);
-            if(unlikely(ret == -1)) {
-               waserror = errno;
+            if(unlikely((ret = $mfd_load_mapheader(maphead, fd, fsdata)) != 0)){
+               waserror = -ret;
                $dlogi("mfd_open_sn: Failed to read .map at %s, error %d = %s\n", fmap, waserror, strerror(waserror));
-               break;
-            }
-            if(unlikely(ret != sizeof(struct $mapheader_t))) {
-               $dlogi("mfd_open_sn: Only read %d bytes instead of %ld from .map at %s. Broken FS?\n", ret, sizeof(struct $mapheader_t), fmap);
-               waserror = EIO;
-               break;
-            }
-
-            // Check the version and the signature
-            if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0) {
-               $dlogi("mfd_open_sn: version or signature bad in map file %s. Broken FS?\n", fmap);
-               waserror = EFAULT;
                break;
             }
 
@@ -432,4 +449,106 @@ static inline int $mfd_init_sn(
       ret = $mfd_close_sn(&mymfd);
    }
    return ret;
+}
+
+
+// TODO
+static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsdata)
+{
+}
+
+
+/** Sets up mfd->sn_steps for a path inside a snapshot.
+ *
+ * Sets:
+ * * mfd->sn_current
+ * * mfd->sn_steps
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on failure
+ */
+static int $mfd_get_sn_steps(struct $mfd_t *mfd, const struct $snpath_t *snpath, const struct $fsdata_t *fsdata)
+{
+   int ret;
+   int i;
+   char *s;
+   char mypath[$$PATH_MAX];
+   char mymappath[$$PATH_MAX];
+   int waserror = 0; // negative on error
+   int fd;
+   struct $mapheader_t maphead;
+
+   // Get the roots of the snapshots and the main space
+   if(unlikely((ret = $sn_get_paths_to(mfd, snpath, fsdata)) != 0)){
+      return ret;
+   }
+
+   // All that remains is to add the path
+
+   // Get the first path
+   if(snpath->is_there > 1){
+      strcpy(mypath, snpath->inpath);
+   }else{
+      mypath[0] = '\0';
+   }
+
+   for(i = mfd->sn_current; i >= 0; i--){
+
+      s = mfd->sn_steps[i].path;
+      if(unlikely(strlen(mypath) + strlen(s) >= $$PATH_MAX)){
+         waserror = -ENAMETOOLONG;
+         break;
+      }
+      strcat(s, mypath);
+
+      // Read the map file for a read directive
+      // TODO Open the dat file as well?
+      if(unlikely((ret = $get_map_path(mymappath, mypath)) != 0)){
+         waserror = ret;
+         break;
+      }
+
+      fd = open(mymappath, O_RDONLY);
+      if(fd == -1){
+         fd = errno;
+         if(fd == ENOENT){
+            // This snapshot has no information about this file
+            mfd->sn_steps[i].mapfd = $$SN_STEPS_UNUSED;
+            mfd->sn_steps[i].datfd = $$SN_STEPS_UNUSED;
+            continue;
+         }else{
+            waserror = -fd;
+            break;
+         }
+      }
+
+      // We save this here so that mfd_destroy_sn_steps would close it on error
+      mfd->sn_steps[i].mapfd = fd;
+      mfd->sn_steps[i].datfd = $$SN_STEPS_NOTOPEN;
+
+      do{
+
+         if(unlikely((ret = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0)){
+            waserror = ret;
+            break;
+         }
+
+         if(maphead.read_v[0] != '\0'){ // there is a read directive
+            strcpy(mypath, maphead.read_v);
+         }
+
+      }while(0);
+
+      if(waserror != 0){
+         break;
+      }
+   }
+
+   if(waserror != 0){
+      $mfd_destroy_sn_steps(mfd, fsdata);
+      return waserror;
+   }
+
+   return 0;
 }

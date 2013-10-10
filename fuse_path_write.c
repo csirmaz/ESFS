@@ -71,7 +71,7 @@ int $mkdir(const char *path, mode_t mode)
 
    log_msg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
-   // TODO mark dir as nonexistend in snapshot
+   // TODO mark dir as nonexistent in snapshot
 
    if(mkdir(fpath, mode) == 0) { return 0; }
    return -errno;
@@ -156,7 +156,7 @@ int $rename(const char *path, const char *newpath)
          }
 
          // Before we modify the read and write directives, we do the actual rename.
-         /* If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
+         /* rename: If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
           * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.
           */
          if(unlikely(rename(fpath, fnewpath) != 0)) {
@@ -240,34 +240,13 @@ int $rename(const char *path, const char *newpath)
 }
 
 
-/** Create a symbolic link
- *
- * The parameters here are a little bit confusing, but do correspond
- * to the symlink() system call.  (1) is where the link points,
- * while (2) is the link itself.  So we need to leave (1)
- * unaltered, but insert the link into the mounted directory.
- */
-int $symlink(const char *dest, const char *path)
-{
-   int ret;
-   $$IF_PATH_MAIN_ONLY
-
-   $dlogdbg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
-
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
-
-   if(symlink(dest, fpath) == 0) { return 0; }
-   return -errno;
-}
-
-
 /** Change the permission bits of a file */
 int $chmod(const char *path, mode_t mode)
 {
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
+   $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
 
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
@@ -282,7 +261,7 @@ int $chown(const char *path, uid_t uid, gid_t gid)
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // $dlogdbg("  chown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
+   $dlogdbg("  chown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
 
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
@@ -389,6 +368,34 @@ int $utimens(const char *path, const struct timespec tv[2])
 
 /* Unsupported operations
  ***********************************************/
+
+
+/** Create a symbolic link
+ *
+ * This is not supported yet.
+ *
+ * The parameters here are a little bit confusing, but do correspond
+ * to the symlink() system call.  (1) is where the link points,
+ * while (2) is the link itself.  So we need to leave (1)
+ * unaltered, but insert the link into the mounted directory.
+ */
+int $symlink(const char *dest, const char *path)
+{
+   return -ENOTSUP;
+
+   /* The implementation could be:
+
+   int ret;
+   $$IF_PATH_MAIN_ONLY
+
+   $dlogdbg("  symlink(dest=\"%s\", path=\"%s\")\n", dest, path);
+
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
+
+   if(symlink(dest, fpath) == 0) { return 0; }
+   return -errno;
+   */
+}
 
 
 /** Create a hard link to a file

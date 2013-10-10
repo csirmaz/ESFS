@@ -22,3 +22,5 @@ lock labels could be used.)
 read it in $n_open and set datfd to negative if true
 
 * Ensure all functions are static
+
+* Cache part of the map in the mfd

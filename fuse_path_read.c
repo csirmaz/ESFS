@@ -47,40 +47,10 @@ int $getattr(const char *path, struct stat *statbuf)
 {
    $$ALL_PATHS // TODO
 
-   // log_msg("  getattr(path=\"%s\", statbuf=0x%08x)\n", path, statbuf);
+   $dlogdbg("  getattr(path=\"%s\")\n", path);
 
    if(lstat(fpath, statbuf) == 0) { return 0; }
    return -errno;
-}
-
-
-/** Read the target of a symbolic link
-*
-* The buffer should be filled with a null terminated string.  The
-* buffer size argument includes the space for the terminating
-* null character.   If the linkname is too long to fit in the
-* buffer, it should be truncated.  The return value should be 0
-* for success.
-*/
-// TODO Implement snapshots
-// Note the system readlink() will truncate and lose the terminating
-// null.  So, the size passed to to the system readlink() must be one
-// less than the size passed to bb_readlink()
-// bb_readlink() code by Bernardo F Costa (thanks!)
-int $readlink(const char *path, char *link, size_t size)
-{
-   int ret;
-   $$IF_PATH_MAIN_ONLY
-
-   // TODO How to save links?
-   log_msg("  readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
-
-   ret = readlink(fpath, link, size - 1);
-   if(unlikely(ret == -1)) {
-      return -errno;
-   }
-   link[ret] = '\0';
-   return 0;
 }
 
 
@@ -101,7 +71,7 @@ int $access(const char *path, int mask)
 {
    $$ALL_PATHS // TODO
 
-   // log_msg("  access(path=\"%s\", mask=0%o)\n", path, mask);
+   $dlogdbg("  access(path=\"%s\", mask=0%o)\n", path, mask);
 
    if(access(fpath, mask) == 0) { return 0; }
    return -errno;
@@ -110,6 +80,41 @@ int $access(const char *path, int mask)
 
 /* Unsupported operations
  ***********************************************/
+
+
+/** Read the target of a symbolic link
+ *
+ * This is not supported yet.
+ *
+ * The buffer should be filled with a null terminated string.  The
+ * buffer size argument includes the space for the terminating
+ * null character.   If the linkname is too long to fit in the
+ * buffer, it should be truncated.  The return value should be 0
+ * for success.
+ */
+// BBFS: Note the system readlink() will truncate and lose the terminating
+// null.  So, the size passed to to the system readlink() must be one
+// less than the size passed to bb_readlink()
+// bb_readlink() code by Bernardo F Costa (thanks!)
+int $readlink(const char *path, char *link, size_t size)
+{
+   return -ENOTSUP;
+
+   /* Implementation without reading snapshots:
+
+   int ret;
+   $$IF_PATH_MAIN_ONLY
+
+   $dlogdbg("  readlink(path=\"%s\", link=\"%s\", size=%d)\n", path, link, size);
+
+   ret = readlink(fpath, link, size - 1);
+   if(unlikely(ret == -1)) {
+      return -errno;
+   }
+   link[ret] = '\0';
+   return 0;
+   */
+}
 
 
 /** Get extended attributes (unsupported) */

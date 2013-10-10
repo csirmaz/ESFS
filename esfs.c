@@ -101,7 +101,7 @@ int $statfs(const char *path, struct statvfs *statv)
    // get stats for underlying filesystem
    if( statvfs(fpath, statv) == 0){ return 0; }
    return -errno;
-   
+
    // log_statvfs(statv);
 }
 
