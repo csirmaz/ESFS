@@ -139,6 +139,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    log_msg("  open success main fd=%d\n", fd);
 
+   mfd->is_main = 1;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -219,6 +220,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       return -waserror;
    }
 
+   mfd->is_main = 1;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -235,21 +237,74 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
  *
  * Introduced in version 2.3
  */
-// TODO Implement snapshots
-//   int (*opendir) (const char *, struct fuse_file_info *);
 int $opendir(const char *path, struct fuse_file_info *fi)
 {
    DIR *dp;
-   $$IF_PATH_MAIN_ONLY // TODO need to open dirs in snapshots
+   int waserror = 0; // negative on error
+   struct $mfd_t *mfd;
 
-   log_msg("  opendir(path=\"%s\", fi=0x%08x)\n", path, fi);
+   $$IF_PATH_SN
+
+   do{
+
+      $dlogdbg("opendir:sn(path=\"%s\"\n", path);
+
+      mfd = malloc(sizeof(struct $mfd_t));
+      if(unlikely(mfd == NULL)) {
+         waserror = -ENOMEM;
+         break;
+      }
+
+      do{
+
+         if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_OPENDIR)) != 0)){
+            break;
+         }
+
+         // No directories found in any snapshot or the main part
+         if(mfd->sn_nonempty == 0){
+            if(unlikely((waserror = $mfd_destroy_sn_steps(mfd, fsdata)) != 0)){
+               break;
+            }
+            waserror = -ENOENT;
+            break;
+         }
+
+         mfd->is_main = 0;
+         fi->fh = (intptr_t) mfd;
+
+      }while(0);
+
+      if(waserror < 0){
+         free(mfd);
+      }
+
+   }while(0);
+
+   snret = waserror;
+
+   $$ELIF_PATH_MAIN
+
+   $dlogdbg("opendir:main(path=\"%s\"\n", path);
+
+   mfd = malloc(sizeof(struct $mfd_t));
+   if(unlikely(mfd == NULL)) {
+      return -ENOMEM;
+   }
 
    dp = opendir(fpath);
-   if(unlikely(dp == NULL)) { return -errno; }
+   if(unlikely(dp == NULL)) {
+      free(mfd);
+      return -errno;
+   }
 
-   fi->fh = (intptr_t) dp;
+   mfd->maindir = dp;
+   mfd->is_main = 1;
+   fi->fh = (intptr_t) mfd;
 
    return 0;
+
+   $$FI_PATH
 }
 
 

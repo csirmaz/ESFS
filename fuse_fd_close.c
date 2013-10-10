@@ -142,16 +142,24 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
  *
  * Introduced in version 2.3
  */
-// TODO Implement snapshots
-//   int (*releasedir) (const char *, struct fuse_file_info *);
 int $releasedir(const char *path, struct fuse_file_info *fi)
 {
+   struct $mfd_t *mfd;
+   int waserror = 0;
    $$DFSDATA
+   mfd = $$MFD;
 
    $dlogdbg("releasedir(path=\"%s\")\n", path);
 
-   if(closedir((DIR *)(uintptr_t) fi->fh) == 0) { return 0; }
-   return -errno;
+   if(mfd->is_main){
+      if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
+      free(mfd);
+      return waserror;
+   }
+
+   waserror = $mfd_destroy_sn_steps(mfd, fsdata);
+   free(mfd);
+   return waserror;
 }
 
 

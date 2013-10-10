@@ -92,45 +92,56 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 /* Read the directory in all snapshots and the main space, collecting all files.
  * If a file is marked as nonexistent, ignore it in later snapshots.
  */
-//   int (*readdir) (const char *, void *, fuse_fill_dir_t, off_t,
-//         struct fuse_file_info *);
-int $readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
-             struct fuse_file_info *fi)
+int $readdir(
+   const char *path,
+   void *buf,
+   fuse_fill_dir_t filler,
+   off_t offset,
+   struct fuse_file_info *fi
+)
 {
-   DIR *dp;
+   struct $mfd_t *mfd;
    struct dirent *de;
+   $$DFSDATA
 
-   log_msg("readdir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n", path, buf, filler, offset, fi);
-   // note that I need to cast fi->fh
-   dp = (DIR *)(uintptr_t) fi->fh;
+   $dlogdbg("readdir(path=\"%s\", offset=%lld)\n", path, (long long int)offset);
 
-   /* TODO
-    * If
-       the  end  of  the  directory stream is reached, NULL is returned and errno is not changed.
-       If an error occurs, NULL is returned and errno is set
-       appropriately.
-   */
+   mfd = $$MFD;
 
-   // Every directory contains at least two entries: . and ..  If my
-   // first call to the system readdir() returns NULL I've got an
-   // error; near as I can tell, that's the only condition under
-   // which I can get an error from readdir()
-   de = readdir(dp);
-   if(de == NULL) {
-      return -errno;
+   if(mfd->is_main){
+
+      /* TODO
+      * If the  end  of  the  directory stream is reached, NULL is returned
+         and errno is not changed.
+         If an error occurs, NULL is returned and errno is set
+         appropriately.
+      */
+
+      // Every directory contains at least two entries: . and ..  If my
+      // first call to the system readdir() returns NULL I've got an
+      // error; near as I can tell, that's the only condition under
+      // which I can get an error from readdir()
+      de = readdir(mfd->maindir);
+      if(de == NULL) {
+         return -errno;
+      }
+
+      // This will copy the entire directory into the buffer.  The loop exits
+      // when either the system readdir() returns NULL, or filler()
+      // returns something non-zero.  The first case just means I've
+      // read the whole directory; the second means the buffer is full.
+      do {
+         if(filler(buf, de->d_name, NULL, 0) != 0) {
+            return -ENOMEM;
+         }
+      } while((de = readdir(mfd->maindir)) != NULL);
+
+      return 0;
+
    }
 
-   // This will copy the entire directory into the buffer.  The loop exits
-   // when either the system readdir() returns NULL, or filler()
-   // returns something non-zero.  The first case just means I've
-   // read the whole directory; the second means the buffer is full.
-   do {
-      if(filler(buf, de->d_name, NULL, 0) != 0) {
-         return -ENOMEM;
-      }
-   } while((de = readdir(dp)) != NULL);
-
-   return 0;
+   // TODO Implement reading dirs from sn_steps
+   return -EBADE;
 }
 
 

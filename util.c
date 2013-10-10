@@ -87,14 +87,14 @@
  * Uses path; Defines fpath, fsdata, snpath, ret
  *
  * First branch: in snapshot space. fpath contains the mapped path; snpath the decomposed paths.
- * DO NOT RETURN FROM THE FOLLOWING BLOCK! SET 'ret' INSTEAD!
+ * DO NOT RETURN FROM THE FOLLOWING BLOCK! SET 'snret' INSTEAD!
  * ! For performance, we only allocate memory for snpath when needed, but because of this,
  * one cannot return in the SN branch.
  */
 #define $$IF_PATH_SN \
    char fpath[$$PATH_MAX]; \
    struct $snpath_t *snpath; \
-   int ret = -EBADE; \
+   int snret = -EBADE; \
    $$DFSDATA \
    if($map_path(fpath, path, fsdata) != 0) { return -ENAMETOOLONG; } \
    if($$_IS_PATH_IN_SN(path)) { \
@@ -105,7 +105,7 @@
 /** Second branch: in main space. fpath contains the mapped path. */
 #define $$ELIF_PATH_MAIN \
       free(snpath); \
-      return ret; \
+      return snret; \
    }
 
 /** Uses ret */
@@ -140,9 +140,9 @@
    } \
    strcpy(newpath, fix); \
    strncat(newpath, oldpath, plen); \
- 
 
- // TODO Use get_hid_path, get_map_path instead
+
+// TODO Use get_hid_path, get_map_path instead
 /** Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)
  *
  * Returns:

@@ -251,7 +251,7 @@ static int $mfd_open_sn(
 
    // Default values
    mfd->is_renamed = 0;
-   mfd->is_main = 1;
+   mfd->is_main = 1; // for safety's sake
 
    // No snapshots?
    if(fsdata->sn_is_any == 0) {
@@ -402,6 +402,7 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
    mfd->datfd = -2;
+   mfd->is_main = 1; // for safety's sake
 }
 
 
@@ -452,13 +453,39 @@ static inline int $mfd_init_sn(
 }
 
 
-// TODO
+/** Closes filehandles and frees the memory associated with sn_steps
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on failure
+ */
 static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsdata)
 {
+   int waserror = 0;
+   int i;
+   int j;
+
+   if(mfd->sn_nonempty == 1){
+      for(i = mfd->sn_current; i >= 0; i--){
+
+         j = mfd->sn_steps[i].mapfd;
+         if(j >= 0 && close(j) != 0){ waserror = -errno; }
+
+         j = mfd->sn_steps[i].datfd;
+         if(j >= 0 && close(j) != 0){ waserror = -errno; }
+
+         if(mfd->sn_steps[i].dirfd != NULL && closedir(mfd->sn_steps[i].dirfd) != 0){ waserror = -errno; }
+      }
+   }
+
+   free(mfd->sn_steps);
+
+   return waserror;
 }
 
 
 /** Sets up mfd->sn_steps for a path inside a snapshot.
+ * Can also open the map files.
  *
  * Sets:
  * * mfd->sn_current
@@ -468,15 +495,21 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
  * * 0 - on success
  * * -errno - on failure
  */
-static int $mfd_get_sn_steps(struct $mfd_t *mfd, const struct $snpath_t *snpath, const struct $fsdata_t *fsdata)
+static int $mfd_get_sn_steps(
+      struct $mfd_t *mfd,
+      const struct $snpath_t *snpath,
+      const struct $fsdata_t *fsdata,
+      int flags /**< See $$SN_STEPS_F_OPENFILE, $$SN_STEPS_F_OPENDIR */
+)
 {
    int ret;
+   int waserror = 0; // negative on error
    int i;
    char *s;
    char mypath[$$PATH_MAX];
    char mymappath[$$PATH_MAX];
-   int waserror = 0; // negative on error
    int fd;
+   DIR *dirfd;
    struct $mapheader_t maphead;
 
    // Get the roots of the snapshots and the main space
@@ -493,6 +526,14 @@ static int $mfd_get_sn_steps(struct $mfd_t *mfd, const struct $snpath_t *snpath,
       mypath[0] = '\0';
    }
 
+   // Initialise all FDs for the benefit of $mfd_destroy_sn_steps
+   mfd->sn_nonempty = 0;
+   for(i = mfd->sn_current; i >= 0; i--){
+      mfd->sn_steps[i].mapfd = $$SN_STEPS_NOTOPEN;
+      mfd->sn_steps[i].datfd = $$SN_STEPS_NOTOPEN;
+      mfd->sn_steps[i].dirfd = NULL;
+   }
+
    for(i = mfd->sn_current; i >= 0; i--){
 
       s = mfd->sn_steps[i].path;
@@ -502,43 +543,74 @@ static int $mfd_get_sn_steps(struct $mfd_t *mfd, const struct $snpath_t *snpath,
       }
       strcat(s, mypath);
 
-      // Read the map file for a read directive
-      // TODO Open the dat file as well?
-      if(unlikely((ret = $get_map_path(mymappath, mypath)) != 0)){
-         waserror = ret;
-         break;
-      }
+      $dlogdbg("sn_step %d: '%s'\n", i, s);
 
-      fd = open(mymappath, O_RDONLY);
-      if(fd == -1){
-         fd = errno;
-         if(fd == ENOENT){
-            // This snapshot has no information about this file
-            mfd->sn_steps[i].mapfd = $$SN_STEPS_UNUSED;
-            mfd->sn_steps[i].datfd = $$SN_STEPS_UNUSED;
-            continue;
-         }else{
-            waserror = -fd;
-            break;
+      if(flags & $$SN_STEPS_F_OPENDIR){
+
+         // Try to open the directory
+         dirfd = opendir(mfd->sn_steps[i].path);
+         if(dirfd == NULL){
+            ret = errno;
+            if(ret == ENOENT){
+               mfd->sn_steps[i].mapfd = $$SN_STEPS_UNUSED;
+               mfd->sn_steps[i].datfd = $$SN_STEPS_UNUSED;
+               continue;
+            }else{
+               waserror = -ret;
+               break;
+            }
          }
+
+         // Successfully opened the directory
+         mfd->sn_steps[i].dirfd = dirfd;
+         mfd->sn_nonempty = 1;
+
       }
+      else if(flags & $$SN_STEPS_F_OPENFILE){
 
-      // We save this here so that mfd_destroy_sn_steps would close it on error
-      mfd->sn_steps[i].mapfd = fd;
-      mfd->sn_steps[i].datfd = $$SN_STEPS_NOTOPEN;
-
-      do{
-
-         if(unlikely((ret = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0)){
+         // Read the map file for a read directive
+         // TODO Open the dat file as well?
+         if(unlikely((ret = $get_map_path(mymappath, mfd->sn_steps[i].path)) != 0)){
             waserror = ret;
             break;
          }
 
-         if(maphead.read_v[0] != '\0'){ // there is a read directive
-            strcpy(mypath, maphead.read_v);
+         fd = open(mymappath, O_RDONLY);
+         if(fd == -1){
+            fd = errno;
+            if(fd == ENOENT){
+               // This snapshot has no information about this file
+               mfd->sn_steps[i].mapfd = $$SN_STEPS_UNUSED;
+               mfd->sn_steps[i].datfd = $$SN_STEPS_UNUSED;
+               continue;
+            }else{
+               waserror = -fd;
+               break;
+            }
          }
 
-      }while(0);
+         // We save this here so that mfd_destroy_sn_steps would close it on error
+         mfd->sn_steps[i].mapfd = fd;
+         mfd->sn_nonempty = 1;
+
+         do{
+
+            if(unlikely((ret = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0)){
+               waserror = ret;
+               break;
+            }
+
+            if(maphead.read_v[0] != '\0'){ // there is a read directive
+               strcpy(mypath, maphead.read_v);
+            }
+
+         }while(0);
+
+      }
+      else{
+         $dlogdbg("Wrong flag!");
+         waserror = -EBADE;
+      }
 
       if(waserror != 0){
          break;

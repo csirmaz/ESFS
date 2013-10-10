@@ -60,11 +60,11 @@ int $mkdir(const char *path, mode_t mode)
    // Create a new snapshot
 
    if(snpath->is_there != 1) {
-      ret = -EFAULT; // "Bad address" if wrong path was used
+      snret = -EFAULT; // "Bad address" if wrong path was used
    } else if($sn_create(fsdata, fpath) != 0) {
-      ret = -EIO; // If error occurred while trying to create snapshot; check logs.
+      snret = -EIO; // If error occurred while trying to create snapshot; check logs.
    } else {
-      ret = 0;
+      snret = 0;
    }
 
    $$ELIF_PATH_MAIN
@@ -92,9 +92,9 @@ int $rmdir(const char *path)
    $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
 
    if(snpath->is_there != 0) {
-      ret = -EFAULT;
+      snret = -EFAULT;
    } else {
-      ret = $sn_destroy(fsdata);
+      snret = $sn_destroy(fsdata);
    }
 
    $$ELIF_PATH_MAIN
