@@ -465,7 +465,7 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
    int i;
    int j;
 
-   if(mfd->sn_nonempty == 1) {
+   if(mfd->sn_first_file >= 0) {
       for(i = mfd->sn_current; i >= 0; i--) {
 
          j = mfd->sn_steps[i].mapfd;
@@ -528,7 +528,7 @@ static int $mfd_get_sn_steps(
    }
 
    // Initialise all FDs for the benefit of $mfd_destroy_sn_steps
-   mfd->sn_nonempty = 0;
+   mfd->sn_first_file = -1;
    for(i = mfd->sn_current; i >= 0; i--) {
       mfd->sn_steps[i].mapfd = $$SN_STEPS_NOTOPEN;
       mfd->sn_steps[i].datfd = $$SN_STEPS_NOTOPEN;
@@ -565,7 +565,7 @@ static int $mfd_get_sn_steps(
 
          // Successfully opened the directory
          mfd->sn_steps[i].dirfd = dirfd;
-         mfd->sn_nonempty = 1;
+         if(mfd->sn_first_file == -1){ mfd->sn_first_file = i; }
 
       } else if(flags & $$SN_STEPS_F_OPENFILE) {
 
@@ -593,7 +593,7 @@ static int $mfd_get_sn_steps(
 
          // We save this here so that mfd_destroy_sn_steps would close it on error
          mfd->sn_steps[i].mapfd = fd;
-         mfd->sn_nonempty = 1;
+         if(mfd->sn_first_file == -1){ mfd->sn_first_file = i; }
 
          do {
 

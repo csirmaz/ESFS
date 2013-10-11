@@ -1,5 +1,4 @@
 
-** mfd->sn_steps->sn_nonempty -> firstfile: -1=none, 0=main, ...=snapshot index
 ** move logic from rename into mfd.c
 
 ** Implement reading dirs from sn_steps in fuse_fd_read

@@ -278,7 +278,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
          }
 
          // No directories found in any snapshot or the main part
-         if(mfd->sn_nonempty == 0) {
+         if(mfd->sn_first_file == -1) {
             if(unlikely((waserror = $mfd_destroy_sn_steps(mfd, fsdata)) != 0)) {
                $dlogdbg("destroy sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
                break;

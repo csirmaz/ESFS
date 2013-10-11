@@ -206,7 +206,7 @@ struct $mfd_t {
 
    // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)
    int sn_current; /**< the largest index in sn_steps, representing the snapshot being read */
-   int sn_nonempty; /**< 1 if sn_steps contains at least one node that could be found, or 0 */
+   int sn_first_file; /**< the largest index where the node can actually be found, or -1 if not found anywhere */
    struct $sn_steps_t *sn_steps; /**< data about each snapshot step, from the main file [0], the first snapshot [1], to the snapshot being read [sn_current] */
 };
 
