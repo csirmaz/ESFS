@@ -139,7 +139,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    $dlogdbg("  open success main fd=%d\n", fd);
 
-   mfd->is_main = 1;
+   mfd->is_main = $$MFD_MAIN;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -220,7 +220,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       return -waserror;
    }
 
-   mfd->is_main = 1;
+   mfd->is_main = $$MFD_MAIN;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -257,6 +257,21 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
       do {
 
+         // If we're opening the main /snapshots/ directory
+         if(snpath->is_there == $$SNPATH_ROOT) {
+
+            dp = opendir(fpath);
+            if(unlikely(dp == NULL)) {
+               waserror = -ENOMEM;
+               break;
+            }
+
+            mfd->maindir = dp;
+            mfd->is_main = $$MFD_SNROOT;
+            fi->fh = (intptr_t) mfd;
+            break;
+         }
+
          if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_OPENDIR)) != 0)) {
             $dlogdbg("get sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
             break;
@@ -272,7 +287,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
             break;
          }
 
-         mfd->is_main = 0;
+         mfd->is_main = $$MFD_SN;
          fi->fh = (intptr_t) mfd;
 
       } while(0);
@@ -301,7 +316,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
    }
 
    mfd->maindir = dp;
-   mfd->is_main = 1;
+   mfd->is_main = $$MFD_MAIN;
    fi->fh = (intptr_t) mfd;
 
    return 0;

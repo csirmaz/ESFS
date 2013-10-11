@@ -97,7 +97,7 @@ int $release(const char *path, struct fuse_file_info *fi)
 
    $dlogdbg("release(path=\"%s\", mainfd=%d)\n", path, $$MFD->mainfd);
 
-   if(mfd->is_main == 1) {
+   if(mfd->is_main == $$MFD_MAIN) {
       ret = $mfd_close_sn(mfd);
       if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
    }
@@ -151,7 +151,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 
    $dlogdbg("releasedir(path=\"%s\")\n", path);
 
-   if(mfd->is_main) {
+   if(mfd->is_main == $$MFD_MAIN) {
       if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
       free(mfd);
       return waserror;

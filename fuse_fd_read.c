@@ -108,40 +108,62 @@ int $readdir(
 
    mfd = $$MFD;
 
-   if(mfd->is_main) {
+   switch(mfd->is_main) {
+      case $$MFD_MAIN:
 
-      /* TODO
-      * If the  end  of  the  directory stream is reached, NULL is returned
-         and errno is not changed.
-         If an error occurs, NULL is returned and errno is set
-         appropriately.
-      */
+         /* readdir: If the  end  of  the  directory stream is reached, NULL is returned
+            and errno is not changed.
+            If an error occurs, NULL is returned and errno is set
+            appropriately.
+         */
 
-      // Every directory contains at least two entries: . and ..  If my
-      // first call to the system readdir() returns NULL I've got an
-      // error; near as I can tell, that's the only condition under
-      // which I can get an error from readdir()
-      de = readdir(mfd->maindir);
-      if(de == NULL) {
-         return -errno;
-      }
-
-      // This will copy the entire directory into the buffer.  The loop exits
-      // when either the system readdir() returns NULL, or filler()
-      // returns something non-zero.  The first case just means I've
-      // read the whole directory; the second means the buffer is full.
-      do {
-         if(filler(buf, de->d_name, NULL, 0) != 0) {
-            return -ENOMEM;
+         while(1) {
+            errno = 0;
+            de = readdir(mfd->maindir);
+            if(de == NULL) {
+               if(errno != 0) { return -errno; }
+               break;
+            }
+            if(filler(buf, de->d_name, NULL, 0) != 0) {
+               return -ENOMEM;
+            }
          }
-      } while((de = readdir(mfd->maindir)) != NULL);
 
-      return 0;
+         return 0;
 
+      case $$MFD_SNROOT:
+
+         // A normal directory read, but skip the .hid file
+
+         while(1) {
+            errno = 0;
+            de = readdir(mfd->maindir);
+            if(de == NULL) {
+               if(errno != 0) { return -errno; }
+               break;
+            }
+
+            if(strcmp(de->d_name, $$EXT_HID) == 0) {
+               continue;
+            }
+
+            if(filler(buf, de->d_name, NULL, 0) != 0) {
+               return -ENOMEM;
+            }
+         }
+
+         return 0;
+
+      case $$MFD_SN:
+
+         // TODO Implement reading dirs from sn_steps
+         return -EBADE;
+
+      default:
+
+         $dlogdbg("Unknown mfd->is_main %d\n", mfd->is_main);
+         return -EBADE;
    }
-
-   // TODO Implement reading dirs from sn_steps
-   return -EBADE;
 }
 
 

@@ -59,7 +59,7 @@ int $mkdir(const char *path, mode_t mode)
 
    // Create a new snapshot
 
-   if(snpath->is_there != 1) {
+   if(snpath->is_there != $$SNPATH_IDONLY) {
       snret = -EFAULT; // "Bad address" if wrong path was used
    } else if($sn_create(fsdata, fpath) != 0) {
       snret = -EIO; // If error occurred while trying to create snapshot; check logs.
@@ -91,7 +91,7 @@ int $rmdir(const char *path)
    // Remove the latest snapshot
    $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
 
-   if(snpath->is_there != 0) {
+   if(snpath->is_there != $$SNPATH_ROOT) {
       snret = -EFAULT;
    } else {
       snret = $sn_destroy(fsdata);

@@ -251,7 +251,7 @@ static int $mfd_open_sn(
 
    // Default values
    mfd->is_renamed = 0;
-   mfd->is_main = 1; // for safety's sake
+   mfd->is_main = $$MFD_MAIN; // for safety's sake
 
    // No snapshots?
    if(fsdata->sn_is_any == 0) {
@@ -402,7 +402,7 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
    mfd->datfd = -2;
-   mfd->is_main = 1; // for safety's sake
+   mfd->is_main = $$MFD_MAIN; // for safety's sake
 }
 
 
@@ -521,7 +521,7 @@ static int $mfd_get_sn_steps(
    // All that remains is to add the path
 
    // Get the first path
-   if(snpath->is_there > 1) {
+   if(snpath->is_there == $$SNPATH_FULL) {
       strcpy(mypath, snpath->inpath);
    } else {
       mypath[0] = '\0';

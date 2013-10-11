@@ -121,10 +121,14 @@ struct $fsdata_t {
 };
 
 
+#define $$SNPATH_ROOT 0
+#define $$SNPATH_IDONLY 1
+#define $$SNPATH_FULL 2
+
 /** A path inside the snapshots space
  */
 struct $snpath_t {
-   int is_there; /**< 0=nothing, 1=ID, 2=ID&inpath -- always check this before using the strings */
+   int is_there; /**< $$SNPATH_ROOT=nothing, $$SNPATH_IDONLY=ID, $$SNPATH_FULL=ID&inpath -- always check this before using the strings */
    char id[$$PATH_MAX]; /**< e.g. "/ID" */
    char inpath[$$PATH_MAX]; /**< e.g. "/dir/dir/file" */
 };
@@ -173,6 +177,10 @@ struct $sn_steps_t {
 };
 
 
+#define $$MFD_SN 0
+#define $$MFD_MAIN 1
+#define $$MFD_SNROOT 2
+
 /** Filehandle struct (mfd)
  *
  * This is the data associated with an open file.
@@ -186,10 +194,10 @@ struct $sn_steps_t {
  * * -4 - if the file was 0 length when the snapshot was taken
  */
 struct $mfd_t {
-   int is_main; /**< bool; 1 if this is a main file; 0 otherwise */
+   int is_main; /**< $$MFD_MAIN if this is a main node; $$MFD_SN if this is a node in a snapshot; $$MFD_SNROOT if it is the snapshots dir */
    // MAIN FILE PART: (used when dealing with a file in the main space)
    int mainfd; /**< filehandle for the main file */
-   DIR *maindir; /**< dir handle for a directory in the main space */
+   DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
    struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory */
    ino_t main_inode; /**< the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot. See $mfd_open_sn */
