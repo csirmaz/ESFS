@@ -44,6 +44,7 @@
 int $getattr(const char *path, struct stat *statbuf)
 {
    struct $mfd_t mfd;
+   int ret;
    $$IF_PATH_SN
 
    if(snpath->is_there != $$SNPATH_FULL) {
@@ -63,12 +64,17 @@ int $getattr(const char *path, struct stat *statbuf)
                                             )) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
+         
          if(mfd.sn_first_file == -1) {
             snret = -ENOENT;
          } else {
             memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
             $dlogdbg("getattr.sn.full successful\n");
          }
+
+         ret = $mfd_destroy_sn_steps(&mfd, fsdata);
+         if(snret == 0){ snret = ret; }
+         
       }
 
    }
@@ -129,47 +135,54 @@ int $access(const char *path, int mask)
       // the following logic needs to be changed.
       // Interpret the mask
 
-      // No file found anywhere, or the map file says the file doesn't exist (the mapheader is not loaded if we're looking at the main file)
-      if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)) {
-         snret = -ENOENT;
-         break;
-      }
+      do{
 
-      if(mask == F_OK) {
-         // Question is the existence of the file
-         snret = 0;
-         break;
-      }
+         // No file found anywhere, or the map file says the file doesn't exist (the mapheader is not loaded if we're looking at the main file)
+         if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)) {
+            snret = -ENOENT;
+            break;
+         }
 
-      // mask is a real mask
+         if(mask == F_OK) {
+            // Question is the existence of the file
+            snret = 0;
+            break;
+         }
 
-      /* access: The  check  is  done using the calling process's *real* UID and GID, rather than the effective IDs
-         * as is done when actually attempting an operation
-         * (e.g., open(2)) on the file.  This allows set-user-ID programs to easily determine the invoking user's authority.
-         * If the calling process is privileged (i.e., its real UID is zero), then an X_OK check is successful
-         * for a regular file if execute  permission  is
-         * enabled for any of the file owner, group, or other.
-         */
+         // mask is a real mask
 
-      // This is the snapshot area: write permission is never granted.
-      if(mask & W_OK) {
-         snret = -EACCES;
-         break;
-      }
+         /* access: The  check  is  done using the calling process's *real* UID and GID, rather than the effective IDs
+            * as is done when actually attempting an operation
+            * (e.g., open(2)) on the file.  This allows set-user-ID programs to easily determine the invoking user's authority.
+            * If the calling process is privileged (i.e., its real UID is zero), then an X_OK check is successful
+            * for a regular file if execute  permission  is
+            * enabled for any of the file owner, group, or other.
+            */
 
-      // TODO 2 This permission checking is incomplete:
-      // We only check the 'user' and 'other' bits.
-      filemode = mfd.mapheader.fstat.st_mode;
-      p = 1;
-      if(getuid() == mfd.mapheader.fstat.st_uid) {
-         if((mask & R_OK) && (!(S_IRUSR & filemode))) { p = 0; }
-         if((mask & X_OK) && (!(S_IXUSR & filemode))) { p = 0; }
-      } else {
-         if((mask & R_OK) && (!(S_IROTH & filemode))) { p = 0; }
-         if((mask & X_OK) && (!(S_IXOTH & filemode))) { p = 0; }
-      }
+         // This is the snapshot area: write permission is never granted.
+         if(mask & W_OK) {
+            snret = -EACCES;
+            break;
+         }
 
-      snret = (p == 1 ? 0 : -EACCES);
+         // TODO 2 This permission checking is incomplete:
+         // We only check the 'user' and 'other' bits.
+         filemode = mfd.mapheader.fstat.st_mode;
+         p = 1;
+         if(getuid() == mfd.mapheader.fstat.st_uid) {
+            if((mask & R_OK) && (!(S_IRUSR & filemode))) { p = 0; }
+            if((mask & X_OK) && (!(S_IXUSR & filemode))) { p = 0; }
+         } else {
+            if((mask & R_OK) && (!(S_IROTH & filemode))) { p = 0; }
+            if((mask & X_OK) && (!(S_IXOTH & filemode))) { p = 0; }
+         }
+
+         snret = (p == 1 ? 0 : -EACCES);
+
+      }while(0);
+
+      p = $mfd_destroy_sn_steps(&mfd, fsdata);
+      if(snret==0){ snret = p; }
 
    } while(0);
 

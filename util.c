@@ -103,7 +103,7 @@
    int snret = -EBADE; \
    $$DFSDATA \
    if($map_path(fpath, path, fsdata) != 0) { return -ENAMETOOLONG; } \
-   if($$_IS_PATH_IN_SN(path)) { \
+   if(unlikely($$_IS_PATH_IN_SN(path))) { \
       snpath = malloc(sizeof(struct $snpath_t)); \
       if(snpath == NULL){ return -ENOMEM; } \
       $decompose_sn_path(snpath, path);

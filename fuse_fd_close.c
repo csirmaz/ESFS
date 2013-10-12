@@ -86,26 +86,27 @@ int $flush(const char *path, struct fuse_file_info *fi)
  * Changed in version 2.2
  */
 // TODO Implement snapshots
-//   int (*release) (const char *, struct fuse_file_info *);
 int $release(const char *path, struct fuse_file_info *fi)
 {
-   struct $mfd_t *mfd;
    int ret = 0;
-   $$DFSDATA
+   $$DFSDATA_MFD
 
    mfd = $$MFD;
 
    $dlogdbg("release(path=\"%s\", mainfd=%d)\n", path, $$MFD->mainfd);
 
-   if(mfd->is_main == $$MFD_MAIN) {
+   if(mfd->is_main != $$MFD_SN) {
+
       ret = $mfd_close_sn(mfd);
       if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
+
+   }else{
+
+      ret = $mfd_destroy_sn_steps(mfd, fsdata);
+      
    }
 
-   // TODO close non-main fds
-
    free(mfd);
-
    return ret;
 }
 

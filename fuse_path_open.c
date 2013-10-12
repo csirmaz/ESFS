@@ -61,7 +61,33 @@ int $open(const char *path, struct fuse_file_info *fi)
    struct $mfd_t *mfd;
    struct stat mystat;
 
-   $$IF_PATH_MAIN_ONLY // TODO 1 need to open files in snapshots (for reading)
+   $$IF_PATH_SN
+
+   do{
+
+      if(snpath->is_there != $$SNPATH_FULL){
+         snret = -EACCES;
+         break;
+      }
+      
+      mfd = malloc(sizeof(struct $mfd_t));
+      if(mfd == NULL) {
+         snret =  -ENOMEM;
+         break;
+      }
+
+      if((snret = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_FILE)) != 0){
+         free(mfd);
+         break;
+      }
+      
+      mfd->is_main = $$MFD_SN;
+      fi->fh = (intptr_t) mfd;
+      snret = 0;
+      
+   }while(0);
+
+   $$ELIF_PATH_MAIN
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL) { return -ENOMEM; }
@@ -69,7 +95,7 @@ int $open(const char *path, struct fuse_file_info *fi)
    do {
       flags = fi->flags;
 
-      $dlogdbg("  open(%s, %s %s %s %s)\n", fpath,
+      $dlogdbg("  open.main(%s, %s %s %s %s)\n", fpath,
                ((flags & O_TRUNC) > 0) ? "TRUNC" : "",
                ((flags & O_RDWR) > 0) ? "RDWR" : "",
                ((flags & O_RDONLY) > 0) ? "RD" : "",
@@ -143,6 +169,8 @@ int $open(const char *path, struct fuse_file_info *fi)
    fi->fh = (intptr_t) mfd;
 
    return 0;
+
+   $$FI_PATH
 }
 
 
