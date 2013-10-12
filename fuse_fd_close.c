@@ -149,16 +149,18 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
    $$DFSDATA
    mfd = $$MFD;
 
-   $dlogdbg("releasedir(path=\"%s\")\n", path);
-
-   if(mfd->is_main == $$MFD_MAIN) {
+   if(mfd->is_main != $$MFD_SN) {
+      $dlogdbg("releasedir.main(path=\"%s\")\n", path);
       if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
       free(mfd);
+      $dlogdbg("  releasedir.main ends with %d\n", waserror);
       return waserror;
    }
 
+   $dlogdbg("releasedir.sn(path=\"%s\")\n", path);
    waserror = $mfd_destroy_sn_steps(mfd, fsdata);
    free(mfd);
+   $dlogdbg("  releasedir.sn ends with %d\n", waserror);
    return waserror;
 }
 

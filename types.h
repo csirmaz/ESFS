@@ -181,9 +181,9 @@ struct $sn_steps_t {
 };
 
 
-#define $$MFD_SN 0
 #define $$MFD_MAIN 1
 #define $$MFD_SNROOT 2
+#define $$MFD_SN 0
 
 /** Filehandle struct (mfd)
  *
