@@ -582,27 +582,27 @@ static int $mfd_get_sn_steps(
       if(flags & $$SN_STEPS_F_TYPE_UNKNOWN) {
          // Test for a directory: try to stat the name as-is
          ret = 0;
-         if(lstat(mfd->sn_steps[sni].path, &mystat)!= 0){
+         if(lstat(mfd->sn_steps[sni].path, &mystat) != 0) {
             ret = errno;
-            if(ret == ENOENT){
+            if(ret == ENOENT) {
                // Try treating this as a file
                knowntype = 'f';
-            }else{
+            } else {
                $dlogdbg("lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                waserror = -ret;
                break;
             }
-         }else{
-            knowntype = (S_ISDIR(mystat.st_mode)?'d':'f'); // 'd' also means that the directory stat is available
+         } else {
+            knowntype = (S_ISDIR(mystat.st_mode) ? 'd' : 'f'); // 'd' also means that the directory stat is available
          }
          $dlogdbg("unknown type at '%s' is recognised as '%c'\n", mfd->sn_steps[sni].path, knowntype);
       }
 
       // DIRECTORY
-      if((knowntype== 'd') || (flags & $$SN_STEPS_F_DIR)) {
+      if((knowntype == 'd') || (flags & $$SN_STEPS_F_DIR)) {
 
          // Try to open the directory
-         if(!(flags & $$SN_STEPS_F_SKIPOPENDIR)){
+         if(!(flags & $$SN_STEPS_F_SKIPOPENDIR)) {
             dirfd = opendir(mfd->sn_steps[sni].path);
             if(dirfd == NULL) {
                ret = errno;
@@ -623,16 +623,16 @@ static int $mfd_get_sn_steps(
 
          if(mfd->sn_first_file == -1) {
             mfd->sn_first_file = sni;
-            if((flags & $$SN_STEPS_F_STATDIR) || (flags & $$SN_STEPS_F_SKIPOPENDIR)){
-               if(knowntype == 'd'){
+            if((flags & $$SN_STEPS_F_STATDIR) || (flags & $$SN_STEPS_F_SKIPOPENDIR)) {
+               if(knowntype == 'd') {
                   memcpy(&(mfd->mapheader.fstat), &mystat, sizeof(struct stat));
-               }else{
-                  if(lstat(mfd->sn_steps[sni].path, &(mfd->mapheader.fstat))!= 0){
+               } else {
+                  if(lstat(mfd->sn_steps[sni].path, &(mfd->mapheader.fstat)) != 0) {
                      ret = errno;
-                     if(ret == ENOENT){
+                     if(ret == ENOENT) {
                         mfd->sn_steps[sni].mapfd = $$SN_STEPS_UNUSED;
                         mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
-                     }else{
+                     } else {
                         $dlogdbg("lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                         waserror = -ret;
                         break;

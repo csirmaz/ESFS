@@ -59,13 +59,13 @@ int $getattr(const char *path, struct stat *statbuf)
 
       $dlogdbg("  getattr.sn.full(path=\"%s\")\n", path);
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
-            $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
-         )) != 0)) {
+                                             $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
+                                            )) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
-         if(mfd.sn_first_file == -1){
+         if(mfd.sn_first_file == -1) {
             snret = -ENOENT;
-         }else{
+         } else {
             memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
             $dlogdbg("getattr.sn.full successful\n");
          }
@@ -102,12 +102,12 @@ int $access(const char *path, int mask)
    mode_t filemode;
    $$IF_PATH_SN
 
-   do{
+   do {
 
       if(snpath->is_there != $$SNPATH_FULL) {
 
          $dlogdbg("  access.sn.root(path=\"%s\", mask=0%o)\n", path, mask);
-         if(access(fpath, mask) == 0){
+         if(access(fpath, mask) == 0) {
             snret = 0;
          } else {
             snret =  -errno;
@@ -117,10 +117,10 @@ int $access(const char *path, int mask)
       }
 
       $dlogdbg("  access.sn.full(path=\"%s\", mask=0%o)\n", path, mask);
-         
+
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
-            $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
-         )) != 0)) {
+                                             $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
+                                            )) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
          break;
       }
@@ -130,17 +130,17 @@ int $access(const char *path, int mask)
       // Interpret the mask
 
       // No file found anywhere, or the map file says the file doesn't exist (the mapheader is not loaded if we're looking at the main file)
-      if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)){
+      if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)) {
          snret = -ENOENT;
          break;
       }
 
-      if(mask == F_OK){
+      if(mask == F_OK) {
          // Question is the existence of the file
          snret = 0;
          break;
       }
-            
+
       // mask is a real mask
 
       /* access: The  check  is  done using the calling process's *real* UID and GID, rather than the effective IDs
@@ -152,7 +152,7 @@ int $access(const char *path, int mask)
          */
 
       // This is the snapshot area: write permission is never granted.
-      if(mask & W_OK){
+      if(mask & W_OK) {
          snret = -EACCES;
          break;
       }
@@ -160,18 +160,18 @@ int $access(const char *path, int mask)
       // TODO 2 This permission checking is incomplete:
       // We only check the 'user' and 'other' bits.
       filemode = mfd.mapheader.fstat.st_mode;
-      p=1;
-      if(getuid() == mfd.mapheader.fstat.st_uid){
-         if((mask & R_OK) && (!(S_IRUSR & filemode))){ p = 0; }
-         if((mask & X_OK) && (!(S_IXUSR & filemode))){ p = 0; }
-      }else{
-         if((mask & R_OK) && (!(S_IROTH & filemode))){ p = 0; }
-         if((mask & X_OK) && (!(S_IXOTH & filemode))){ p = 0; }
+      p = 1;
+      if(getuid() == mfd.mapheader.fstat.st_uid) {
+         if((mask & R_OK) && (!(S_IRUSR & filemode))) { p = 0; }
+         if((mask & X_OK) && (!(S_IXUSR & filemode))) { p = 0; }
+      } else {
+         if((mask & R_OK) && (!(S_IROTH & filemode))) { p = 0; }
+         if((mask & X_OK) && (!(S_IXOTH & filemode))) { p = 0; }
       }
 
-      snret = (p==1?0:-EACCES);
+      snret = (p == 1 ? 0 : -EACCES);
 
-   }while(0);
+   } while(0);
 
    $$ELIF_PATH_MAIN
 
