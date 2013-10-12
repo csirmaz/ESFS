@@ -508,15 +508,18 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
  * Can also open the map files.
  *
  * Flags:
- * * $$SN_STEPS_F_OPENFILE | $$SN_STEPS_F_OPENDIR -- depending on the expected file types
+ * * $$SN_STEPS_F_FILE | $$SN_STEPS_F_DIR | $$SN_STEPS_F_TYPE_UNKNOWN -- what type to expect
  * * $$SN_STEPS_F_FIRSTONLY -- stop after the first file found
  * * $$SN_STEPS_F_SKIPOPENDAT -- skip opening the dat files and the main file
+ * * $$SN_STEPS_F_SKIPOPENDIR -- skip opening the directories (but stat them into mfd->mapheader.fstat)
+ * * $$SN_STEPS_F_STATDIR -- stat directories into mfd->mapheader.fstat
  *
  * Sets:
  * * mfd->sn_current - index of the selected snapshot
  * * mfd->sn_first_file - index of the first snapshot with information about the file
  * * mfd->sn_steps
- * * mfd->mapheader - from the first map file found
+ * * mfd->mapheader - from the first map file found, or
+ * * mfd->mapheader.fstat - from a main file or a directory
  *
  * Returns:
  * * 0 - on success
@@ -531,11 +534,13 @@ static int $mfd_get_sn_steps(
 {
    int waserror = 0; // negative on error
    int sni, ret, fd;
+   char knowntype;
    char *s;
    char mypath[$$PATH_MAX];
    char mysnpath[$$PATH_MAX];
    DIR *dirfd;
    struct $mapheader_t maphead;
+   struct stat mystat;
 
    // Get the roots of the snapshots and the main space
    if(unlikely((ret = $sn_get_paths_to(mfd, snpath, fsdata)) != 0)) {
@@ -571,33 +576,75 @@ static int $mfd_get_sn_steps(
 
       $dlogdbg("sn_step %d: '%s'\n", sni, s);
 
-      // DIRECTORY
-      if(flags & $$SN_STEPS_F_OPENDIR) {
-
-         // Try to open the directory
-         dirfd = opendir(mfd->sn_steps[sni].path);
-         if(dirfd == NULL) {
+      // IF WE DON'T KNOW WHETHER TO EXPECT A FILE OR A DIRECTORY
+      // Used when we want to stat a path
+      knowntype = '?';
+      if(flags & $$SN_STEPS_F_TYPE_UNKNOWN) {
+         // Test for a directory: try to stat the name as-is
+         ret = 0;
+         if(lstat(mfd->sn_steps[sni].path, &mystat)!= 0){
             ret = errno;
-            if(ret == ENOENT) {
-               mfd->sn_steps[sni].mapfd = $$SN_STEPS_UNUSED;
-               mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
-               continue;
-            } else {
-               $dlogdbg("opendir on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+            if(ret == ENOENT){
+               // Try treating this as a file
+               knowntype = 'f';
+            }else{
+               $dlogdbg("lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                waserror = -ret;
                break;
             }
+         }else{
+            knowntype = (S_ISDIR(mystat.st_mode)?'d':'f'); // 'd' also means that the directory stat is available
+         }
+         $dlogdbg("unknown type at '%s' is recognised as '%c'\n", mfd->sn_steps[sni].path, knowntype);
+      }
+
+      // DIRECTORY
+      if((knowntype== 'd') || (flags & $$SN_STEPS_F_DIR)) {
+
+         // Try to open the directory
+         if(!(flags & $$SN_STEPS_F_SKIPOPENDIR)){
+            dirfd = opendir(mfd->sn_steps[sni].path);
+            if(dirfd == NULL) {
+               ret = errno;
+               if(ret == ENOENT) {
+                  mfd->sn_steps[sni].mapfd = $$SN_STEPS_UNUSED;
+                  mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
+                  continue;
+               } else {
+                  $dlogdbg("opendir on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+                  waserror = -ret;
+                  break;
+               }
+            }
+
+            // Successfully opened the directory
+            mfd->sn_steps[sni].dirfd = dirfd;
          }
 
-         // Successfully opened the directory
-         mfd->sn_steps[sni].dirfd = dirfd;
          if(mfd->sn_first_file == -1) {
             mfd->sn_first_file = sni;
+            if((flags & $$SN_STEPS_F_STATDIR) || (flags & $$SN_STEPS_F_SKIPOPENDIR)){
+               if(knowntype == 'd'){
+                  memcpy(&(mfd->mapheader.fstat), &mystat, sizeof(struct stat));
+               }else{
+                  if(lstat(mfd->sn_steps[sni].path, &(mfd->mapheader.fstat))!= 0){
+                     ret = errno;
+                     if(ret == ENOENT){
+                        mfd->sn_steps[sni].mapfd = $$SN_STEPS_UNUSED;
+                        mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
+                     }else{
+                        $dlogdbg("lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+                        waserror = -ret;
+                        break;
+                     }
+                  }
+               }
+            }
             if(flags & $$SN_STEPS_F_FIRSTONLY) { break; }
          }
 
          // FILE
-      } else if(flags & $$SN_STEPS_F_OPENFILE) {
+      } else if((knowntype == 'f') || (flags & $$SN_STEPS_F_FILE)) {
 
          if(sni > 0) { // in a snapshot
 
@@ -640,11 +687,7 @@ static int $mfd_get_sn_steps(
             } while(0);
 
             // Open the dat file
-            if(flags & $$SN_STEPS_F_SKIPOPENDAT) {
-
-               mfd->sn_steps[sni].datfd = $$SN_STEPS_NOTOPEN;
-
-            } else {
+            if(!(flags & $$SN_STEPS_F_SKIPOPENDAT)) {
 
                if(unlikely((ret = $get_dat_path(mysnpath, mfd->sn_steps[sni].path)) != 0)) {
                   waserror = ret;
@@ -720,7 +763,7 @@ static int $mfd_get_sn_steps(
          }
 
       } else {
-         $dlogdbg("Wrong flag!");
+         $dlogi("Wrong flag!");
          waserror = -EBADE;
       }
 

@@ -58,12 +58,13 @@ int $getattr(const char *path, struct stat *statbuf)
    } else {
 
       $dlogdbg("  getattr.sn.full(path=\"%s\")\n", path);
-      if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata, $$SN_STEPS_F_OPENFILE | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT)) != 0)) {
+      if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
+            $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
+         )) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
          memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
          $dlogdbg("getattr.sn.full successful\n");
-         snret = 0;
       }
 
    }

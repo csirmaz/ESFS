@@ -272,7 +272,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
             break;
          }
 
-         if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_OPENDIR)) != 0)) {
+         if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_DIR)) != 0)) {
             $dlogdbg("get sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
             break;
          }
