@@ -99,19 +99,19 @@ static int $_sn_readdir(
    struct $mapheader_t maphead;
 
    pathmark = malloc(allocated * sizeof(struct $pathmark_t));
-   if(pathmark == NULL){
+   if(pathmark == NULL) {
       return -ENOMEM;
    }
 
    // Read all the directories in all the snapshots
-   for(sni = mfd->sn_current; sni >= 0; sni--){ // begin for (a)
+   for(sni = mfd->sn_current; sni >= 0; sni--) { // begin for (a)
 
       step = &(mfd->sn_steps[sni]);
 
       $dlogdbg("Reading sn dir '%s' '%d'\n", step->path, step->mapfd);
-      
+
       // Skip snapshots with no information
-      if(step->mapfd == $$SN_STEPS_UNUSED){ continue; }
+      if(step->mapfd == $$SN_STEPS_UNUSED) { continue; }
 
       // The directories are already open
       // Read everything in this directory
@@ -128,7 +128,7 @@ static int $_sn_readdir(
          $dlogdbg("Found name '%s'\n", de->d_name);
 
          // Generate the absolute path for this file
-         if(strlen(step->path) + 1 + strlen(de->d_name) > $$PATH_MAX){
+         if(strlen(step->path) + 1 + strlen(de->d_name) > $$PATH_MAX) {
             waserror = -ENAMETOOLONG;
             break; // break while (b)
          }
@@ -137,83 +137,83 @@ static int $_sn_readdir(
          strcat(fpath, de->d_name);
 
          // Decide what this name means
-         p=0; // 0=check if new; 1=store; 2=nonexistent; -1=skip
+         p = 0; // 0=check if new; 1=store; 2=nonexistent; -1=skip
 
-         if(sni>0){
+         if(sni > 0) {
 
             // Decide how to present names in the snapshots
             j = $mfd_filter_name(de->d_name);
             $dlogdbg("Name sn type: j='%d'\n", j);
-            
-            if(j==0){ continue; } // cont while (b). should not be shown (.dat file)
+
+            if(j == 0) { continue; } // cont while (b). should not be shown (.dat file)
 
             strcpy(name, de->d_name);
 
-            if(j==2){ // .map file - remove the extension
+            if(j == 2) { // .map file - remove the extension
 
-               name[strlen(name)-$$EXT_LEN] = '\0';
+               name[strlen(name) - $$EXT_LEN] = '\0';
 
                // This is a map file.
                // Unless we have already seen this file, we need to load
                // the mapheader to see if it is nonexistent.
-               for(k=0; k<used; k++){
-                  if(strcmp(name, pathmark[k].path)==0){
+               for(k = 0; k < used; k++) {
+                  if(strcmp(name, pathmark[k].path) == 0) {
                      p = -1;
                      break; // break inner for (1)
                   }
                } // end inner for (1)
-               if(p==-1){ continue; } // cont while. If we've seen this file, go to the next file in the dir
+               if(p == -1) { continue; } // cont while. If we've seen this file, go to the next file in the dir
 
                // We haven't seen this file
                // we need to load the mapheader
                $dlogdbg("Directory listing: opening mapheader '%s'\n", fpath);
                fd = open(fpath, O_RDONLY);
-               if(fd == -1){
+               if(fd == -1) {
                   waserror = -errno;
                   $dlogdbg("Opening '%s' failed with %d = %s\n", fpath, -waserror, strerror(-waserror));
                   break; // break while (b)
                }
-               if((waserror = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0){
+               if((waserror = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0) {
                   $dlogdbg("mfd_load_mapheader failed with '%s'\n", strerror(-waserror));
                   close(fd); // cleanup
                   break; // break while (b)
                }
-               if(close(fd) != 0){
+               if(close(fd) != 0) {
                   waserror = -errno;
                   break; // break while (b)
                }
 
-               p=(maphead.exists == 1 ? 1:2);
+               p = (maphead.exists == 1 ? 1 : 2);
 
             }
 
-         }else{
+         } else {
 
             // In the main space, the names are names.
             strcpy(name, de->d_name);
-            
+
          }
 
-         if(p!=2){
-            
+         if(p != 2) {
+
             // Is it stored already?
-            if(p==0){
-               for(j=0; j<used; j++){
-                  if(strcmp(name, pathmark[j].path)==0){
+            if(p == 0) {
+               for(j = 0; j < used; j++) {
+                  if(strcmp(name, pathmark[j].path) == 0) {
                      p = -1;
                      break; // break inner for (2)
                   }
                } // end inner for (2)
-               if(p==-1){ continue; } // cont. while (b)
+               if(p == -1) { continue; } // cont. while (b)
             }
 
             // Get the stat
             struct stat st2; // TODO what does this mean here?
-            if(p==1){
+            if(p == 1) {
                memcpy(&st2, &(maphead.fstat), sizeof(struct stat));
-            }else{
+            } else {
                // Note: we also stat . and .. here, but all from the selected snapshot dir
-               if(lstat(fpath, &st2) != 0){
+               if(lstat(fpath, &st2) != 0) {
                   waserror = -errno;
                   break; // break while (b)
                }
@@ -225,18 +225,18 @@ static int $_sn_readdir(
                waserror = -ENOMEM;
                break; // break while (b)
             }
-            
+
          }
 
          // Store the name as seen, even if it was marked as nonexistent
 
          $dlogdbg("Name seen: '%s' p='%d' used='%d'\n", name, p, used);
 
-         if(used >= allocated){
+         if(used >= allocated) {
             // Allocate more memory
             allocated *= 2;
             pathmark2 = realloc(pathmark, allocated * sizeof(struct $pathmark_t));
-            if(pathmark2 == NULL){
+            if(pathmark2 == NULL) {
                waserror = -ENOMEM;
                break; // break while (b)
             }
@@ -248,12 +248,12 @@ static int $_sn_readdir(
 
       } // end while (b)
 
-      if(waserror != 0){ break; } // break for (a)
+      if(waserror != 0) { break; } // break for (a)
 
    } // end for (a)
 
    $dlogdbg("Directory listing complete with error %d = %s\n", -waserror, strerror(-waserror));
-   
+
    free(pathmark);
 
    return waserror;

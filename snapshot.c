@@ -59,9 +59,9 @@ static inline int $sn_filter_name(char *name)
    $$PATH_LEN_T plen;
 
    plen = strlen(name);
-   if(plen < $$EXT_LEN){ return 1; }
-   if(strcmp(name, $$EXT_HID)==0){ return 0; }
-   if(strcmp(name + plen - $$EXT_LEN, $$EXT_HID)==0){ return 0; }
+   if(plen < $$EXT_LEN) { return 1; }
+   if(strcmp(name, $$EXT_HID) == 0) { return 0; }
+   if(strcmp(name + plen - $$EXT_LEN, $$EXT_HID) == 0) { return 0; }
    return 1;
 }
 

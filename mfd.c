@@ -143,10 +143,10 @@ static inline int $mfd_filter_name(char *name)
    $$PATH_LEN_T plen;
 
    plen = strlen(name);
-   if(plen <= $$EXT_LEN){ return 1; }
+   if(plen <= $$EXT_LEN) { return 1; }
    name = name + plen - $$EXT_LEN;
-   if(strcmp(name, $$EXT_DAT)==0){ return 0; }
-   if(strcmp(name, $$EXT_MAP)==0){ return 2; }
+   if(strcmp(name, $$EXT_DAT) == 0) { return 0; }
+   if(strcmp(name, $$EXT_MAP) == 0) { return 2; }
    return 1;
 }
 
@@ -586,9 +586,9 @@ static int $mfd_get_sn_steps(
 
          // Successfully opened the directory
          mfd->sn_steps[i].dirfd = dirfd;
-         if(mfd->sn_first_file == -1){ mfd->sn_first_file = i; }
+         if(mfd->sn_first_file == -1) { mfd->sn_first_file = i; }
 
-      // FILE
+         // FILE
       } else if(flags & $$SN_STEPS_F_OPENFILE) {
 
          // Read the map file for a read directive
@@ -615,7 +615,7 @@ static int $mfd_get_sn_steps(
 
          // We save this here so that mfd_destroy_sn_steps would close it on error
          mfd->sn_steps[i].mapfd = fd;
-         if(mfd->sn_first_file == -1){ mfd->sn_first_file = i; }
+         if(mfd->sn_first_file == -1) { mfd->sn_first_file = i; }
 
          do {
 
