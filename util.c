@@ -40,17 +40,23 @@
  * strerror(errno)
  */
 
+/** Extracts and casts fsdata */
+#define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
+
+/** Defines, extracts and casts fsdata */
+#define $$DFSDATA struct $fsdata_t *fsdata; fsdata = $$FSDATA;
+
+/** Extracts and casts mfd */
+#define $$MFD ((struct $mfd_t *) fi->fh)
+
+/** Defines and extracts fsdata and mfd */
+#define $$DFSDATA_MFD struct $fsdata_t *fsdata; struct $mfd_t *mfd; fsdata = $$FSDATA; mfd = $$MFD;
+
 
 /** Sleeps. Needs struct timespec delay */
 #define $$SLEEP pselect(0, NULL, NULL, NULL, &delay, NULL);
 
 
-/** Extracta and casta fsdata */
-#define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )
-
-
-/** Defines, extracts and casts fsdata */
-#define $$DFSDATA struct $fsdata_t *fsdata; fsdata = $$FSDATA;
 
 
 /** Checks if (virtual) path is in the snapshot space */
@@ -202,6 +208,23 @@ static inline int $get_map_path(char *newpath, const char *oldpath)
    if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)) {
       strcpy(newpath, oldpath);
       strncat(newpath, $$EXT_MAP, $$EXT_LEN);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
+
+
+/** Adds the "dat" suffix to a path
+ *
+ * Returns:
+ * * 0 - success
+ * * -ENAMETOOLONG - if the new path is too long
+ */
+static inline int $get_dat_path(char *newpath, const char *oldpath)
+{
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN)) {
+      strcpy(newpath, oldpath);
+      strncat(newpath, $$EXT_DAT, $$EXT_LEN);
       return 0;
    }
    return -ENAMETOOLONG;

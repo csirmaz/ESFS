@@ -148,29 +148,32 @@ struct $mapheader_t {
 // TODO 2 To make FS files portable, the types used here should be reviewed, and proper (de)serialisation implemented.
 
 
-/** Don't open map files and don't follow read directives; open the paths as directories instead. */
-#define $$SN_STEPS_F_OPENDIR 2
-
-/** Open map files and follow read directives. */
+/** See $mfd_get_sn_steps */
 #define $$SN_STEPS_F_OPENFILE 1
+#define $$SN_STEPS_F_OPENDIR 2
+#define $$SN_STEPS_F_FIRSTONLY 4
+#define $$SN_STEPS_F_SKIPOPENDAT 8
 
 #define $$SN_STEPS_UNUSED -8
 #define $$SN_STEPS_NOTOPEN -9
+#define $$SN_STEPS_MAIN -7
 
 /** Filehandle struct extension for files in snapshots
  *
  * When dealing with a file in a snapshot:
  * * mfd->is_main is $$MFD_SN
- * * The mapheader from the specified snapshot is loaded into mfd->mapheader ( # TODO ???????????? )
  *
  * [C] = can also be:
  * * $$SN_STEPS_NOTOPEN = if the file has not been opened yet
  * * $$SN_STEPS_UNUSED = if the snapshot has no information about the file
+ *
+ * [D] = can also be:
+ * * $$SN_STEPS_MAIN = if the step represents a main file (index==0)
  */
 struct $sn_steps_t {
    char path[$$PATH_MAX]; /**< first the real path of the snapshot ID, then the file (or the main file) */
-   int mapfd; /**< filehandle to the map file[C] */
-   int datfd; /**< filehandle to the dat file[C] */
+   int mapfd; /**< filehandle to the map file[C,D] */
+   int datfd; /**< filehandle to the dat file[C] or the main file */
    DIR *dirfd; /**< handle to the open directory, or NULL */
 };
 
@@ -193,10 +196,11 @@ struct $sn_steps_t {
  */
 struct $mfd_t {
    int is_main; /**< $$MFD_MAIN if this is a main node; $$MFD_SN if this is a node in a snapshot; $$MFD_SNROOT if it is the snapshots dir */
+   struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory for main files, and from the first map file for snapshot files */
+
    // MAIN FILE PART: (used when dealing with a file in the main space)
    int mainfd; /**< filehandle for the main file */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
-   struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory */
    ino_t main_inode; /**< the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot. See $mfd_open_sn */
    int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
@@ -207,10 +211,6 @@ struct $mfd_t {
    int sn_first_file; /**< the largest index where the node can actually be found, or -1 if not found anywhere */
    struct $sn_steps_t *sn_steps; /**< data about each snapshot step, from the main file [0], the first snapshot [1], to the snapshot being read [sn_current] */
 };
-
-// CAST
-// TODO Are repeated accesses fast enough, or should we store this in a variable?
-#define $$MFD ((struct $mfd_t *) fi->fh)
 
 
 /** A path and a marker */

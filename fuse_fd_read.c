@@ -286,13 +286,10 @@ int $readdir(
    struct fuse_file_info *fi
 )
 {
-   struct $mfd_t *mfd;
    struct dirent *de;
-   $$DFSDATA
+   $$DFSDATA_MFD
 
    $dlogdbg("readdir(path=\"%s\", offset=%lld)\n", path, (long long int)offset);
-
-   mfd = $$MFD;
 
    switch(mfd->is_main) {
       case $$MFD_MAIN:
@@ -364,18 +361,24 @@ int $readdir(
  *
  * Introduced in version 2.5
  */
-// TODO Implement snapshots
-//   int (*fgetattr) (const char *, struct stat *, struct fuse_file_info *);
-// Since it's currently only called after bb_create(), and bb_create()
+// BBFS: Since it's currently only called after bb_create(), and bb_create()
 // opens the file, I ought to be able to just use the fd and ignore
 // the path...
 int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
+   $$DFSDATA_MFD
 
-   // log_msg("fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n", path, statbuf, fi);
+   $dlogdbg("fgetattr(path=\"%s\", is_main='%d' mainfd='%d')\n", path, mfd->is_main, mfd->mainfd);
 
-   if(fstat($$MFD->mainfd, statbuf) == 0) { return 0; }
-   return -errno;
+   if(mfd->is_main != $$MFD_SN){
+      if(fstat(mfd->mainfd, statbuf) == 0) { return 0; }
+      return -errno;
+   }
+
+   // In snapshot -- but if this is only really called after create(),
+   // this will never happen.
+   memcpy(statbuf, &(mfd->mapheader.fstat), sizeof(struct stat));
+   return 0;
 }
 
 

@@ -41,16 +41,41 @@
 * ignored.  The 'st_ino' field is ignored except if the 'use_ino'
 * mount option is given.
 */
-// TODO Implement snapshots
-//   int (*getattr) (const char *, struct stat *);
 int $getattr(const char *path, struct stat *statbuf)
 {
-   $$ALL_PATHS // TODO
+   struct $mfd_t mfd;
+   $$IF_PATH_SN
 
-   $dlogdbg("  getattr(path=\"%s\")\n", path);
+   if(snpath->is_there != $$SNPATH_FULL){
+      
+      $dlogdbg("  getattr.sn.root/id(path=\"%s\")\n", path);
+      if(lstat(fpath, statbuf) == 0) {
+         snret = 0;
+      }else{
+         snret =  -errno;
+      }
+      
+   }else{
+
+      $dlogdbg("  getattr.sn.full(path=\"%s\")\n", path);
+      if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata, $$SN_STEPS_F_OPENFILE | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT)) != 0)) {
+         $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
+      }else{
+         memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
+         $dlogdbg("getattr.sn.full successful\n");
+         snret = 0;
+      }
+
+   }
+
+   $$ELIF_PATH_MAIN
+
+   $dlogdbg("  getattr.main(path=\"%s\")\n", path);
 
    if(lstat(fpath, statbuf) == 0) { return 0; }
    return -errno;
+
+   $$FI_PATH
 }
 
 
