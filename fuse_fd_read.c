@@ -370,7 +370,7 @@ int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 
    $dlogdbg("fgetattr(path=\"%s\", is_main='%d' mainfd='%d')\n", path, mfd->is_main, mfd->mainfd);
 
-   if(mfd->is_main != $$MFD_SN){
+   if(mfd->is_main != $$MFD_SN) {
       if(fstat(mfd->mainfd, statbuf) == 0) { return 0; }
       return -errno;
    }

@@ -146,7 +146,7 @@
    } \
    strcpy(newpath, fix); \
    strncat(newpath, oldpath, plen); \
-
+ 
 
 // TODO Use get_hid_path, get_map_path instead
 /** Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)

@@ -46,21 +46,21 @@ int $getattr(const char *path, struct stat *statbuf)
    struct $mfd_t mfd;
    $$IF_PATH_SN
 
-   if(snpath->is_there != $$SNPATH_FULL){
-      
+   if(snpath->is_there != $$SNPATH_FULL) {
+
       $dlogdbg("  getattr.sn.root/id(path=\"%s\")\n", path);
       if(lstat(fpath, statbuf) == 0) {
          snret = 0;
-      }else{
+      } else {
          snret =  -errno;
       }
-      
-   }else{
+
+   } else {
 
       $dlogdbg("  getattr.sn.full(path=\"%s\")\n", path);
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata, $$SN_STEPS_F_OPENFILE | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT)) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
-      }else{
+      } else {
          memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
          $dlogdbg("getattr.sn.full successful\n");
          snret = 0;

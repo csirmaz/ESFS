@@ -511,7 +511,7 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
  * * $$SN_STEPS_F_OPENFILE | $$SN_STEPS_F_OPENDIR -- depending on the expected file types
  * * $$SN_STEPS_F_FIRSTONLY -- stop after the first file found
  * * $$SN_STEPS_F_SKIPOPENDAT -- skip opening the dat files and the main file
- * 
+ *
  * Sets:
  * * mfd->sn_current - index of the selected snapshot
  * * mfd->sn_first_file - index of the first snapshot with information about the file
@@ -593,13 +593,13 @@ static int $mfd_get_sn_steps(
          mfd->sn_steps[sni].dirfd = dirfd;
          if(mfd->sn_first_file == -1) {
             mfd->sn_first_file = sni;
-            if(flags & $$SN_STEPS_F_FIRSTONLY){ break; }            
+            if(flags & $$SN_STEPS_F_FIRSTONLY) { break; }
          }
 
          // FILE
       } else if(flags & $$SN_STEPS_F_OPENFILE) {
 
-         if(sni > 0){ // in a snapshot
+         if(sni > 0) { // in a snapshot
 
             // Read the map file for a read directive
             if(unlikely((ret = $get_map_path(mysnpath, mfd->sn_steps[sni].path)) != 0)) {
@@ -640,12 +640,12 @@ static int $mfd_get_sn_steps(
             } while(0);
 
             // Open the dat file
-            if(flags & $$SN_STEPS_F_SKIPOPENDAT){
+            if(flags & $$SN_STEPS_F_SKIPOPENDAT) {
 
                mfd->sn_steps[sni].datfd = $$SN_STEPS_NOTOPEN;
 
-            }else{
-               
+            } else {
+
                if(unlikely((ret = $get_dat_path(mysnpath, mfd->sn_steps[sni].path)) != 0)) {
                   waserror = ret;
                   break;
@@ -667,19 +667,19 @@ static int $mfd_get_sn_steps(
 
                // We save this here so that mfd_destroy_sn_steps would close it on error
                mfd->sn_steps[sni].datfd = fd;
-               
+
             }
 
-         }else{ // a main file
+         } else { // a main file
 
             mfd->sn_steps[sni].mapfd = $$SN_STEPS_MAIN;
 
-            if(flags & $$SN_STEPS_F_SKIPOPENDAT){
+            if(flags & $$SN_STEPS_F_SKIPOPENDAT) {
 
                mfd->sn_steps[sni].datfd = $$SN_STEPS_NOTOPEN;
 
-            }else{
-               
+            } else {
+
                // Try to open the file
                $dlogdbg("opening the main file '%s'\n", mfd->sn_steps[sni].path);
                fd = open(mfd->sn_steps[sni].path, O_RDONLY);
@@ -704,19 +704,19 @@ static int $mfd_get_sn_steps(
 
          if(mfd->sn_first_file == -1) { // first existing file found
             mfd->sn_first_file = sni;
-            if(sni>0){
+            if(sni > 0) {
                // Save the mapheader from the first map file found
                $dlogdbg("stating: saving the map header\n");
                memcpy(&(mfd->mapheader), &maphead, sizeof(struct $mapheader_t));
-            }else{
+            } else {
                // stat the main file as well
-               $dlogdbg("stating the main file '%s'\n",mfd->sn_steps[sni].path);
-               if(unlikely(lstat(mfd->sn_steps[sni].path, &(mfd->mapheader.fstat)) != 0)){
+               $dlogdbg("stating the main file '%s'\n", mfd->sn_steps[sni].path);
+               if(unlikely(lstat(mfd->sn_steps[sni].path, &(mfd->mapheader.fstat)) != 0)) {
                   waserror = -errno;
                   break;
                }
             }
-            if(flags & $$SN_STEPS_F_FIRSTONLY){ break; }
+            if(flags & $$SN_STEPS_F_FIRSTONLY) { break; }
          }
 
       } else {
