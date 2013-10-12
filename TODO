@@ -1,17 +1,13 @@
 
-** Variable declaration in loop?
-** Why don't dat files get created?
-
-
 ** move logic from rename into mfd.c
+
+** implement reading data from snapshots
 
 * Add locking around recursive remove
 
 * Can creating directories & cleaning them up conflict with other threads?
    (Different files will use different locks.)
    Can mkpath conflict with itself?
-
-* Add plan to list directories in snapshots
 
 * Add locking around open, truncate, unlink
 - that is, ensure when we read the map file (existence) or the map header,

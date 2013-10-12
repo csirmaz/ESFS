@@ -208,12 +208,9 @@ static int $_sn_readdir(
             }
 
             // Get the stat
-            struct stat st2; // TODO what does this mean here?
-            if(p == 1) {
-               memcpy(&st2, &(maphead.fstat), sizeof(struct stat));
-            } else {
+            if(p != 1) {
                // Note: we also stat . and .. here, but all from the selected snapshot dir
-               if(lstat(fpath, &st2) != 0) {
+               if(lstat(fpath, &(maphead.fstat)) != 0) {
                   waserror = -errno;
                   break; // break while (b)
                }
@@ -221,7 +218,7 @@ static int $_sn_readdir(
 
             // Give the data to FUSE
             $dlogdbg(" - '%s'\n", name);
-            if(filler(buf, name, &st2, 0) != 0) {
+            if(filler(buf, name, &(maphead.fstat), 0) != 0) {
                waserror = -ENOMEM;
                break; // break while (b)
             }
