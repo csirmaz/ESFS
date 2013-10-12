@@ -505,7 +505,7 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
 
 
 /** Sets up mfd->sn_steps for a path inside a snapshot.
- * Can also open the map files.
+ * Can also open the map, dat, main files and directories.
  *
  * Flags:
  * * $$SN_STEPS_F_FILE | $$SN_STEPS_F_DIR | $$SN_STEPS_F_TYPE_UNKNOWN -- what type to expect

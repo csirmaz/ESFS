@@ -63,8 +63,12 @@ int $getattr(const char *path, struct stat *statbuf)
          )) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
-         memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
-         $dlogdbg("getattr.sn.full successful\n");
+         if(mfd.sn_first_file == -1){
+            snret = -ENOENT;
+         }else{
+            memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
+            $dlogdbg("getattr.sn.full successful\n");
+         }
       }
 
    }
@@ -91,16 +95,92 @@ int $getattr(const char *path, struct stat *statbuf)
  *
  * Introduced in version 2.5
  */
-// TODO Implement snapshots
-//   int (*access) (const char *, int);
 int $access(const char *path, int mask)
 {
-   $$ALL_PATHS // TODO
+   struct $mfd_t mfd;
+   int p;
+   mode_t filemode;
+   $$IF_PATH_SN
 
-   $dlogdbg("  access(path=\"%s\", mask=0%o)\n", path, mask);
+   do{
+
+      if(snpath->is_there != $$SNPATH_FULL) {
+
+         $dlogdbg("  access.sn.root(path=\"%s\", mask=0%o)\n", path, mask);
+         if(access(fpath, mask) == 0){
+            snret = 0;
+         } else {
+            snret =  -errno;
+         }
+         break;
+
+      }
+
+      $dlogdbg("  access.sn.full(path=\"%s\", mask=0%o)\n", path, mask);
+         
+      if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
+            $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
+         )) != 0)) {
+         $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
+         break;
+      }
+
+      // WARNING: access dereferences symbolic links - if we support them,
+      // the following logic needs to be changed.
+      // Interpret the mask
+
+      // No file found anywhere, or the map file says the file doesn't exist (the mapheader is not loaded if we're looking at the main file)
+      if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)){
+         snret = -ENOENT;
+         break;
+      }
+
+      if(mask == F_OK){
+         // Question is the existence of the file
+         snret = 0;
+         break;
+      }
+            
+      // mask is a real mask
+
+      /* access: The  check  is  done using the calling process's *real* UID and GID, rather than the effective IDs
+         * as is done when actually attempting an operation
+         * (e.g., open(2)) on the file.  This allows set-user-ID programs to easily determine the invoking user's authority.
+         * If the calling process is privileged (i.e., its real UID is zero), then an X_OK check is successful
+         * for a regular file if execute  permission  is
+         * enabled for any of the file owner, group, or other.
+         */
+
+      // This is the snapshot area: write permission is never granted.
+      if(mask & W_OK){
+         snret = -EACCES;
+         break;
+      }
+
+      // TODO 2 This permission checking is incomplete:
+      // We only check the 'user' and 'other' bits.
+      filemode = mfd.mapheader.fstat.st_mode;
+      p=1;
+      if(getuid() == mfd.mapheader.fstat.st_uid){
+         if((mask & R_OK) && (!(S_IRUSR & filemode))){ p = 0; }
+         if((mask & X_OK) && (!(S_IXUSR & filemode))){ p = 0; }
+      }else{
+         if((mask & R_OK) && (!(S_IROTH & filemode))){ p = 0; }
+         if((mask & X_OK) && (!(S_IXOTH & filemode))){ p = 0; }
+      }
+
+      snret = (p==1?0:-EACCES);
+
+   }while(0);
+
+   $$ELIF_PATH_MAIN
+
+   $dlogdbg("  access.main(path=\"%s\", mask=0%o)\n", path, mask);
 
    if(access(fpath, mask) == 0) { return 0; }
    return -errno;
+
+   $$FI_PATH
 }
 
 

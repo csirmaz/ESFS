@@ -1,6 +1,4 @@
 
-** move logic from rename into mfd.c
-
 ** implement reading data from snapshots
 
 * Add locking around recursive remove
