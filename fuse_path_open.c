@@ -63,29 +63,29 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    $$IF_PATH_SN
 
-   do{
+   do {
 
-      if(snpath->is_there != $$SNPATH_FULL){
+      if(snpath->is_there != $$SNPATH_FULL) {
          snret = -EACCES;
          break;
       }
-      
+
       mfd = malloc(sizeof(struct $mfd_t));
       if(mfd == NULL) {
          snret =  -ENOMEM;
          break;
       }
 
-      if((snret = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_FILE)) != 0){
+      if((snret = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_FILE)) != 0) {
          free(mfd);
          break;
       }
-      
+
       mfd->is_main = $$MFD_SN;
       fi->fh = (intptr_t) mfd;
       snret = 0;
-      
-   }while(0);
+
+   } while(0);
 
    $$ELIF_PATH_MAIN
 

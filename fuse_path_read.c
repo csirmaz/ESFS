@@ -64,7 +64,7 @@ int $getattr(const char *path, struct stat *statbuf)
                                             )) != 0)) {
          $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
-         
+
          if(mfd.sn_first_file == -1) {
             snret = -ENOENT;
          } else {
@@ -73,8 +73,8 @@ int $getattr(const char *path, struct stat *statbuf)
          }
 
          ret = $mfd_destroy_sn_steps(&mfd, fsdata);
-         if(snret == 0){ snret = ret; }
-         
+         if(snret == 0) { snret = ret; }
+
       }
 
    }
@@ -135,7 +135,7 @@ int $access(const char *path, int mask)
       // the following logic needs to be changed.
       // Interpret the mask
 
-      do{
+      do {
 
          // No file found anywhere, or the map file says the file doesn't exist (the mapheader is not loaded if we're looking at the main file)
          if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)) {
@@ -179,10 +179,10 @@ int $access(const char *path, int mask)
 
          snret = (p == 1 ? 0 : -EACCES);
 
-      }while(0);
+      } while(0);
 
       p = $mfd_destroy_sn_steps(&mfd, fsdata);
-      if(snret==0){ snret = p; }
+      if(snret == 0) { snret = p; }
 
    } while(0);
 

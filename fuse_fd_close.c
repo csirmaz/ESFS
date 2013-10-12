@@ -100,10 +100,10 @@ int $release(const char *path, struct fuse_file_info *fi)
       ret = $mfd_close_sn(mfd);
       if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
 
-   }else{
+   } else {
 
       ret = $mfd_destroy_sn_steps(mfd, fsdata);
-      
+
    }
 
    free(mfd);
