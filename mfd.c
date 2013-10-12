@@ -131,6 +131,26 @@
  */
 
 
+/** Returns if a filename in a snapshot should be presented, and if yes, how.
+ *
+ * Returns:
+ * 0 - if the file is internal, and should not be shown
+ * 1 - if the file should be shown (directories)
+ * 2 - if the file should be shown, but without the last $$EXT_LEN characters
+ */
+static inline int $mfd_filter_name(char *name)
+{
+   $$PATH_LEN_T plen;
+
+   plen = strlen(name);
+   if(plen <= $$EXT_LEN){ return 1; }
+   name = name + plen - $$EXT_LEN;
+   if(strcmp(name, $$EXT_DAT)==0){ return 0; }
+   if(strcmp(name, $$EXT_MAP)==0){ return 2; }
+   return 1;
+}
+
+
 /** Write the map header to the map file
  *
  * Returns:
@@ -546,6 +566,7 @@ static int $mfd_get_sn_steps(
 
       $dlogdbg("sn_step %d: '%s'\n", i, s);
 
+      // DIRECTORY
       if(flags & $$SN_STEPS_F_OPENDIR) {
 
          // Try to open the directory
@@ -567,6 +588,7 @@ static int $mfd_get_sn_steps(
          mfd->sn_steps[i].dirfd = dirfd;
          if(mfd->sn_first_file == -1){ mfd->sn_first_file = i; }
 
+      // FILE
       } else if(flags & $$SN_STEPS_F_OPENFILE) {
 
          // Read the map file for a read directive

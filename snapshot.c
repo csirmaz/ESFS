@@ -47,6 +47,25 @@
  * All these pointers contain the real paths to the snapshot roots: "ROOT/snapshots/<ID>"
  */
 
+
+/** Filters out internal names in the /snapshots/ dir
+ *
+ * Returns:
+ * 1 - if the name should be shown
+ * 0 - if the name is internal
+ */
+static inline int $sn_filter_name(char *name)
+{
+   $$PATH_LEN_T plen;
+
+   plen = strlen(name);
+   if(plen < $$EXT_LEN){ return 1; }
+   if(strcmp(name, $$EXT_HID)==0){ return 0; }
+   if(strcmp(name + plen - $$EXT_LEN, $$EXT_HID)==0){ return 0; }
+   return 1;
+}
+
+
 /** Creates the snapshot dir if necessary.
  *
  * Returns

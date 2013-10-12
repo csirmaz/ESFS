@@ -44,9 +44,8 @@
 
 // Logging
 // -------
-#define $log(...) log_msg(__VA_ARGS__)
-#define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__) // debug messages
-#define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__) // important log lines
+#define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__);fflush(fsdata->logfile) // debug messages
+#define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__);fflush(fsdata->logfile) // important log lines
 
 
 // Constants
@@ -161,13 +160,12 @@ struct $mapheader_t {
 /** Filehandle struct extension for files in snapshots
  *
  * When dealing with a file in a snapshot:
- * * mfd->is_main is 0
- * * The mapheader from the specified snapshot is loaded into mfd->mapheader
+ * * mfd->is_main is $$MFD_SN
+ * * The mapheader from the specified snapshot is loaded into mfd->mapheader ( # TODO ???????????? )
  *
  * [C] = can also be:
  * * $$SN_STEPS_NOTOPEN = if the file has not been opened yet
  * * $$SN_STEPS_UNUSED = if the snapshot has no information about the file
- * * $$SN_STEPS_ISDIR = the directory handle is valid
  */
 struct $sn_steps_t {
    char path[$$PATH_MAX]; /**< first the real path of the snapshot ID, then the file (or the main file) */
@@ -214,5 +212,10 @@ struct $mfd_t {
 // TODO Are repeated accesses fast enough, or should we store this in a variable?
 #define $$MFD ((struct $mfd_t *) fi->fh)
 
+
+/** A path and a marker */
+struct $pathmark_t {
+   char path[$$PATH_MAX];
+};
 
 #endif

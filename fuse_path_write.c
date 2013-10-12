@@ -92,6 +92,7 @@ int $rmdir(const char *path)
    $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
 
    if(snpath->is_there != $$SNPATH_ROOT) {
+      $dlogdbg("Bad path\n");
       snret = -EFAULT;
    } else {
       snret = $sn_destroy(fsdata);

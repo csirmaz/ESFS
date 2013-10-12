@@ -1,7 +1,9 @@
 
-** move logic from rename into mfd.c
+** Variable declaration in loop?
+** Why don't dat files get created?
 
-** Implement reading dirs from sn_steps in fuse_fd_read
+
+** move logic from rename into mfd.c
 
 * Add locking around recursive remove
 
