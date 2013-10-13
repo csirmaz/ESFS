@@ -64,7 +64,7 @@
 
 #include "types_c.h"
 
-#include "log_c.h"
+#include "log_c.c"
 
 #include "util_c.c"
 #include "snapshot_c.c"
@@ -95,8 +95,9 @@
 //   int (*statfs) (const char *, struct statvfs *);
 int $statfs(const char *path, struct statvfs *statv)
 {
-   // log_msg("\nstatfs(path=\"%s\", statv=0x%08x)\n", path, statv);
    $$IF_PATH_MAIN_ONLY
+
+   $dlogdbg("statfs(path=\"%s\")\n", path);
 
    // get stats for underlying filesystem
    if( statvfs(fpath, statv) == 0){ return 0; }

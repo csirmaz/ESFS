@@ -69,7 +69,7 @@ int $mkdir(const char *path, mode_t mode)
 
    $$ELIF_PATH_MAIN
 
-   log_msg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+   $dlogdbg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
    // TODO mark dir as nonexistent in snapshot
 
@@ -100,7 +100,7 @@ int $rmdir(const char *path)
 
    $$ELIF_PATH_MAIN
 
-   // log_msg("rmdir(path=\"%s\")\n", path);
+   $dlogdbg("rmdir(path=\"%s\")\n", path);
    if(rmdir(fpath) == 0) { return 0; }
    return -errno;
 
@@ -459,7 +459,7 @@ int $setxattr(const char *path, const char *name, const char *value, size_t size
 
    /*
    $$IF_PATH_MAIN_ONLY
-   log_msg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
+   logmsg("\nsetxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n", path, name, value, size, flags);
    if(lsetxattr(fpath, name, value, size, flags) == 0){ return 0; }
    return -errno;
    */
@@ -487,7 +487,7 @@ int $removexattr(const char *path, const char *name)
 
    /*
    $$IF_PATH_MAIN_ONLY
-   log_msg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
+   logmsg("\nremovexattr(path=\"%s\", name=\"%s\")\n", path, name);
    if(lremovexattr(fpath, name) == 0){ return 0; }
    return -errno;
    */

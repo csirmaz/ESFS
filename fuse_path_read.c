@@ -244,7 +244,7 @@ int $getxattr(const char *path, const char *name, char *value, size_t size)
 
    /*
    $$IF_PATH_MAIN_ONLY
-   log_msg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
+   logmsg("\ngetxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n", path, name, value, size);
    if(lgetxattr(fpath, name, value, size) == 0){ return 0; }
    return -errno;
    */
@@ -259,7 +259,7 @@ int $listxattr(const char *path, char *list, size_t size)
 
    /*
    $$IF_PATH_MAIN_ONLY
-   log_msg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
+   logmsg("listxattr(path=\"%s\", list=0x%08x, size=%d)\n", path, list, size);
    if( llistxattr(fpath, list, size) == 0){ return 0; }
    return -errno;
    */

@@ -1,14 +1,11 @@
 use strict;
 
 my $m = <<THEEND
-esfs : esfs_c.o log_c.o
-	gcc -O3 -o esfs esfs_c.o log_c.o `pkg-config fuse --libs`
+esfs : esfs_c.o
+	gcc -O3 -o esfs esfs_c.o `pkg-config fuse --libs`
 
-esfs_c.o : esfs_c.c log_c.h params_c.h types_c.h snapshot_c.c mfd_c.c block_c.c util_c.c mflock_c.c stat_c.c fuse_fd_close_c.c fuse_fd_read_c.c fuse_fd_write_c.c fuse_path_open_c.c fuse_path_read_c.c fuse_path_write_c.c
+esfs_c.o : esfs_c.c log_c.c params_c.h types_c.h snapshot_c.c mfd_c.c block_c.c util_c.c mflock_c.c stat_c.c fuse_fd_close_c.c fuse_fd_read_c.c fuse_fd_write_c.c fuse_path_open_c.c fuse_path_read_c.c fuse_path_write_c.c
 	gcc -O3 -Wall `pkg-config fuse --cflags` -c esfs_c.c
-
-log_c.o : log_c.c log_c.h params_c.h
-	gcc -O3 -Wall `pkg-config fuse --cflags` -c log_c.c
 
 THEEND
 ;

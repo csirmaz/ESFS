@@ -38,6 +38,60 @@
  */
 
 
+
+/** A logging function from BBFS, for reference.
+ */
+
+//  macro to log fields in structs.
+#define log_struct(st, field, format, typecast) \
+  log_msg("    " #field " = " #format "\n", typecast st->field)
+
+// struct fuse_file_info keeps information about files (surprise!).
+// This dumps all the information in a struct fuse_file_info.  The struct
+// definition, and comments, come from /usr/include/fuse/fuse_common.h
+// Duplicated here for convenience.
+void log_fi (struct fuse_file_info *fi)
+{
+    /** Open flags.  Available in open() and release() */
+    //   int flags;
+   log_struct(fi, flags, 0x%08x, );
+
+    /** Old file handle, don't use */
+    //   unsigned long fh_old;
+   log_struct(fi, fh_old, 0x%08lx,  );
+
+    /** In case of a write operation indicates if this was caused by a
+        writepage */
+    //   int writepage;
+   log_struct(fi, writepage, %d, );
+
+    /** Can be filled in by open, to use direct I/O on this file.
+        Introduced in version 2.4 */
+    //   unsigned int keep_cache : 1;
+   log_struct(fi, direct_io, %d, );
+
+    /** Can be filled in by open, to indicate, that cached file data
+        need not be invalidated.  Introduced in version 2.4 */
+    //   unsigned int flush : 1;
+   log_struct(fi, keep_cache, %d, ); // TODO Check if this would be useful
+
+    /** Padding.  Do not use*/
+    //   unsigned int padding : 29;
+
+    /** File handle.  May be filled in by filesystem in open().
+        Available in all other file operations */
+    //   uint64_t fh;
+   log_struct(fi, fh, 0x%016llx,  );
+
+    /** Lock owner id.  Available in locking operations and flush */
+    //  uint64_t lock_owner;
+   log_struct(fi, lock_owner, 0x%016llx, );
+};
+
+
+
+
+
    /** Change the access and/or modification times of a file
     *
     * Deprecated, use utimens() instead.

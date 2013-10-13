@@ -62,8 +62,9 @@
 //   int (*flush) (const char *, struct fuse_file_info *);
 int $flush(const char *path, struct fuse_file_info *fi)
 {
+   $$DFSDATA_MFD
 
-   log_msg("flush(path=\"%s\", fi=0x%08x)\n", path, fi);
+   $dlogdbg("flush(path=\"%s\")\n", path);
 
    // TODO THIS IS IGNORED
 
@@ -126,8 +127,9 @@ int $release(const char *path, struct fuse_file_info *fi)
 //   int (*fsync) (const char *, int, struct fuse_file_info *);
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
+   $$DFSDATA_MFD
 
-   log_msg("fsync(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
+   $dlogdbg("fsync(path=\"%s\", datasync=%d)\n", path, datasync);
 
    if(datasync) {
       if(fdatasync($$MFD->mainfd) == 0) { return 0; } // TODO sync other files
@@ -185,8 +187,9 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 // happens to be a directory? ???
 int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
+   $$DFSDATA_MFD
 
-   log_msg("fsyncdir(path=\"%s\", datasync=%d, fi=0x%08x)\n", path, datasync, fi);
+   $dlogdbg("fsyncdir(path=\"%s\", datasync=%d)\n", path, datasync);
 
    // TODO This is ignored
 
