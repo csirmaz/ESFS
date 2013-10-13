@@ -1,5 +1,4 @@
 
-* Delete $$MFD_MAINLIKE, PATH_ALL
 * Error "cat mnt/snapshots/1/a"
 * When opening sn file, check open flags
 * Add sn_id t fsdata and mfd; new mfd method should check this and reopen map/dat

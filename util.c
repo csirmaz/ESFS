@@ -135,18 +135,6 @@ FILE *log_open()
    return -EFAULT;
 
 
-// Use this to allow the operation everywhere.
-// TODO Later, replace this with something that hides .hid files
-// and deals with .dat extensions on non-directories.
-// Uses path; Defines fpath, fsdata
-#define $$ALL_PATHS \
-   char fpath[$$PATH_MAX]; \
-   $$DFSDATA \
-   switch($map_path(fpath, path, fsdata)){ \
-      case -ENAMETOOLONG : return -ENAMETOOLONG; \
-   }
-
-
 // TODO Check where these are used, and simplify them!
 /** Adds a prefix to a path (MAY RETURN)
  *
