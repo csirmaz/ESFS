@@ -58,7 +58,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 
    $dlogdbg("read(path=\"%s\")\n", path);
 
-   if(mfd->is_main == $$mfd_main){
+   if(mfd->is_main == $$mfd_main) {
 
       ret = pread($$MFD->mainfd, buf, size, offset);
       if(ret >= 0) { return ret; }
@@ -66,7 +66,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 
    }
 
-   if(mfd->is_main == $$mfd_sn_full){
+   if(mfd->is_main == $$mfd_sn_full) {
 
       return $b_read(buf, fsdata, mfd, size, offset);
 
@@ -119,9 +119,9 @@ static int $_sn_readdir(
       return -ENOMEM;
    }
 
-   if(flags & $$READDIR_F_SKIP_SNROOT){
+   if(flags & $$READDIR_F_SKIP_SNROOT) {
       strcpy(fpath, $$SNDIR);
-      strcpy(pathmark[used].path, fpath+1);
+      strcpy(pathmark[used].path, fpath + 1);
       used++;
    }
 

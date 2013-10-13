@@ -104,10 +104,10 @@ int $release(const char *path, struct fuse_file_info *fi)
       ret = $mfd_destroy_sn_steps(mfd, fsdata);
 
    } else {
-      
+
       $dlogi("Wrong is_main!\n");
       ret = -EBADE;
-      
+
    }
 
    free(mfd);
