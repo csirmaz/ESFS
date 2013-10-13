@@ -36,9 +36,25 @@
 
 // This file contains low-level tools.
 
-/* USEFUL
- * strerror(errno)
- */
+
+FILE *log_open()
+{
+   FILE *logfile;
+
+   // very first thing, open up the logfile and mark that we got in
+   // here.  If we can't open the logfile, we're dead.
+   logfile = fopen("esfs.log", "w");
+   if(logfile == NULL) {
+      perror("logfile");
+      exit(EXIT_FAILURE);
+   }
+
+   // set logfile to line buffering
+   setvbuf(logfile, NULL, _IOLBF, 0);
+
+   return logfile;
+}
+
 
 /** Extracts and casts fsdata */
 #define $$FSDATA ((struct $fsdata_t *) fuse_get_context()->private_data )

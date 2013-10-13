@@ -64,8 +64,6 @@
 
 #include "types_c.h"
 
-#include "log_c.c"
-
 #include "util_c.c"
 #include "snapshot_c.c"
 #include "mfd_c.c"
