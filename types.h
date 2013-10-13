@@ -154,13 +154,13 @@ struct $mapheader_t {
 
 
 /** See $mfd_get_sn_steps */
-#define $$SN_STEPS_F_FILE 1
-#define $$SN_STEPS_F_DIR 2
-#define $$SN_STEPS_F_TYPE_UNKNOWN 4
-#define $$SN_STEPS_F_FIRSTONLY 8
-#define $$SN_STEPS_F_SKIPOPENDAT 16
-#define $$SN_STEPS_F_SKIPOPENDIR 32
-#define $$SN_STEPS_F_STATDIR 64
+#define $$SN_STEPS_F_FILE           00000001
+#define $$SN_STEPS_F_DIR            00000002
+#define $$SN_STEPS_F_TYPE_UNKNOWN   00000004
+#define $$SN_STEPS_F_FIRSTONLY      00000010
+#define $$SN_STEPS_F_SKIPOPENDAT    00000020
+#define $$SN_STEPS_F_SKIPOPENDIR    00000040
+#define $$SN_STEPS_F_STATDIR        00000100
 
 #define $$SN_STEPS_UNUSED -8
 #define $$SN_STEPS_NOTOPEN -9

@@ -63,11 +63,18 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    $$IF_PATH_SN
 
-   $dlogdbg("* open.sn path='%s'\n", path);
+   flags = fi->flags;
+
+   $dlogdbg("* open.sn path='%s' flags= '%d'\n", path, flags);
 
    do {
 
-      if(snpath->is_there != $$snpath_full) {
+      if((flags & O_ACCMODE) != O_RDONLY){
+         snret = -EACCES;
+         break;
+      }
+
+      if(snpath->is_there != $$snpath_full) { // We cannot open the snapshot roots
          snret = -EACCES;
          break;
       }
@@ -99,13 +106,9 @@ int $open(const char *path, struct fuse_file_info *fi)
    do {
       flags = fi->flags;
 
-      $dlogdbg("  open.main(%s, %s %s %s %s)\n", fpath,
-               ((flags & O_TRUNC) > 0) ? "TRUNC" : "",
-               ((flags & O_RDWR) > 0) ? "RDWR" : "",
-               ((flags & O_RDONLY) > 0) ? "RD" : "",
-               ((flags & O_WRONLY) > 0) ? "WR" : "");
+      $dlogdbg("  open.main path='%s' flags='%d'\n", fpath, flags);
 
-      if((flags & O_WRONLY) == 0 && (flags & O_RDWR) == 0) { // opening for read-only
+      if((flags & O_ACCMODE) == O_RDONLY) { // opening for read-only
 
          $mfd_open_sn_rdonly(mfd);
 
