@@ -169,7 +169,7 @@ static int $sn_get_paths_to(struct $mfd_t *mfd, const struct $snpath_t *snpath, 
    char mysnroot[$$PATH_MAX];
 
    // Get the real snapshot path we'll be comparing to
-   if(snpath->is_there == $$SNPATH_ROOT) {
+   if(snpath->is_there == $$snpath_root) {
       $dlogdbg("Attempted to list something outside a snapshot\n");
       return -EFAULT;
    }

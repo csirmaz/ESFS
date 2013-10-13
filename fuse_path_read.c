@@ -47,7 +47,7 @@ int $getattr(const char *path, struct stat *statbuf)
    int ret;
    $$IF_PATH_SN
 
-   if(snpath->is_there != $$SNPATH_FULL) {
+   if(snpath->is_there != $$snpath_full) {
 
       $dlogdbg("  getattr.sn.root/id(path=\"%s\")\n", path);
       if(lstat(fpath, statbuf) == 0) {
@@ -110,7 +110,7 @@ int $access(const char *path, int mask)
 
    do {
 
-      if(snpath->is_there != $$SNPATH_FULL) {
+      if(snpath->is_there != $$snpath_full) {
 
          $dlogdbg("  access.sn.root(path=\"%s\", mask=0%o)\n", path, mask);
          if(access(fpath, mask) == 0) {

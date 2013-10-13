@@ -65,7 +65,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    do {
 
-      if(snpath->is_there != $$SNPATH_FULL) {
+      if(snpath->is_there != $$snpath_full) {
          snret = -EACCES;
          break;
       }
@@ -286,7 +286,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
       do {
 
          // If we're opening the main /snapshots/ directory
-         if(snpath->is_there == $$SNPATH_ROOT) {
+         if(snpath->is_there == $$snpath_root) {
 
             dp = opendir(fpath);
             if(unlikely(dp == NULL)) {
@@ -316,7 +316,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
             break;
          }
 
-         mfd->is_main = (snpath->is_there == $$SNPATH_FULL ? $$mfd_sn_full : $$mfd_sn_id);
+         mfd->is_main = (snpath->is_there == $$snpath_full ? $$mfd_sn_full : $$mfd_sn_id);
          fi->fh = (intptr_t) mfd;
 
       } while(0);

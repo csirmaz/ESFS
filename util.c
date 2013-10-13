@@ -266,9 +266,9 @@ static inline int $map_path(char *fpath, const char *path, const struct $fsdata_
  * For example: "/snapshots/ID/dir/dir/file"
  *
  * Returns snpath->is_there:
- * * 0 - if the string is "/snapshots" or "/snapshots?" (from $$_IS_PATH_IN_SN we'll know that ?='/') or "/snapshots//"
- * * 1 - if the string is "/snapshots/ID($|/)"
- * * 2 - if the string is "/snapshots/ID/..."
+ * * $$snpath_root - if the string is "/snapshots" or "/snapshots?" (from $$_IS_PATH_IN_SN we'll know that ?='/') or "/snapshots//"
+ * * $$snpath_id - if the string is "/snapshots/ID($|/)"
+ * * $$snpath_full - if the string is "/snapshots/ID/..."
  */
 static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 {
@@ -280,7 +280,7 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
    len = strlen(path);
    // we know the string starts with "/snapshots"
    if(len <= $$SNDIR_LEN + 1) { // the string is "/snapshots" or "/snapshots?"
-      snpath->is_there = $$SNPATH_ROOT;
+      snpath->is_there = $$snpath_root;
       return 0;
    }
 
@@ -288,18 +288,18 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
    nextslash = strchr(idstart + 1, $$DIRSEPCH);
 
    if(nextslash == NULL) { // there's no next '/', so the string must be "/snapshots/ID"
-      snpath->is_there = $$SNPATH_IDONLY;
+      snpath->is_there = $$snpath_id;
       strcpy(snpath->id, idstart);
       return 1;
    }
 
    if(nextslash == idstart + 1) { // the string must be "/snapshots//"
-      snpath->is_there = $$SNPATH_ROOT;
+      snpath->is_there = $$snpath_root;
       return 0;
    }
 
    if(nextslash == path + len - 1) { // the next slash the last character, so "/snapshots/ID/"
-      snpath->is_there = $$SNPATH_IDONLY;
+      snpath->is_there = $$snpath_id;
       idlen = len - $$SNDIR_LEN - 1;
       strncpy(snpath->id, idstart, idlen);
       snpath->id[idlen] = '\0';
@@ -307,7 +307,7 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
    }
 
    // otherwise we've got "/snapshots/ID/..."
-   snpath->is_there = $$SNPATH_FULL;
+   snpath->is_there = $$snpath_full;
    idlen = nextslash - idstart;
    strncpy(snpath->id, idstart, idlen);
    snpath->id[idlen] = '\0';

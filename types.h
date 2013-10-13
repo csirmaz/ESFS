@@ -120,14 +120,19 @@ struct $fsdata_t {
 };
 
 
-#define $$SNPATH_ROOT 0
-#define $$SNPATH_IDONLY 1
-#define $$SNPATH_FULL 2
+/** Values to track what kind of path is stored in snpath.
+ * Note the $$ prefix to distinguish these from function names and structs.
+ */
+enum $$snpath_types {
+   $$snpath_root, /**< /snapshots */
+   $$snpath_id, /**< /snapshots/ID */
+   $$snpath_full /**< /snapshots/ID/... */
+};
 
 /** A path inside the snapshots space
  */
 struct $snpath_t {
-   int is_there; /**< $$SNPATH_ROOT=nothing, $$SNPATH_IDONLY=ID, $$SNPATH_FULL=ID&inpath -- always check this before using the strings */
+   enum $$snpath_types is_there; /**< always check this before using the strings */
    char id[$$PATH_MAX]; /**< e.g. "/ID" */
    char inpath[$$PATH_MAX]; /**< e.g. "/dir/dir/file" */
 };
@@ -161,10 +166,8 @@ struct $mapheader_t {
 #define $$SN_STEPS_NOTOPEN -9
 #define $$SN_STEPS_MAIN -7
 
-/** Filehandle struct extension for files in snapshots
- *
- * When dealing with a file in a snapshot:
- * * mfd->is_main is $$MFD_SN
+/** Filehandle struct extension for files in snapshots.
+ * Each step represents a snapshot or the main space with potential information about the resource.
  *
  * [C] = can also be:
  * * $$SN_STEPS_NOTOPEN = if the file has not been opened yet

@@ -551,7 +551,7 @@ static int $mfd_get_sn_steps(
    // All that remains is to add the path
 
    // Get the first path
-   if(snpath->is_there == $$SNPATH_FULL) {
+   if(snpath->is_there == $$snpath_full) {
       strcpy(mypath, snpath->inpath);
    } else {
       mypath[0] = '\0';
