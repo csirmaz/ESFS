@@ -58,14 +58,28 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 
    $dlogdbg("read(path=\"%s\")\n", path);
 
-   if(mfd->is_main != $$MFD_SN){
+   if(mfd->is_main == $$mfd_main){
+
       ret = pread($$MFD->mainfd, buf, size, offset);
       if(ret >= 0) { return ret; }
       return -errno;
+
    }
 
-   return $b_read(buf, fsdata, mfd, size, offset);
+   if(mfd->is_main == $$mfd_sn_full){
+
+      return $b_read(buf, fsdata, mfd, size, offset);
+
+   }
+
+   $dlogi("Wrong is_main!\n");
+   return -EBADE;
+
 }
+
+
+#define $$READDIR_F_DEFAULTS 0
+#define $$READDIR_F_SKIP_SNROOT 1
 
 
 /**
@@ -84,7 +98,8 @@ static int $_sn_readdir(
    fuse_fill_dir_t filler,
    off_t offset,
    const struct $fsdata_t *fsdata,
-   const struct $mfd_t *mfd
+   const struct $mfd_t *mfd,
+   int flags /**< $$READDIR_F_DEFAULTS, $$READDIR_F_SKIP_SNROOT */
 )
 {
    int sni, j, k, p, fd;
@@ -102,6 +117,12 @@ static int $_sn_readdir(
    pathmark = malloc(allocated * sizeof(struct $pathmark_t));
    if(pathmark == NULL) {
       return -ENOMEM;
+   }
+
+   if(flags & $$READDIR_F_SKIP_SNROOT){
+      strcpy(fpath, $$SNDIR);
+      strcpy(pathmark[used].path, fpath+1);
+      used++;
    }
 
    // Read all the directories in all the snapshots
@@ -293,7 +314,7 @@ int $readdir(
    $dlogdbg("readdir(path=\"%s\", offset=%lld)\n", path, (long long int)offset);
 
    switch(mfd->is_main) {
-      case $$MFD_MAIN:
+      case $$mfd_main:
 
          /* readdir: If the  end  of  the  directory stream is reached, NULL is returned
             and errno is not changed.
@@ -315,7 +336,7 @@ int $readdir(
 
          return 0;
 
-      case $$MFD_SNROOT:
+      case $$mfd_sn_root:
 
          // A normal directory read, but skip the .hid files
 
@@ -338,9 +359,13 @@ int $readdir(
 
          return 0;
 
-      case $$MFD_SN:
+      case $$mfd_sn_id:
 
-         return $_sn_readdir(path, buf, filler, offset, fsdata, mfd);
+         return $_sn_readdir(path, buf, filler, offset, fsdata, mfd, $$READDIR_F_SKIP_SNROOT);
+
+      case $$mfd_sn_full:
+
+         return $_sn_readdir(path, buf, filler, offset, fsdata, mfd, $$READDIR_F_DEFAULTS);
 
       default:
 
@@ -371,7 +396,7 @@ int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 
    $dlogdbg("fgetattr(path=\"%s\", is_main='%d' mainfd='%d')\n", path, mfd->is_main, mfd->mainfd);
 
-   if(mfd->is_main != $$MFD_SN) {
+   if(mfd->is_main != $$mfd_sn_full) {
       if(fstat(mfd->mainfd, statbuf) == 0) { return 0; }
       return -errno;
    }

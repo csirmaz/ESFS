@@ -85,7 +85,6 @@ int $flush(const char *path, struct fuse_file_info *fi)
  *
  * Changed in version 2.2
  */
-// TODO Implement snapshots
 int $release(const char *path, struct fuse_file_info *fi)
 {
    int ret = 0;
@@ -95,15 +94,20 @@ int $release(const char *path, struct fuse_file_info *fi)
 
    $dlogdbg("release(path=\"%s\")\n", path);
 
-   if(mfd->is_main != $$MFD_SN) {
+   if(mfd->is_main == $$mfd_main) {
 
       ret = $mfd_close_sn(mfd);
       if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
 
-   } else {
+   } else if(mfd->is_main == $$mfd_sn_full) {
 
       ret = $mfd_destroy_sn_steps(mfd, fsdata);
 
+   } else {
+      
+      $dlogi("Wrong is_main!\n");
+      ret = -EBADE;
+      
    }
 
    free(mfd);
@@ -150,12 +154,14 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
    $$DFSDATA
    mfd = $$MFD;
 
-   if(mfd->is_main != $$MFD_SN) {
+   if($$MFD_MAINLIKE(mfd->is_main)) {
+
       $dlogdbg("releasedir.main(path=\"%s\")\n", path);
       if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
       free(mfd);
       $dlogdbg("  releasedir.main ends with %d\n", waserror);
       return waserror;
+
    }
 
    $dlogdbg("releasedir.sn(path=\"%s\")\n", path);

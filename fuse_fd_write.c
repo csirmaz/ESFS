@@ -61,7 +61,7 @@ int $write(
    mfd = $$MFD;
 
    // Only allow writes on main FDs
-   if(mfd->is_main != $$MFD_MAIN) { return -EACCES; }
+   if(mfd->is_main != $$mfd_main) { return -EACCES; }
 
    $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, mfd->mainfd);
 

@@ -271,7 +271,7 @@ static int $mfd_open_sn(
 
    // Default values
    mfd->is_renamed = 0;
-   mfd->is_main = $$MFD_MAIN; // for safety's sake
+   mfd->is_main = $$mfd_main; // for safety's sake
 
    // No snapshots?
    if(fsdata->sn_is_any == 0) {
@@ -422,7 +422,7 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
 {
    mfd->mapfd = -2;
    mfd->datfd = -2;
-   mfd->is_main = $$MFD_MAIN; // for safety's sake
+   mfd->is_main = $$mfd_main; // for safety's sake
 }
 
 

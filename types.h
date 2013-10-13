@@ -181,9 +181,17 @@ struct $sn_steps_t {
 };
 
 
-#define $$MFD_MAIN 1
-#define $$MFD_SNROOT 2
-#define $$MFD_SN 0
+/** Values to track what kind of node is stored in the mfd.
+ * Note the $$ prefix to distinguish these from function names and structs.
+ */
+enum $$mfd_types {
+   $$mfd_main,
+   $$mfd_sn_root, /**< when it is /snapshots */
+   $$mfd_sn_id, /**< when it is /snapshots/ID */
+   $$mfd_sn_full
+};
+
+#define $$MFD_MAINLIKE(is_main) ((is_main == $$mfd_main) || (is_main == $$mfd_sn_root))
 
 /** Filehandle struct (mfd)
  *
@@ -198,7 +206,7 @@ struct $sn_steps_t {
  * * -4 - if the file was 0 length when the snapshot was taken
  */
 struct $mfd_t {
-   int is_main; /**< $$MFD_MAIN if this is a main node; $$MFD_SN if this is a node in a snapshot; $$MFD_SNROOT if it is the snapshots dir */
+   enum $$mfd_types is_main;
    struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory for main files, and from the first map file for snapshot files */
 
    // MAIN FILE PART: (used when dealing with a file in the main space)

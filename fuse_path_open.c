@@ -81,7 +81,7 @@ int $open(const char *path, struct fuse_file_info *fi)
          break;
       }
 
-      mfd->is_main = $$MFD_SN;
+      mfd->is_main = $$mfd_sn_full;
       fi->fh = (intptr_t) mfd;
       snret = 0;
 
@@ -165,7 +165,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    $dlogdbg("  open success main fd=%d\n", fd);
 
-   mfd->is_main = $$MFD_MAIN;
+   mfd->is_main = $$mfd_main;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -248,7 +248,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       return -waserror;
    }
 
-   mfd->is_main = $$MFD_MAIN;
+   mfd->is_main = $$mfd_main;
    fi->fh = (intptr_t) mfd;
 
    return 0;
@@ -295,9 +295,10 @@ int $opendir(const char *path, struct fuse_file_info *fi)
             }
 
             mfd->maindir = dp;
-            mfd->is_main = $$MFD_SNROOT;
+            mfd->is_main = $$mfd_sn_root;
             fi->fh = (intptr_t) mfd;
             break;
+
          }
 
          if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_DIR)) != 0)) {
@@ -315,7 +316,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
             break;
          }
 
-         mfd->is_main = $$MFD_SN;
+         mfd->is_main = (snpath->is_there == $$SNPATH_FULL ? $$mfd_sn_full : $$mfd_sn_id);
          fi->fh = (intptr_t) mfd;
 
       } while(0);
@@ -344,7 +345,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
    }
 
    mfd->maindir = dp;
-   mfd->is_main = $$MFD_MAIN;
+   mfd->is_main = $$mfd_main;
    fi->fh = (intptr_t) mfd;
 
    return 0;
