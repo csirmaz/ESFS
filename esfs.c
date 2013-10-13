@@ -251,6 +251,7 @@ int main(int argc, char *argv[])
    }
 
    fsdata->rootdir_len = strlen(fsdata->rootdir);
+   fsdata->sn_number = 0;
 
    argv[argc-2] = argv[argc-1];
    argv[argc-1] = NULL;

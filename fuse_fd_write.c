@@ -65,6 +65,9 @@ int $write(
 
    $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, mfd->mainfd);
 
+   // Verify that we're writing into the latest snapshot
+   if(unlikely((ret = $mfd_validate(mfd, fsdata)) != 0)){ return ret; }
+
    // Save blocks into snapshot
    if(unlikely((ret = $b_write(fsdata, mfd, size, offset)) != 0)) { return ret; }
 
@@ -96,10 +99,12 @@ int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 
    $dlogdbg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
 
+   // Verify that we're writing into the latest snapshot
+   if(unlikely((ret = $mfd_validate(mfd, fsdata)) != 0)){ return ret; }
+
    if(unlikely((ret = $b_truncate(fsdata, mfd, newsize)) != 0)) { return ret; }
 
    if(ftruncate(mfd->mainfd, newsize) == 0) { return 0; }
    return -errno;
 }
-
 

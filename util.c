@@ -165,23 +165,42 @@ FILE *log_open()
    return 0;
 
 
-/** Adds a prefix and two suffixes to a path (MAY RETURN)
+/** Adds the "map" suffix and a prefix to a path
  *
- * Needs $$PATH_LEN_T plen
- *
- * Returns -ENAMETOOLONG - if the new path is too long
- * Otherwise CONTINUES
+ * Returns:
+ * * 0 - success
+ * * -ENAMETOOLONG - if the new path is too long
  */
-#define $$ADDNPSFIX_CONT(newpath1, newpath2, oldpath, prefix, prefixlen, suffix1, suffix2, suffixlen) \
-   plen = $$PATH_MAX - prefixlen - suffixlen; \
-   if(unlikely(strlen(oldpath) >= plen)) { \
-      return -ENAMETOOLONG; \
-   } \
-   strcpy(newpath1, prefix); \
-   strncat(newpath1, oldpath, plen); \
-   strcpy(newpath2, newpath1); \
-   strncat(newpath1, suffix1, suffixlen); \
-   strncat(newpath2, suffix2, suffixlen);
+static inline int $get_map_prefix_path(char *newpath, const char *oldpath, const char*prefix, int prefixlen)
+{
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - prefixlen)) {
+      strncpy(newpath, prefix, prefixlen);
+      newpath[prefixlen] = '\0';
+      strcat(newpath, oldpath);
+      strncat(newpath, $$EXT_MAP, $$EXT_LEN);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
+
+
+/** Adds the "dat" suffix and a prefix to a path
+ *
+ * Returns:
+ * * 0 - success
+ * * -ENAMETOOLONG - if the new path is too long
+ */
+static inline int $get_dat_prefix_path(char *newpath, const char *oldpath, const char*prefix, int prefixlen)
+{
+   if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - prefixlen)) {
+      strncpy(newpath, prefix, prefixlen);
+      newpath[prefixlen] = '\0';
+      strcat(newpath, oldpath);
+      strncat(newpath, $$EXT_DAT, $$EXT_LEN);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
 
 
 /** Adds the "hidden" suffix to a path

@@ -128,7 +128,7 @@ int $open(const char *path, struct fuse_file_info *fi)
          // If the client wants to open O_WRONLY, we still need to read from the file to save
          // the overwritten blocks.
          // TODO Should we get a new filehandle to do this?
-         if((flags & O_ACCMODE) = O_WRONLY) {
+         if((flags & O_ACCMODE) == O_WRONLY) {
             flags |= O_ACCMODE;
             flags ^= O_ACCMODE;
             flags |= O_RDWR;

@@ -289,7 +289,7 @@ static inline int $b_write(
 
          if(unlikely((lock = $mflock_lock(fsdata, mfd->main_inode)) < 0)) {
             waserror = -lock;
-            $dlogdbg("Error: lock for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+            $dlogdbg("*** Error: lock for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
             break;
          }
          $dlogdbg("b_write: Got lock %d for main file FD %d\n", lock, mfd->mainfd);
@@ -316,20 +316,20 @@ static inline int $b_write(
       ret = pread(mfd->mainfd, buf, $$BL_S, (blockoffset << $$BL_SLOG)); // TODO check all left shifts for potential overflow. Here, blockoffset is off_t
       if(unlikely(ret < 1)) { // We should be able to read from the main file at least 1 byte
          waserror = (ret == -1 ? errno : ENXIO);
-         $dlogdbg("Error: pread from main file FD %d count %d offset %td, ret %d err %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
+         $dlogdbg("*** Error: pread from main file FD %d count %d offset %td, ret %d err %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
          break;
       }
 
       // Get the size of the dat file -- this is where we'll write
       if(unlikely((datsize = lseek(mfd->datfd, 0, SEEK_END)) == -1)) {
          waserror = errno;
-         $dlogdbg("Error: lseek on dat for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+         $dlogdbg("*** Error: lseek on dat for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
          break;
       }
 
       // Sanity check: the size of the dat file should be divisible by $$BL_S
       if(unlikely((datsize & ($$BL_S - 1)) != 0)) {
-         $dlogi("Error: Size of dat file is not divisible by block size (%d = 2^%d) for main FD %d.\n", $$BL_S, $$BL_SLOG, mfd->mainfd);
+         $dlogi("*** Error: Size of dat file (%td) is not divisible by block size (%d = 2^%d) for main FD '%d', path '%s'; datfd '%d'.\n", datsize, $$BL_S, $$BL_SLOG, mfd->mainfd, mfd->vpath, mfd->datfd);
          waserror = EFAULT;
          break;
       }
@@ -338,7 +338,7 @@ static inline int $b_write(
       ret = write(mfd->datfd, buf, $$BL_S);
       if(unlikely(ret != $$BL_S)) {
          waserror = (ret == -1 ? errno : ENXIO);
-         $dlogdbg("Error: write into .dat for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
+         $dlogdbg("*** Error: write into .dat for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
 
@@ -348,7 +348,7 @@ static inline int $b_write(
       ret = pwrite(mfd->mapfd, &pointer, $$BLP_S, mapoffset);
       if(unlikely(ret != $$BLP_S)) {
          waserror = (ret == -1 ? errno : ENXIO);
-         $dlogdbg("Error: pwrite on .map for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
+         $dlogdbg("*** Error: pwrite on .map for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
 
@@ -360,7 +360,7 @@ static inline int $b_write(
    if(lock != -1) {
       $dlogdbg("b_write: Releasing lock %d for main file FD %d\n", lock, mfd->mainfd);
       if(unlikely((lock = $mflock_unlock(fsdata, lock)) < 0)) {
-         $dlogdbg("Error: unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
+         $dlogdbg("*** Error: unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
          return -lock;
       }
 

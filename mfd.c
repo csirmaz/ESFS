@@ -212,18 +212,22 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
 // breaks below are not errors, but we want to skip opening/creating the dat file
 // if the file was empty or nonexistent when the snapshot was taken
 #define $$MFD_OPEN_DAT_FILE \
-            if(maphead->exists == 0){ \
-               mfd->datfd = -3; \
+            if(maphead->exists == 0) { \
+               mfd->datfd = $$MFD_FD_ENOENT; \
                break; \
             } \
-            if(unlikely(maphead->fstat.st_size == 0)){ \
-               mfd->datfd = -4; \
+            if(unlikely(maphead->fstat.st_size == 0)) { \
+               mfd->datfd = $$MFD_FD_ZLEN; \
+               break; \
+            } \
+            if($get_dat_prefix_path(fdat, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len) != 0) { \
+               waserror = ENAMETOOLONG; \
                break; \
             } \
             fd_dat = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
             if(fd_dat == -1){ \
                fd_dat = errno; \
-               $dlogi("mfd_open_sn: Failed to open .dat at %s, error %d = %s (1)\n", fdat, fd_dat, strerror(fd_dat)); \
+               $dlogi("mfd_open_sn: Failed to open .dat at '%s', error %d = %s (1)\n", fdat, fd_dat, strerror(fd_dat)); \
                waserror = fd_dat; \
                break; \
             } \
@@ -252,7 +256,7 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
 static int $mfd_open_sn(
    struct $mfd_t *mfd,
    const char *vpath, /**< the virtual path in the main space */
-   const char *fpath,
+   const char *fpath, /**< the real path or NULL  */
    const struct $fsdata_t *fsdata,
    int flags /**< $$MFD_DEFAULTS or $$MFD_NOFOLLOW */
 )
@@ -270,19 +274,24 @@ static int $mfd_open_sn(
    maphead = &(mfd->mapheader);
 
    // Default values
+   mfd->sn_number = fsdata->sn_number; /* to see if a new snapshot was created */ \
+   strcpy(mfd->vpath, vpath); /* to be able to reinitialise the mfd */ \
+   mfd->flags = flags; /* to be able to reinitialise the mfd */ \
+   mfd->is_main = $$mfd_main; /* for safety's sake */
    mfd->is_renamed = 0;
-   mfd->is_main = $$mfd_main; // for safety's sake
 
    // No snapshots?
    if(fsdata->sn_is_any == 0) {
       $dlogdbg("mfd_open_sn: no snapshots found, so returning\n");
-      mfd->mapfd = -1;
-      mfd->datfd = -1;
+      mfd->mapfd = $$MFD_FD_NOSN;
+      mfd->datfd = $$MFD_FD_NOSN;
       return 0;
    }
 
    // Get the paths of the map & dat files
-   $$ADDNPSFIX_CONT(fmap, fdat, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len, $$EXT_MAP, $$EXT_DAT, $$EXT_LEN)
+   if($get_map_prefix_path(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len) != 0){
+      return -ENAMETOOLONG;
+   }
 
    // Create path
    ret = $mkpath(fmap, NULL, S_IRWXU); // TODO 1: this is almost thread safe, so decide where to lock
@@ -369,8 +378,13 @@ static int $mfd_open_sn(
          maphead->read_v[0] = '\0';
          maphead->write_v[0] = '\0';
 
+#define $$FPATH_TMP fdat
          // stat the main file
-         if(lstat(fpath, &(maphead->fstat)) != 0) {
+         if(fpath == NULL){ // We need to re-calculate fpath if we're re-initialising as it is not cached
+            if($map_path($$FPATH_TMP, vpath, fsdata) != 0) { waserror = -ENAMETOOLONG; break; }
+         }
+
+         if(lstat((fpath==NULL?$$FPATH_TMP:fpath), &(maphead->fstat)) != 0) {
             ret = errno;
             if(ret == ENOENT) {  // main file does not exist (yet?)
                // WARNING In this case, mfd.mapheader.fstat remains uninitialised!
@@ -381,6 +395,7 @@ static int $mfd_open_sn(
                break;
             }
          }
+#undef $$FPATH_TMP
 
          // mfd's are not currently allowed for directories.
          // We rely on this return value to disallow moving/renaming directories
@@ -418,11 +433,13 @@ static int $mfd_open_sn(
 
 
 /** Marks a main MFD as read-only */
-static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
+static inline void $mfd_open_sn_rdonly(
+   struct $mfd_t *mfd
+)
 {
-   mfd->mapfd = -2;
-   mfd->datfd = -2;
-   mfd->is_main = $$mfd_main; // for safety's sake
+   mfd->mapfd = $$MFD_FD_RDONLY;
+   mfd->datfd = $$MFD_FD_RDONLY;
+   mfd->is_main = $$mfd_main; /* for safety's sake */
 }
 
 
@@ -432,7 +449,7 @@ static inline void $mfd_open_sn_rdonly(struct $mfd_t *mfd)
  * * 0 on success
  * * -errno on error (the last errno)
  */
-static inline int $mfd_close_sn(struct $mfd_t *mfd)
+static inline int $mfd_close_sn(const struct $mfd_t *mfd)
 {
    int waserror = 0;
 
@@ -470,6 +487,35 @@ static inline int $mfd_init_sn(
       ret = $mfd_close_sn(&mymfd);
    }
    return ret;
+}
+
+
+/** Ensures that a snapshot has not been created since the mfd was initialised.
+ * If yes, re-initialise the mfd.
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on error
+ */
+static inline int $mfd_validate(
+   struct $mfd_t *mfd,
+   const struct $fsdata_t *fsdata
+)
+{
+   int ret;
+
+   if(fsdata->sn_number == mfd->sn_number){ return 0; }
+
+   // We won't use the snapshot if the main file is opened for read only
+   if(mfd->mapfd == $$MFD_FD_RDONLY){ return 0; }
+
+   $dlogdbg("! Reinitialising the mfd\n");
+
+   if((ret = $mfd_close_sn(mfd)) != 0){ return ret; }
+   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata, mfd->flags)) != 0){ return ret; }
+   
+   mfd->sn_number = fsdata->sn_number;
+   return 0;
 }
 
 

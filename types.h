@@ -113,7 +113,8 @@ struct $fsdata_t {
    char *rootdir; /**< the underlying root acting as the source of the FS */
    $$PATH_LEN_T rootdir_len; /**< the length of rootdir string, without the terminating NULL */
    char sn_dir[$$PATH_MAX]; /**< the real path to the snapshot directory */
-   char sn_lat_dir[$$PATH_MAX]; /**< the real path to the root of the latest snapshot */
+   int sn_number; /**< increases when a snapshot is made; compared to mfd->sn_number */
+   char sn_lat_dir[$$PATH_MAX]; /**< caches the real path to the root of the latest snapshot */
    $$PATH_LEN_T sn_lat_dir_len; /**< the length of the latest snapshot dir string */
    int sn_is_any; /**< whether there are any snapshots, 1 or 0 */
    struct $mflock_t *mflocks; /**< file-based locks */
@@ -169,15 +170,15 @@ struct $mapheader_t {
 /** Filehandle struct extension for files in snapshots.
  * Each step represents a snapshot or the main space with potential information about the resource.
  *
- * [C] = can also be:
+ * [C] = can also be < 0:
  * * $$SN_STEPS_NOTOPEN = if the file has not been opened yet
  * * $$SN_STEPS_UNUSED = if the snapshot has no information about the file
  *
- * [D] = can also be:
+ * [D] = can also be < 0:
  * * $$SN_STEPS_MAIN = if the step represents a main file (index==0)
  */
 struct $sn_steps_t {
-   char path[$$PATH_MAX]; /**< first the real path of the snapshot ID, then the file (or the main file) */
+   char path[$$PATH_MAX]; /**< after $sn_get_paths_to, the real path of the snapshot ID; after $mfd_get_sn_steps, the file (or the main file) */
    int mapfd; /**< filehandle to the map file[C,D] */
    int datfd; /**< filehandle to the dat file[C] or the main file */
    DIR *dirfd; /**< handle to the open directory, or NULL */
@@ -195,23 +196,31 @@ enum $$mfd_types {
 };
 
 
+#define $$MFD_FD_NOSN -1
+#define $$MFD_FD_RDONLY -2
+#define $$MFD_FD_ENOENT -3
+#define $$MFD_FD_ZLEN -4
+
 /** Filehandle struct (mfd)
  *
- * This is the data associated with an open file.
+ * This is the data associated with an open node (file or directory).
  *
- * [A] = can also be:
- * * -1 - if there are no snapshots
- * * -2 - if the main file is opened for read-only
+ * [A] = can also be < 0:
+ * * $$MFD_FD_NOSN - if there are no snapshots
+ * * $$MFD_FD_RDONLY - if the main file is opened for read-only
  *
- * [B] = can also be:
- * * -3 - if the file didn't exist when the snapshot was taken
- * * -4 - if the file was 0 length when the snapshot was taken
+ * [B] = can also be < 0:
+ * * $$MFD_FD_ENOENT - if the file didn't exist when the snapshot was taken
+ * * $$MFD_FD_ZLEN - if the file was 0 length when the snapshot was taken
  */
 struct $mfd_t {
-   enum $$mfd_types is_main;
+   enum $$mfd_types is_main; /**< what this node is */
    struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory for main files, and from the first map file for snapshot files */
 
    // MAIN FILE PART: (used when dealing with a file in the main space)
+   int sn_number; /**< a number identifying the current snapshot; compared to fsdata->sn_number */
+   char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised */
+   int flags; /**< the flags the mfd was opened with; needed in case the map/dat files must be reinitalised */
    int mainfd; /**< filehandle for the main file */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
    ino_t main_inode; /**< the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking */

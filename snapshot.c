@@ -147,7 +147,7 @@ static int $sn_get_earliest(const struct $fsdata_t *fsdata, char snpath[$$PATH_M
 }
 
 
-// TODO Invalidate open snapshot files on snapshot creation and deletion - or rely on files continuing to exist?
+// TODO Invalidate open snapshot files on snapshot deletion - or rely on files continuing to exist?
 /** Allocates memory for and compiles a list of paths for each snapshot up to a given one.
  *
  * Allocates memory for mfd->sn_steps and:
@@ -282,7 +282,8 @@ static int $sn_get_latest(struct $fsdata_t *fsdata)
  *
  * * writes .../snapshots/.hid
  * * sets fsdata->sn_is_any
- * * sets fsdata->sn_lat_dir
+ * * increases fsdata->sn_number
+ * * sets fsdata->sn_lat_dir and _len
  *
  * Returns:
  * * 0 - on success
@@ -321,6 +322,7 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
    strcpy(fsdata->sn_lat_dir, newpath);
    fsdata->sn_lat_dir_len = len - 1;
    fsdata->sn_is_any = 1;
+   fsdata->sn_number++;
 
    return 0;
 }
