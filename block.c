@@ -79,6 +79,130 @@
  */
 
 
+/** Reads data from a snapshot file
+ *
+ * Returns:
+ * * >=0 - the number of bytes read on success
+ * * -errno - on error
+ */
+static int $b_read(
+   char *buf,
+   const struct $fsdata_t *fsdata,
+   const struct $mfd_t *mfd,
+   size_t readsize,
+   off_t readoffset
+)
+{
+   $$BLP_T pointer;
+   off_t blockoffset, mapoffset, copyfrom;
+   size_t blocknumber, copylength;
+   ssize_t copyto;
+   int sni, ret, waserror, copyfd;
+
+   $dlogdbg("b_read: About to read offset='%zu' size='%td'\n", readoffset, readsize);
+   if(readsize==0){ return 0; }
+
+   // Adjust how many bytes we can read based on the filesize
+#define $$B_SNSIZE blockoffset // variable to store original file size
+   $$B_SNSIZE = mfd->mapheader.fstat.st_size;
+   if(readoffset + readsize > $$B_SNSIZE){
+      if(readoffset >= $$B_SNSIZE){
+         return -EINVAL;
+      }
+      readsize = $$B_SNSIZE - readoffset; // warning: size_t is unsigned and can underflow
+   }
+#undef $$B_SNSIZE
+
+   // See which blocks we need to read
+   blockoffset = (readoffset >> $$BL_SLOG);
+   blocknumber = (readsize >> $$BL_SLOG) + 1;
+
+   $dlogdbg("b_read: adjusted readoffs='%zu' readsize='%td' bloffs='%zu' blockno='%td'\n", readoffset, readsize, blockoffset, blocknumber);
+
+   copyto = 0;
+   
+   for(;blocknumber > 0; blocknumber--, blockoffset++, copyto += copylength){
+
+      // blocknumber -- number of blocks still to read
+      // blockoffset -- the offset of the current block to read in the reconstructed file
+      // copyto -- offset in buf to read data to
+      // copyfrom -- offset in file being read
+      // copylength -- bytes to copy from file to buf
+      // copyfd -- fd to use
+
+      $dlogdbg("b_read: reading block no '%zu'\n", blockoffset);
+
+      mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO 2 There shouldn't be overflow as blockoffset is off_t
+
+      copylength = $$BL_S;
+      copyfrom = 0;
+      if(copyto==0){ // if we're reading the first block
+         // we initialise copyfrom with the offset from the beginning of the block to the real offset
+         copyfrom = readoffset - (blockoffset << $$BL_SLOG);
+         // copylength is then smaller
+         copylength -= copyfrom;
+         // $dlogdbg("b_read: first block: readoffset='%zu', blockoffset='%zu', blockoffset**='%zu' -> copyfrom='%zu'\n", readoffset, blockoffset, (blockoffset << $$BL_SLOG), copyfrom);
+         // $dlogdbg("b_read: first block: -> copylength='%td', blocksize='%d'\n", copylength, $$BL_S);
+      }
+
+      if(blocknumber == 1){ // if this is the last block
+         // copylength is smaller again.
+         // At this point, blockoffset is already original_blockoffset + blocknumber - 1
+         copylength -= ((blockoffset+1) << $$BL_SLOG) - readoffset - readsize;
+      }
+
+      $dlogdbg("b_read: initial copyfrom='%zu', copylength='%td'\n", copyfrom, copylength);
+
+      // Now see where we can read the block from
+      for(sni = mfd->sn_first_file; sni >=0; sni--){
+
+         if(sni>0){ // a snapshot file
+
+            // TODO do we need any locking when reading?
+            ret = pread(mfd->sn_steps[sni].mapfd, &pointer, $$BLP_S, mapoffset);
+            if(unlikely(ret != $$BLP_S && ret != 0)){
+               waserror = (ret==-1?errno:ENXIO);
+               $dlogdbg("Error: pread on map ret=%d err=%s\n", ret, strerror(waserror));
+               return -waserror;
+            }
+            if(ret==0){ pointer = 0; }
+            $dlogdbg("b_read: pointer read from map at mapoffs='%td', ret='%d', pointer='%td'\n", mapoffset, ret, pointer);
+
+            if(pointer==0){ continue; } // go to next snapshot
+
+            $dlogdbg("b_read: block found in snapshot '%d' at '%td'\n", sni, pointer-1);
+            copyfd = mfd->sn_steps[sni].datfd;
+            copyfrom += ((pointer-1) << $$BL_SLOG);
+
+         }else{ // we are reading from the main file
+
+            $dlogdbg("b_read: reading block from main file\n");
+            copyfd = mfd->sn_steps[sni].datfd;
+            copyfrom += (blockoffset << $$BL_SLOG);
+
+         }
+
+         $dlogdbg("b_read: final copyfrom='%zu', copyto='%td', copylength='%td'\n", copyfrom, copyto, copylength);
+
+         ret = pread(copyfd, buf+copyto, copylength, copyfrom);
+         if(unlikely(ret != copylength)){
+            waserror = (ret ==-1?errno:ENXIO);
+            $dlogdbg("Error: pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
+            return -waserror;
+         }
+
+         // We've found the block -- no need to look further
+         break;
+         
+      } // end for sni
+      
+   } // end for block
+
+   $dlogdbg("b_read: Read '%zu' bytes\n", copyto);
+   return (int)copyto;
+}
+
+
 #define $$BLOCK_READ_POINTER \
       ret = pread(mfd->mapfd, &pointer, $$BLP_S, mapoffset); \
       if(unlikely(ret != $$BLP_S && ret != 0)){ \
@@ -113,7 +237,7 @@ static inline int $b_write(
    int ret;
 
    // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
-   if(mfd->datfd < 0){ return 0; }
+   if(mfd->datfd < 0 || writesize==0){ return 0; }
 
    $dlogdbg("b_write: woffset: %zu wsize: %td size_in_sn: %zu\n", writeoffset, writesize, mfd->mapheader.fstat.st_size);
 
@@ -130,8 +254,7 @@ static inline int $b_write(
    }
 #undef $$B_SNSIZE
 
-   // TODO Check if writesize > 0
-
+   // See which blocks we need to write
    blockoffset = (writeoffset >> $$BL_SLOG);
    blocknumber = (writesize >> $$BL_SLOG) + 1;
 
@@ -143,7 +266,7 @@ static inline int $b_write(
 
       $dlogdbg("b_write: Processing block no %zu from main FD %d\n", blockoffset, mfd->mainfd);
 
-      mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO There shouldn't be overflow as blockoffset is off_t
+      mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO 2 There shouldn't be overflow as blockoffset is off_t
 
       // Read the pointer from the map file.
       // This may not be the final pointer if we haven't got the lock, but if it's already non-0, we

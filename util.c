@@ -442,8 +442,8 @@ static int $read_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH
       $dlogi("reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
       return -ret;
    }
-   if(ret == 0 || buf[ret] != '\0') {
-      $dlogi("reading from %s returned 0 bytes or string is not 0-terminated.\n", filepath);
+   if(ret == 0 || buf[ret-1] != '\0') {
+      $dlogi("reading from '%s' returned '%d'==0 bytes or string is not 0-terminated ('%c').\n", filepath, ret, buf[ret]);
       return -EIO;
    }
 

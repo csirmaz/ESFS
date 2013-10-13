@@ -46,9 +46,6 @@
  *
  * Changed in version 2.2
  */
-// TODO Implement snapshots
-//   int (*read) (const char *, char *, size_t, off_t,
-//           struct fuse_file_info *);
 // BBFS: I don't fully understand the documentation above -- it doesn't
 // match the documentation for the read() system call which says it
 // can return with anything up to the amount of data requested. nor
@@ -57,13 +54,17 @@
 int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
    int ret;
+   $$DFSDATA_MFD
 
-   log_msg("read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x, main fd=%d)\n", path, buf, size, offset, fi, $$MFD->mainfd);
-   // TODO Check if path is null, as expected
+   $dlogdbg("read(path=\"%s\")\n", path);
 
-   ret = pread($$MFD->mainfd, buf, size, offset);
-   if(ret >= 0) { return ret; }
-   return -errno;
+   if(mfd->is_main != $$MFD_SN){
+      ret = pread($$MFD->mainfd, buf, size, offset);
+      if(ret >= 0) { return ret; }
+      return -errno;
+   }
+
+   return $b_read(buf, fsdata, mfd, size, offset);
 }
 
 

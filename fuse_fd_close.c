@@ -93,7 +93,7 @@ int $release(const char *path, struct fuse_file_info *fi)
 
    mfd = $$MFD;
 
-   $dlogdbg("release(path=\"%s\", mainfd=%d)\n", path, $$MFD->mainfd);
+   $dlogdbg("release(path=\"%s\")\n", path);
 
    if(mfd->is_main != $$MFD_SN) {
 
