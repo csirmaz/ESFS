@@ -55,12 +55,16 @@
 // pwrite needs >= 500
 // pselect needs >= 600
 // nftw needs >= 500
-#define _XOPEN_SOURCE 600
+// define _XOPEN_SOURCE 600
+// Included in _GNU_SOURCE
 
 // Needed to get utimensat and AT_FDCWD
 // Backtrace: fcntl.h, sys/stat.h <- features.h 
-#define _ATFILE_SOURCE 1
+// define _ATFILE_SOURCE 1
+// Included in _GNU_SOURCE
 
+// Needed for O_NOATIME
+#define _GNU_SOURCE 1
 
 // In case it matters
 // ------------------

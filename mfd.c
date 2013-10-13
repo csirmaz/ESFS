@@ -224,7 +224,7 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
                waserror = ENAMETOOLONG; \
                break; \
             } \
-            fd_dat = open(fdat, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU); \
+            fd_dat = open(fdat, O_WRONLY | O_CREAT | O_APPEND | O_NOATIME, S_IRWXU); \
             if(fd_dat == -1){ \
                fd_dat = errno; \
                $dlogi("mfd_open_sn: Failed to open .dat at '%s', error %d = %s (1)\n", fdat, fd_dat, strerror(fd_dat)); \
@@ -301,7 +301,7 @@ static int $mfd_open_sn(
    }
 
    // Open or create the map file
-   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL, S_IRWXU); // TODO 2: add O_NOATIME
+   fd = open(fmap, O_RDWR | O_CREAT | O_EXCL | O_NOATIME, S_IRWXU);
 
    if(fd == -1) {
 
