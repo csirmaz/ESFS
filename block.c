@@ -162,8 +162,8 @@ static int $b_read(
 
             // TODO do we need any locking when reading?
 
-            if(mfd->sn_steps[sni].mapfd < 0){ continue; } // go the next snapshot if there is not map file here
-            
+            if(mfd->sn_steps[sni].mapfd < 0) { continue; } // go the next snapshot if there is not map file here
+
             ret = pread(mfd->sn_steps[sni].mapfd, &pointer, $$BLP_S, mapoffset);
             if(unlikely(ret != $$BLP_S && ret != 0)) {
                waserror = (ret == -1 ? errno : ENXIO);
