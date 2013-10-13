@@ -1,6 +1,4 @@
 
-** Add sn_id t fsdata and mfd; new mfd method should check this and reopen map/dat
-
 * Add locking around recursive remove
 
 * Can creating directories & cleaning them up conflict with other threads?

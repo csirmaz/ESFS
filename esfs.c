@@ -83,13 +83,13 @@
 // come from /usr/include/fuse.h
 
 
-   /** Get file system statistics
-    *
-    * The 'f_frsize', 'f_favail', 'f_fsid' and 'f_flag' fields are ignored
-    *
-    * Replaced 'struct statfs' parameter with 'struct statvfs' in
-    * version 2.5
-    */
+/** Get file system statistics
+ *
+ * The 'f_frsize', 'f_favail', 'f_fsid' and 'f_flag' fields are ignored
+ *
+ * Replaced 'struct statfs' parameter with 'struct statvfs' in
+ * version 2.5
+ */
 //   int (*statfs) (const char *, struct statvfs *);
 int $statfs(const char *path, struct statvfs *statv)
 {
@@ -98,7 +98,7 @@ int $statfs(const char *path, struct statvfs *statv)
    $dlogdbg("statfs(path=\"%s\")\n", path);
 
    // get stats for underlying filesystem
-   if( statvfs(fpath, statv) == 0){ return 0; }
+   if(statvfs(fpath, statv) == 0) { return 0; }
    return -errno;
 
    // log_statvfs(statv);
@@ -106,16 +106,16 @@ int $statfs(const char *path, struct statvfs *statv)
 
 
 
-   /**
-    * Initialize filesystem
-    *
-    * The return value will passed in the private_data field of
-    * fuse_context to all file operations and as a parameter to the
-    * destroy() method.
-    *
-    * Introduced in version 2.3
-    * Changed in version 2.6
-    */
+/**
+ * Initialize filesystem
+ *
+ * The return value will passed in the private_data field of
+ * fuse_context to all file operations and as a parameter to the
+ * destroy() method.
+ *
+ * Introduced in version 2.3
+ * Changed in version 2.6
+ */
 //   void *(*init) (struct fuse_conn_info *conn);
 // Undocumented but extraordinarily useful fact:  the fuse_context is
 // set up before this function is called, and
@@ -128,20 +128,20 @@ void *$init(struct fuse_conn_info *conn)
 {
    struct $fsdata_t *fsdata;
 
-   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data );
+   fsdata = ((struct $fsdata_t *) fuse_get_context()->private_data);
 
    $dlogi("Initialised ESFS\n");
 
    return fsdata;
 }
 
-   /**
-    * Clean up filesystem
-    *
-    * Called on filesystem exit.
-    *
-    * Introduced in version 2.3
-    */
+/**
+ * Clean up filesystem
+ *
+ * Called on filesystem exit.
+ *
+ * Introduced in version 2.3
+ */
 //   void (*destroy) (void *userdata==private_data);
 void $destroy(void *privdata)
 {
@@ -149,7 +149,7 @@ void $destroy(void *privdata)
 
    struct $fsdata_t *fsdata;
 
-   fsdata = ((struct $fsdata_t *) privdata );
+   fsdata = ((struct $fsdata_t *) privdata);
 
    $mflock_destroy(fsdata);
 
@@ -162,40 +162,40 @@ void $destroy(void *privdata)
 
 
 struct fuse_operations $oper = {
-  .getattr = $getattr,
-  .readlink = $readlink,
-  .mknod   = $mknod,
-  .mkdir   = $mkdir,
-  .unlink  = $unlink,
-  .rmdir   = $rmdir,
-  .symlink = $symlink,
-  .rename  = $rename,
-  .link    = $link,
-  .chmod   = $chmod,
-  .chown   = $chown,
-  .truncate = $truncate,
-  .open    = $open,
-  .read    = $read,
-  .write   = $write,
-  .statfs  = $statfs,
-  .flush   = $flush,
-  .release = $release,
-  .fsync     = $fsync,
-  .setxattr  = $setxattr,
-  .getxattr  = $getxattr,
-  .listxattr = $listxattr,
-  .removexattr = $removexattr,
-  .opendir    = $opendir,
-  .readdir    = $readdir,
-  .releasedir = $releasedir,
-  .fsyncdir   = $fsyncdir,
-  .init    = $init,
-  .destroy = $destroy,
-  .access  = $access,
-  .create  = $create,
-  .ftruncate = $ftruncate,
-  .fgetattr  = $fgetattr,
-  .utimens   = $utimens
+   .getattr = $getattr,
+   .readlink = $readlink,
+   .mknod   = $mknod,
+   .mkdir   = $mkdir,
+   .unlink  = $unlink,
+   .rmdir   = $rmdir,
+   .symlink = $symlink,
+   .rename  = $rename,
+   .link    = $link,
+   .chmod   = $chmod,
+   .chown   = $chown,
+   .truncate = $truncate,
+   .open    = $open,
+   .read    = $read,
+   .write   = $write,
+   .statfs  = $statfs,
+   .flush   = $flush,
+   .release = $release,
+   .fsync     = $fsync,
+   .setxattr  = $setxattr,
+   .getxattr  = $getxattr,
+   .listxattr = $listxattr,
+   .removexattr = $removexattr,
+   .opendir    = $opendir,
+   .readdir    = $readdir,
+   .releasedir = $releasedir,
+   .fsyncdir   = $fsyncdir,
+   .init    = $init,
+   .destroy = $destroy,
+   .access  = $access,
+   .create  = $create,
+   .ftruncate = $ftruncate,
+   .fgetattr  = $fgetattr,
+   .utimens   = $utimens
 };
 
 void $usage(void)
@@ -218,18 +218,18 @@ int main(int argc, char *argv[])
    // and refuse if it is.  The somewhat smaller hole of an ordinary
    // user doing it with the allow_other flag is still there because
    // I don't want to parse the options string.
-   if ((getuid() == 0) || (geteuid() == 0)) {
+   if((getuid() == 0) || (geteuid() == 0)) {
       fprintf(stderr, "Running ESFS as root opens unnacceptable security holes. Aborting.\n");
       return 1;
    }
 
-   if((ret = $check_params()) != 0){
+   if((ret = $check_params()) != 0) {
       fprintf(stderr, "There's a problem with the parameters; ESFS needs to be recompiled. Code = %d. Aborting.\n", ret);
       return 1;
    }
 
    fsdata = malloc(sizeof(struct $fsdata_t));
-   if (fsdata == NULL) {
+   if(fsdata == NULL) {
       fprintf(stderr, "Out of memory. Aborting.\n");
       return 1;
    }
@@ -239,22 +239,22 @@ int main(int argc, char *argv[])
    // start with a hyphen (this will break if you actually have a
    // rootpoint or mountpoint whose name starts with a hyphen, but so
    // will a zillion other programs)
-   if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
+   if((argc < 3) || (argv[argc - 2][0] == '-') || (argv[argc - 1][0] == '-'))
       $usage();
 
    // Pull the rootdir out of the argument list and save it in my
    // internal data
-   fsdata->rootdir = realpath(argv[argc-2], NULL); // this calls malloc
-   if(fsdata->rootdir == NULL){
-      fprintf(stderr, "Error getting the root dir %s. Aborting.\n", argv[argc-2]);
+   fsdata->rootdir = realpath(argv[argc - 2], NULL); // this calls malloc
+   if(fsdata->rootdir == NULL) {
+      fprintf(stderr, "Error getting the root dir %s. Aborting.\n", argv[argc - 2]);
       return 1;
    }
 
    fsdata->rootdir_len = strlen(fsdata->rootdir);
    fsdata->sn_number = 0;
 
-   argv[argc-2] = argv[argc-1];
-   argv[argc-1] = NULL;
+   argv[argc - 2] = argv[argc - 1];
+   argv[argc - 1] = NULL;
    argc--;
 
    fsdata->logfile = log_open(); // TODO check for errors
@@ -262,22 +262,22 @@ int main(int argc, char *argv[])
    // Initial things to do
 
    // Get the main snapshot dir path
-   if($map_path(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG){
+   if($map_path(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG) {
       fprintf(stderr, "Snapshot dir path is too long. Aborting.\n");
       return 1;
    }
 
-   if($sn_check_dir(fsdata) != 0){
+   if($sn_check_dir(fsdata) != 0) {
       fprintf(stderr, "Snapshot dir check failed, please check logs. Aborting.\n");
       return 1;
    }
 
-   if($sn_get_latest(fsdata) != 0){
+   if($sn_get_latest(fsdata) != 0) {
       fprintf(stderr, "Getting latest snapshot failed, please check logs. Aborting.\n");
       return 1;
    }
 
-   if($mflock_init(fsdata) != 0){
+   if($mflock_init(fsdata) != 0) {
       fprintf(stderr, "Failed to initialise mutexes. Aborting.\n");
       return 1;
    }
@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
    // turn over control to fuse
    // user_data   user data supplied in the context during the init() method
    // Returns: 0 on success, nonzero on failure
-   if((ret = fuse_main(argc, argv, &$oper, fsdata)) != 0){
+   if((ret = fuse_main(argc, argv, &$oper, fsdata)) != 0) {
       fprintf(stderr, "FUSE returned with error %d. Sorry.\n", ret);
    }
    return ret;

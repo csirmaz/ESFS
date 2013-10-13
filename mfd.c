@@ -274,9 +274,9 @@ static int $mfd_open_sn(
    maphead = &(mfd->mapheader);
 
    // Default values
-   mfd->sn_number = fsdata->sn_number; /* to see if a new snapshot was created */ \
-   strcpy(mfd->vpath, vpath); /* to be able to reinitialise the mfd */ \
-   mfd->flags = flags; /* to be able to reinitialise the mfd */ \
+   mfd->sn_number = fsdata->sn_number; /* to see if a new snapshot was created */
+   strcpy(mfd->vpath, vpath); /* to be able to reinitialise the mfd */
+   mfd->flags = flags; /* to be able to reinitialise the mfd */
    mfd->is_main = $$mfd_main; /* for safety's sake */
    mfd->is_renamed = 0;
 
@@ -289,7 +289,7 @@ static int $mfd_open_sn(
    }
 
    // Get the paths of the map & dat files
-   if($get_map_prefix_path(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len) != 0){
+   if($get_map_prefix_path(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len) != 0) {
       return -ENAMETOOLONG;
    }
 
@@ -380,11 +380,11 @@ static int $mfd_open_sn(
 
 #define $$FPATH_TMP fdat
          // stat the main file
-         if(fpath == NULL){ // We need to re-calculate fpath if we're re-initialising as it is not cached
+         if(fpath == NULL) { // We need to re-calculate fpath if we're re-initialising as it is not cached
             if($map_path($$FPATH_TMP, vpath, fsdata) != 0) { waserror = -ENAMETOOLONG; break; }
          }
 
-         if(lstat((fpath==NULL?$$FPATH_TMP:fpath), &(maphead->fstat)) != 0) {
+         if(lstat((fpath == NULL ? $$FPATH_TMP : fpath), &(maphead->fstat)) != 0) {
             ret = errno;
             if(ret == ENOENT) {  // main file does not exist (yet?)
                // WARNING In this case, mfd.mapheader.fstat remains uninitialised!
@@ -504,16 +504,16 @@ static inline int $mfd_validate(
 {
    int ret;
 
-   if(fsdata->sn_number == mfd->sn_number){ return 0; }
+   if(fsdata->sn_number == mfd->sn_number) { return 0; }
 
    // We won't use the snapshot if the main file is opened for read only
-   if(mfd->mapfd == $$MFD_FD_RDONLY){ return 0; }
+   if(mfd->mapfd == $$MFD_FD_RDONLY) { return 0; }
 
    $dlogdbg("! Reinitialising the mfd\n");
 
-   if((ret = $mfd_close_sn(mfd)) != 0){ return ret; }
-   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata, mfd->flags)) != 0){ return ret; }
-   
+   if((ret = $mfd_close_sn(mfd)) != 0) { return ret; }
+   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata, mfd->flags)) != 0) { return ret; }
+
    mfd->sn_number = fsdata->sn_number;
    return 0;
 }

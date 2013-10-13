@@ -171,7 +171,7 @@ FILE *log_open()
  * * 0 - success
  * * -ENAMETOOLONG - if the new path is too long
  */
-static inline int $get_map_prefix_path(char *newpath, const char *oldpath, const char*prefix, int prefixlen)
+static inline int $get_map_prefix_path(char *newpath, const char *oldpath, const char *prefix, int prefixlen)
 {
    if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - prefixlen)) {
       strncpy(newpath, prefix, prefixlen);
@@ -190,7 +190,7 @@ static inline int $get_map_prefix_path(char *newpath, const char *oldpath, const
  * * 0 - success
  * * -ENAMETOOLONG - if the new path is too long
  */
-static inline int $get_dat_prefix_path(char *newpath, const char *oldpath, const char*prefix, int prefixlen)
+static inline int $get_dat_prefix_path(char *newpath, const char *oldpath, const char *prefix, int prefixlen)
 {
    if(likely(strlen(oldpath) < $$PATH_MAX - $$EXT_LEN - prefixlen)) {
       strncpy(newpath, prefix, prefixlen);
@@ -465,7 +465,7 @@ static int $read_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH
       $dlogi("reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
       return -ret;
    }
-   if(ret == 0 || buf[ret-1] != '\0') {
+   if(ret == 0 || buf[ret - 1] != '\0') {
       $dlogi("reading from '%s' returned '%d'==0 bytes or string is not 0-terminated ('%c').\n", filepath, ret, buf[ret]);
       return -EIO;
    }
