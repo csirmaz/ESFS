@@ -63,6 +63,8 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    $$IF_PATH_SN
 
+   $dlogdbg("* open.sn path='%s'\n", path);
+
    do {
 
       if(snpath->is_there != $$snpath_full) {
@@ -88,6 +90,8 @@ int $open(const char *path, struct fuse_file_info *fi)
    } while(0);
 
    $$ELIF_PATH_MAIN
+
+   $dlogdbg("* open.main path='%s'\n", path);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL) { return -ENOMEM; }
@@ -195,7 +199,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
    $$IF_PATH_MAIN_ONLY
 
-   $dlogdbg("  create(path=\"%s\", mode=0%03o)\n", path, mode);
+   $dlogdbg("* create(path=\"%s\", mode=0%03o)\n", path, mode);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL) { return -ENOMEM; }
@@ -275,7 +279,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
    do {
 
-      $dlogdbg("opendir:sn(path=\"%s\")\n", path);
+      $dlogdbg("* opendir.sn(path=\"%s\")\n", path);
 
       mfd = malloc(sizeof(struct $mfd_t));
       if(unlikely(mfd == NULL)) {
@@ -331,7 +335,7 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
    $$ELIF_PATH_MAIN
 
-   $dlogdbg("opendir:main(path=\"%s\")\n", path);
+   $dlogdbg("* opendir.main(path=\"%s\")\n", path);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(unlikely(mfd == NULL)) {

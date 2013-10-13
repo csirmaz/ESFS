@@ -49,7 +49,7 @@ int $getattr(const char *path, struct stat *statbuf)
 
    if(snpath->is_there != $$snpath_full) {
 
-      $dlogdbg("  getattr.sn.root/id(path=\"%s\")\n", path);
+      $dlogdbg("* getattr.sn.root/id(path=\"%s\")\n", path);
       if(lstat(fpath, statbuf) == 0) {
          snret = 0;
       } else {
@@ -58,7 +58,7 @@ int $getattr(const char *path, struct stat *statbuf)
 
    } else {
 
-      $dlogdbg("  getattr.sn.full(path=\"%s\")\n", path);
+      $dlogdbg("* getattr.sn.full(path=\"%s\")\n", path);
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
                                              $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
                                             )) != 0)) {
@@ -81,7 +81,7 @@ int $getattr(const char *path, struct stat *statbuf)
 
    $$ELIF_PATH_MAIN
 
-   $dlogdbg("  getattr.main(path=\"%s\")\n", path);
+   $dlogdbg("* getattr.main(path=\"%s\")\n", path);
 
    if(lstat(fpath, statbuf) == 0) { return 0; }
    return -errno;
@@ -112,7 +112,7 @@ int $access(const char *path, int mask)
 
       if(snpath->is_there != $$snpath_full) {
 
-         $dlogdbg("  access.sn.root(path=\"%s\", mask=0%o)\n", path, mask);
+         $dlogdbg("* access.sn.root(path=\"%s\", mask=0%o)\n", path, mask);
          if(access(fpath, mask) == 0) {
             snret = 0;
          } else {
@@ -122,7 +122,7 @@ int $access(const char *path, int mask)
 
       }
 
-      $dlogdbg("  access.sn.full(path=\"%s\", mask=0%o)\n", path, mask);
+      $dlogdbg("* access.sn.full(path=\"%s\", mask=0%o)\n", path, mask);
 
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
                                              $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
@@ -188,7 +188,7 @@ int $access(const char *path, int mask)
 
    $$ELIF_PATH_MAIN
 
-   $dlogdbg("  access.main(path=\"%s\", mask=0%o)\n", path, mask);
+   $dlogdbg("* access.main(path=\"%s\", mask=0%o)\n", path, mask);
 
    if(access(fpath, mask) == 0) { return 0; }
    return -errno;

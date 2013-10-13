@@ -56,7 +56,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
    int ret;
    $$DFSDATA_MFD
 
-   $dlogdbg("read(path=\"%s\")\n", path);
+   $dlogdbg("* read(path=\"%s\")\n", path);
 
    if(mfd->is_main == $$mfd_main) {
 
@@ -311,7 +311,7 @@ int $readdir(
    struct dirent *de;
    $$DFSDATA_MFD
 
-   $dlogdbg("readdir(path=\"%s\", offset=%lld)\n", path, (long long int)offset);
+   $dlogdbg("* readdir(path=\"%s\", offset=%lld)\n", path, (long long int)offset);
 
    switch(mfd->is_main) {
       case $$mfd_main:
@@ -394,7 +394,7 @@ int $fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
    $$DFSDATA_MFD
 
-   $dlogdbg("fgetattr(path=\"%s\", is_main='%d' mainfd='%d')\n", path, mfd->is_main, mfd->mainfd);
+   $dlogdbg("* fgetattr(path=\"%s\", is_main='%d' mainfd='%d')\n", path, mfd->is_main, mfd->mainfd);
 
    if(mfd->is_main != $$mfd_sn_full) {
       if(fstat(mfd->mainfd, statbuf) == 0) { return 0; }

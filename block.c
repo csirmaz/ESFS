@@ -156,13 +156,18 @@ static int $b_read(
       // Now see where we can read the block from
       for(sni = mfd->sn_first_file; sni >= 0; sni--) {
 
+         $dlogdbg("b_read: trying snapshot '%d' = '%s'\n", sni, mfd->sn_steps[sni].path);
+
          if(sni > 0) { // a snapshot file
 
             // TODO do we need any locking when reading?
+
+            if(mfd->sn_steps[sni].mapfd < 0){ continue; } // go the next snapshot if there is not map file here
+            
             ret = pread(mfd->sn_steps[sni].mapfd, &pointer, $$BLP_S, mapoffset);
             if(unlikely(ret != $$BLP_S && ret != 0)) {
                waserror = (ret == -1 ? errno : ENXIO);
-               $dlogdbg("Error: pread on map ret=%d err=%s\n", ret, strerror(waserror));
+               $dlogdbg("*** Error: pread on map ret=%d err=%s\n", ret, strerror(waserror));
                return -waserror;
             }
             if(ret == 0) { pointer = 0; }
@@ -187,7 +192,7 @@ static int $b_read(
          ret = pread(copyfd, buf + copyto, copylength, copyfrom);
          if(unlikely(ret != copylength)) {
             waserror = (ret == -1 ? errno : ENXIO);
-            $dlogdbg("Error: pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
+            $dlogdbg("*** Error: pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
             return -waserror;
          }
 
