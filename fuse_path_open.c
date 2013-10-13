@@ -91,7 +91,10 @@ int $open(const char *path, struct fuse_file_info *fi)
       }
 
       mfd->is_main = $$mfd_sn_full;
+
       fi->fh = (intptr_t) mfd;
+      fi->keep_cache = 1;
+
       snret = 0;
 
    } while(0);
@@ -125,7 +128,11 @@ int $open(const char *path, struct fuse_file_info *fi)
          // If the client wants to open O_WRONLY, we still need to read from the file to save
          // the overwritten blocks.
          // TODO Should we get a new filehandle to do this?
-         if(flags & O_WRONLY) { flags ^= O_WRONLY; flags |= O_RDWR; }
+         if((flags & O_ACCMODE) = O_WRONLY) {
+            flags |= O_ACCMODE;
+            flags ^= O_ACCMODE;
+            flags |= O_RDWR;
+         }
 
       }
 
@@ -173,7 +180,9 @@ int $open(const char *path, struct fuse_file_info *fi)
    $dlogdbg("  open success main fd=%d\n", fd);
 
    mfd->is_main = $$mfd_main;
+
    fi->fh = (intptr_t) mfd;
+   fi->keep_cache = 1;
 
    return 0;
 
@@ -256,7 +265,9 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
    }
 
    mfd->is_main = $$mfd_main;
+
    fi->fh = (intptr_t) mfd;
+   fi->keep_cache = 1;
 
    return 0;
 }
@@ -303,7 +314,10 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
             mfd->maindir = dp;
             mfd->is_main = $$mfd_sn_root;
+
             fi->fh = (intptr_t) mfd;
+            fi->keep_cache = 1;
+
             break;
 
          }
@@ -324,7 +338,9 @@ int $opendir(const char *path, struct fuse_file_info *fi)
          }
 
          mfd->is_main = (snpath->is_there == $$snpath_full ? $$mfd_sn_full : $$mfd_sn_id);
+
          fi->fh = (intptr_t) mfd;
+         fi->keep_cache = 1;
 
       } while(0);
 
@@ -353,7 +369,9 @@ int $opendir(const char *path, struct fuse_file_info *fi)
 
    mfd->maindir = dp;
    mfd->is_main = $$mfd_main;
+
    fi->fh = (intptr_t) mfd;
+   fi->keep_cache = 1;
 
    return 0;
 
