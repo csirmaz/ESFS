@@ -1,5 +1,7 @@
 
-* Add locking around recursive remove
+** Review locking
+
+** Add locking around recursive remove
 
 * Can creating directories & cleaning them up conflict with other threads?
    (Different files will use different locks.)

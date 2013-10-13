@@ -198,33 +198,53 @@ struct fuse_operations $oper = {
    .utimens   = $utimens
 };
 
+
 void $usage(void)
 {
-   fprintf(stderr, "usage:  esfs [FUSE and mount options] rootDir mountPoint\n");
-   abort();
+   fprintf(stderr, "USAGE:  esfs [ FUSE and mount options ] (RootDir) (MountPoint)\n\n");
 }
+
 
 int main(int argc, char *argv[])
 {
    int ret;
    struct $fsdata_t *fsdata;
 
-   // ESFS doesn't do any access checking on its own (the comment
+   // The FS doesn't do any access checking on its own (the comment
    // blocks in fuse.h mention some of the functions that need
    // accesses checked -- but note there are other functions, like
    // chown(), that also need checking!).  Since running bbfs as root
-   // will therefore open Metrodome-sized holes in the system
+   // will therefore open holes in the system
    // security, we'll check if root is trying to mount the filesystem
    // and refuse if it is.  The somewhat smaller hole of an ordinary
    // user doing it with the allow_other flag is still there because
-   // I don't want to parse the options string.
+   // we don't parse the options string.
    if((getuid() == 0) || (geteuid() == 0)) {
-      fprintf(stderr, "Running ESFS as root opens unnacceptable security holes. Aborting.\n");
+      fprintf(stderr, "Running ESFS as root opens security holes. Aborting.\n");
       return 1;
    }
 
    if((ret = $check_params()) != 0) {
       fprintf(stderr, "There's a problem with the parameters; ESFS needs to be recompiled. Code = %d. Aborting.\n", ret);
+      return 1;
+   }
+
+   // If the first argument is "-h", call fuse to print help
+   if(strcmp(argv[1], "-h") == 0){
+      for(ret=2;ret<argc;ret++){ argv[ret] = NULL; }
+      argc = 2;
+      $usage();
+      fprintf(stderr, "FUSE AND MOUNT OPTIONS:\n\n");
+      fuse_main(argc, argv, NULL, NULL);
+      return 2;
+   }
+
+   // Perform some sanity checking on the command line:  make sure
+   // there are enough arguments, and that neither of the last two
+   // start with a hyphen (this will break if you actually have a
+   // rootpoint or mountpoint whose name starts with a hyphen)
+   if((argc < 3) || (argv[argc - 2][0] == '-') || (argv[argc - 1][0] == '-')){
+      $usage();
       return 1;
    }
 
@@ -234,19 +254,10 @@ int main(int argc, char *argv[])
       return 1;
    }
 
-   // Perform some sanity checking on the command line:  make sure
-   // there are enough arguments, and that neither of the last two
-   // start with a hyphen (this will break if you actually have a
-   // rootpoint or mountpoint whose name starts with a hyphen, but so
-   // will a zillion other programs)
-   if((argc < 3) || (argv[argc - 2][0] == '-') || (argv[argc - 1][0] == '-'))
-      $usage();
-
-   // Pull the rootdir out of the argument list and save it in my
-   // internal data
+   // Pull the rootdir out of the argument list and save it in the internal data
    fsdata->rootdir = realpath(argv[argc - 2], NULL); // this calls malloc
    if(fsdata->rootdir == NULL) {
-      fprintf(stderr, "Error getting the root dir %s. Aborting.\n", argv[argc - 2]);
+      fprintf(stderr, "Error getting the root directory from '%s'. Aborting.\n", argv[argc - 2]);
       return 1;
    }
 
@@ -262,23 +273,23 @@ int main(int argc, char *argv[])
    // Initial things to do
 
    // Get the main snapshot dir path
-   if($map_path(fsdata->sn_dir, $$SNDIR, fsdata) == -ENAMETOOLONG) {
-      fprintf(stderr, "Snapshot dir path is too long. Aborting.\n");
+   if($map_path(fsdata->sn_dir, $$SNDIR, fsdata) != 0) {
+      fprintf(stderr, "Snapshot directory path is too long. Aborting.\n");
       return 1;
    }
 
    if($sn_check_dir(fsdata) != 0) {
-      fprintf(stderr, "Snapshot dir check failed, please check logs. Aborting.\n");
+      fprintf(stderr, "Snapshot dirextory check failed, please check the logs. Aborting.\n");
       return 1;
    }
 
    if($sn_get_latest(fsdata) != 0) {
-      fprintf(stderr, "Getting latest snapshot failed, please check logs. Aborting.\n");
+      fprintf(stderr, "Getting the latest snapshot failed, please check the logs. Aborting.\n");
       return 1;
    }
 
    if($mflock_init(fsdata) != 0) {
-      fprintf(stderr, "Failed to initialise mutexes. Aborting.\n");
+      fprintf(stderr, "Failed to initialise the mutexes. Aborting.\n");
       return 1;
    }
 
@@ -286,7 +297,7 @@ int main(int argc, char *argv[])
    // user_data   user data supplied in the context during the init() method
    // Returns: 0 on success, nonzero on failure
    if((ret = fuse_main(argc, argv, &$oper, fsdata)) != 0) {
-      fprintf(stderr, "FUSE returned with error %d. Sorry.\n", ret);
+      fprintf(stderr, "FUSE returned with error '%d'. Aborting.\n", ret);
    }
    return ret;
 }
