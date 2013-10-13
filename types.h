@@ -194,7 +194,6 @@ enum $$mfd_types {
    $$mfd_sn_full
 };
 
-#define $$MFD_MAINLIKE(is_main) ((is_main == $$mfd_main) || (is_main == $$mfd_sn_root))
 
 /** Filehandle struct (mfd)
  *

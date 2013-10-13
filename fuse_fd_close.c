@@ -156,7 +156,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
    $$DFSDATA
    mfd = $$MFD;
 
-   if($$MFD_MAINLIKE(mfd->is_main)) {
+   if((mfd->is_main == $$mfd_main) || (mfd->is_main == $$mfd_sn_root)) {
 
       $dlogdbg("releasedir.main(path=\"%s\")\n", path);
       if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
