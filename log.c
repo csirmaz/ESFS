@@ -109,7 +109,7 @@ void log_fi (struct fuse_file_info *fi)
     /** Can be filled in by open, to indicate, that cached file data
         need not be invalidated.  Introduced in version 2.4 */
     //	unsigned int flush : 1;
-	log_struct(fi, keep_cache, %d, );
+	log_struct(fi, keep_cache, %d, ); // TODO Check if this would be useful
 
     /** Padding.  Do not use*/
     //	unsigned int padding : 29;
