@@ -37,15 +37,6 @@
 #ifndef $$TYPES_H_
 #define $$TYPES_H_
 
-/* Formats on my system
- * size_t %zu
- * off_t %td
- */
-
-// Logging
-// -------
-#define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__);fflush(fsdata->logfile) // debug messages
-#define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__);fflush(fsdata->logfile) // important log lines
 
 
 // Constants

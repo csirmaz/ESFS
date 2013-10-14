@@ -42,6 +42,15 @@
 #ifndef $$PARAMS_H_
 #define $$PARAMS_H_
 
+/** Debug level
+ *
+ * Available levels:
+ * 0 = no logs
+ * 1 = important messages
+ * 2 = debug messages
+ */
+#define $$DEBUG 2
+
 // The FUSE API has been changed a number of times.  So, our code
 // needs to define the version of the API that we assume.  As of this
 // writing, the most current API version is 26

@@ -56,14 +56,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/xattr.h> // TODO not needed?
 #include <sys/stat.h> // utimens
 #include <sys/select.h> // pselect
+#if $$DEBUG > 0
+#  include <sys/syscall.h> // for gettid only
+#endif
 #include <pthread.h> // mutexes
 #include <ftw.h> // nftw
 
 #include "types_c.h"
-
 #include "util_c.c"
 #include "snapshot_c.c"
 #include "mfd_c.c"
@@ -154,6 +155,10 @@ void $destroy(void *privdata)
    $mflock_destroy(fsdata);
 
    $dlogi("Bye!\n");
+
+#if $$DEBUG > 0
+   log_close(fsdata->logfile);
+#endif
 
    free(fsdata->rootdir);
    free(fsdata);
@@ -268,7 +273,12 @@ int main(int argc, char *argv[])
    argv[argc - 1] = NULL;
    argc--;
 
-   fsdata->logfile = log_open(); // TODO check for errors
+#if $$DEBUG > 0
+   if((fsdata->logfile = log_open()) == NULL){
+      fprintf(stderr, "Could not open the logfile. Aborting.\n");
+      return 1;
+   }
+#endif
 
    // Initial things to do
 

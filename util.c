@@ -36,23 +36,43 @@
 
 // This file contains low-level tools.
 
+// Logging
+// -------
+// important log lines
+#if $$DEBUG > 0
+#   define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__)
+#else
+#   define $dlogi(...)
+#endif
 
+// debug messages
+#if $$DEBUG > 1
+#   define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__)
+#else
+#   define $dlogdbg(...)
+#endif
+
+
+/** Opens the logfile
+ */
 FILE *log_open()
 {
    FILE *logfile;
 
-   // very first thing, open up the logfile and mark that we got in
-   // here.  If we can't open the logfile, we're dead.
    logfile = fopen("esfs.log", "w");
-   if(logfile == NULL) {
-      perror("logfile");
-      exit(EXIT_FAILURE);
+   if(logfile != NULL) {
+      // set logfile to line buffering
+      setvbuf(logfile, NULL, _IOLBF, 0);
    }
 
-   // set logfile to line buffering
-   setvbuf(logfile, NULL, _IOLBF, 0);
-
    return logfile;
+}
+
+
+/** Closes the logfile
+ */
+log_close(FILE *logfile){
+   fclose(logfile);
 }
 
 
