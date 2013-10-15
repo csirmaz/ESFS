@@ -291,14 +291,14 @@ int $opendir(const char *path, struct fuse_file_info *fi)
          }
 
          if(unlikely((waserror = $mfd_get_sn_steps(mfd, snpath, fsdata, $$SN_STEPS_F_DIR)) != 0)) {
-            $dlogdbg("get sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
+            $dlogi("ERROR get sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
             break;
          }
 
          // No directories found in any snapshot or the main part
          if(mfd->sn_first_file == -1) {
             if(unlikely((waserror = $mfd_destroy_sn_steps(mfd, fsdata)) != 0)) {
-               $dlogdbg("destroy sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
+               $dlogi("ERROR destroy sn steps failed with %d = %s\n", -waserror, strerror(-waserror));
                break;
             }
             waserror = -ENOENT;
@@ -393,7 +393,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
 
    // TODO CLEAN UP MAP/DAT FILES unnecessarily created?
    if(unlikely((ret = $mfd_close_sn(mfd, fsdata)) != 0)) {
-      $dlogdbg("_open_truncate_close(%s): mfd_close_sn failed err %d = %s\n", fpath, -ret, strerror(-ret));
+      $dlogi("ERROR _open_truncate_close(%s): mfd_close_sn failed err %d = %s\n", fpath, -ret, strerror(-ret));
       return ret;
    }
 

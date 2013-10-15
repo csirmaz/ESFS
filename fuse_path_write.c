@@ -140,7 +140,7 @@ int $rename(const char *path, const char *newpath)
 
    $dlogdbg("Rename: Opening '%s'... (mymfd)\n", path);
    if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
-      $dlogi("Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", path, ret, strerror(-ret));
+      $dlogi("ERROR Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", path, ret, strerror(-ret));
       // We do not allow moving/renaming directories,
       // to save the complexity of saving the file change of everything under them.
       if(ret == -EISDIR) {
@@ -155,7 +155,7 @@ int $rename(const char *path, const char *newpath)
       // Get the mfd for newpath.
       $dlogdbg("Rename: Opening '%s'... (mynewmfd)\n", newpath);
       if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
-         $dlogi("Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", newpath, ret, strerror(-ret));
+         $dlogi("ERROR Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", newpath, ret, strerror(-ret));
          waserror = ret;
          break;
       }
@@ -165,7 +165,7 @@ int $rename(const char *path, const char *newpath)
          // If newpath exists, it will be replaced, so we need to save it.
          if(mynewmfd.mapheader.exists != 0) {
             if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0)) != 0)) {
-               $dlogi("Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
+               $dlogi("ERROR Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
                waserror = ret;
                break;
             }
@@ -179,7 +179,7 @@ int $rename(const char *path, const char *newpath)
          if(mymfd.write_vpath[0] != '\0') {
             $dlogdbg("Rename: Opening '%s' with nofollow... (mydirectmfd)\n", path);
             if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW | $$MFD_KEEPLOCK)) != 0)) {
-               $dlogi("Rename: mfd_open_sn(nofollow) failed on %s with %d = %s\n", path, ret, strerror(-ret));
+               $dlogi("ERROR Rename: mfd_open_sn(nofollow) failed on %s with %d = %s\n", path, ret, strerror(-ret));
                waserror = ret;
                break;
             }
@@ -208,7 +208,7 @@ int $rename(const char *path, const char *newpath)
 
             // TODO 2 Skip saving the mapheader wile opening mfd if the map file has just been created here
             if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
-               $dlogi("Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
+               $dlogi("ERROR Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
                // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
                waserror = ret;
                break;
@@ -219,7 +219,7 @@ int $rename(const char *path, const char *newpath)
                $dlogdbg("Rename: removing the write directive from the direct map of '%s'\n", path);
                mydirectmfd.mapheader.write_v[0] = '\0';
                if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)) {
-                  $dlogi("Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
+                  $dlogi("ERROR Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
                   waserror = ret;
                   break;
                }
@@ -230,7 +230,7 @@ int $rename(const char *path, const char *newpath)
             strcpy(mymfd.mapheader.read_v, newpath);
             $dlogdbg("Rename: writing the read directive '%s' into the map of '%s'\n", mymfd.mapheader.read_v, path);
             if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)) {
-               $dlogi("Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
+               $dlogi("ERROR Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
                // We could restore mynewmfd.mapheader & mydirectmfd.mapheader here.
                waserror = ret;
                break;
@@ -241,7 +241,7 @@ int $rename(const char *path, const char *newpath)
          if(mymfd.write_vpath[0] != '\0') {
             // We want to close mydirectmfd on both success and failure
             if(unlikely((ret = $mfd_close_sn(&mydirectmfd, fsdata)) != 0)) {
-               $dlogi("Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
+               $dlogi("ERROR Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
                waserror = ret;
                break;
             }
@@ -251,7 +251,7 @@ int $rename(const char *path, const char *newpath)
       } while(0);
 
       if((ret = $mfd_close_sn(&mynewmfd, fsdata)) != 0) {
-         $dlogi("Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
+         $dlogi("ERROR Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
          waserror = ret;
          break;
       }
@@ -259,7 +259,7 @@ int $rename(const char *path, const char *newpath)
    } while(0);
 
    if((ret = $mfd_close_sn(&mymfd, fsdata)) != 0) {
-      $dlogi("Rename: mfd_close_sn(mymfd) failed with %d = %s\n", ret, strerror(-ret));
+      $dlogi("ERROR Rename: mfd_close_sn(mymfd) failed with %d = %s\n", ret, strerror(-ret));
       waserror = ret;
    }
 
@@ -314,7 +314,7 @@ int $unlink(const char *path)
    if(unlink(fpath) == 0) { return 0; }
 
    ret = errno;
-   $dlogdbg("unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogdbg("ERROR unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: move file to snapshot if feasible
@@ -338,7 +338,7 @@ int $truncate(const char *path, off_t newsize)
    if(truncate(fpath, newsize) == 0) { return 0; }
 
    ret = errno;
-   $dlogdbg("truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogdbg("ERROR truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: copy file to snapshot if that's faster?

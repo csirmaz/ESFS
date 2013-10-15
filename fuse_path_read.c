@@ -62,7 +62,7 @@ int $getattr(const char *path, struct stat *statbuf)
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
                                              $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
                                             )) != 0)) {
-         $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
+         $dlogi("ERROR get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
 
          if(mfd.sn_first_file == -1) {
@@ -127,7 +127,7 @@ int $access(const char *path, int mask)
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
                                              $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
                                             )) != 0)) {
-         $dlogdbg("get sn steps failed with %d = %s\n", -snret, strerror(-snret));
+         $dlogi("ERROR get sn steps failed with %d = %s\n", -snret, strerror(-snret));
          break;
       }
 

@@ -408,18 +408,18 @@ static int $read_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH
       if(fd == ENOENT) {
          return 0;
       }
-      $dlogi("opening %s failed with %d = %s\n", filepath, fd, strerror(fd));
+      $dlogi("ERROR opening %s failed with %d = %s\n", filepath, fd, strerror(fd));
       return -fd;
    }
 
    ret = pread(fd, buf, $$PATH_MAX, 0);
    if(ret == -1) {
       ret = errno;
-      $dlogi("reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
+      $dlogi("ERROR reading from %s failed with %d = %s\n", filepath, ret, strerror(ret));
       return -ret;
    }
    if(ret == 0 || buf[ret - 1] != '\0') {
-      $dlogi("reading from '%s' returned '%d'==0 bytes or string is not 0-terminated ('%c').\n", filepath, ret, buf[ret]);
+      $dlogi("ERROR reading from '%s' returned '%d'==0 bytes or string is not 0-terminated ('%c').\n", filepath, ret, buf[ret]);
       return -EIO;
    }
 

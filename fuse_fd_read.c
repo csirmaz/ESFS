@@ -72,7 +72,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 
    }
 
-   $dlogi("Wrong is_main!\n");
+   $dlogi("ERROR Wrong is_main!\n");
    return -EBADE;
 
 }
@@ -192,11 +192,11 @@ static int $_sn_readdir(
                fd = open(fpath, O_RDONLY);
                if(fd == -1) {
                   waserror = -errno;
-                  $dlogdbg("Opening '%s' failed with %d = %s\n", fpath, -waserror, strerror(-waserror));
+                  $dlogi("ERROR Opening '%s' failed with %d = %s\n", fpath, -waserror, strerror(-waserror));
                   break; // break while (b)
                }
                if((waserror = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0) {
-                  $dlogdbg("mfd_load_mapheader failed with '%s'\n", strerror(-waserror));
+                  $dlogi("ERROR mfd_load_mapheader failed with '%s'\n", strerror(-waserror));
                   close(fd); // cleanup
                   break; // break while (b)
                }
@@ -369,7 +369,7 @@ int $readdir(
 
       default:
 
-         $dlogdbg("Unknown mfd->is_main %d\n", mfd->is_main);
+         $dlogi("ERROR Unknown mfd->is_main %d\n", mfd->is_main);
          return -EBADE;
    }
 }

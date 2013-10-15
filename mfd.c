@@ -165,12 +165,12 @@ static inline int $mfd_save_mapheader(const struct $mfd_t *mfd, const struct $fs
    ret = pwrite(mfd->mapfd, &(mfd->mapheader), sizeof(struct $mapheader_t), 0);
    if(unlikely(ret == -1)) {
       ret = errno;
-      $dlogi("mfd_save_mapheader: Failed to write .map header, error %d = %s\n", ret, strerror(ret));
+      $dlogi("ERROR mfd_save_mapheader: Failed to write .map header, error %d = %s\n", ret, strerror(ret));
       return -ret;
    }
 
    if(unlikely(ret != sizeof(struct $mapheader_t))) {
-      $dlogi("mfd_save_mapheader: Failed: only written %d bytes into .map header\n", ret);
+      $dlogi("ERROR mfd_save_mapheader: Failed: only written %d bytes into .map header\n", ret);
       return -EIO;
    }
 
@@ -191,17 +191,17 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
    ret = pread(fd, maphead, sizeof(struct $mapheader_t), 0);
    if(unlikely(ret == -1)) {
       ret = errno;
-      $dlogi("Failed to read .map, error %d = %s\n", ret, strerror(ret));
+      $dlogi("ERROR Failed to read .map, error %d = %s\n", ret, strerror(ret));
       return -ret;
    }
    if(unlikely(ret != sizeof(struct $mapheader_t))) {
-      $dlogi("Only read %d bytes instead of %ld from .map. Broken FS?\n", ret, sizeof(struct $mapheader_t));
+      $dlogi("ERROR Only read %d bytes instead of %ld from .map. Broken FS?\n", ret, sizeof(struct $mapheader_t));
       return -EIO;
    }
 
    // Check the version and the signature
    if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0) {
-      $dlogi("version or signature bad in map file. Broken FS?\n");
+      $dlogi("ERROR version or signature bad in map file. Broken FS?\n");
       return -EFAULT;
    }
 
@@ -691,7 +691,7 @@ static int $mfd_get_sn_steps(
 
    // Get the roots of the snapshots and the main space
    if(unlikely((ret = $sn_get_paths_to(mfd, snpath, fsdata)) != 0)) {
-      $dlogdbg("sn_get_paths_to failed with %d = %s\n", -ret, strerror(-ret));
+      $dlogi("ERROR sn_get_paths_to failed with %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
 
@@ -735,7 +735,7 @@ static int $mfd_get_sn_steps(
                // Try treating this as a file
                knowntype = 'f';
             } else {
-               $dlogdbg("lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+               $dlogi("ERROR lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                waserror = -ret;
                break;
             }
@@ -758,7 +758,7 @@ static int $mfd_get_sn_steps(
                   mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                   continue;
                } else {
-                  $dlogdbg("opendir on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+                  $dlogi("ERROR opendir on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                   waserror = -ret;
                   break;
                }
@@ -780,7 +780,7 @@ static int $mfd_get_sn_steps(
                         mfd->sn_steps[sni].mapfd = $$SN_STEPS_UNUSED;
                         mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                      } else {
-                        $dlogdbg("lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+                        $dlogi("ERROR lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                         waserror = -ret;
                         break;
                      }
@@ -811,7 +811,7 @@ static int $mfd_get_sn_steps(
                   mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                   continue;
                } else {
-                  $dlogdbg("open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
+                  $dlogi("ERROR open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
                   waserror = -ret;
                   break;
                }
@@ -849,7 +849,7 @@ static int $mfd_get_sn_steps(
                      mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                      continue;
                   } else {
-                     $dlogdbg("open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
+                     $dlogi("ERROR open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
                      waserror = -ret;
                      break;
                   }
@@ -879,7 +879,7 @@ static int $mfd_get_sn_steps(
                      mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                      continue;
                   } else {
-                     $dlogdbg("open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
+                     $dlogi("ERROR open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
                      waserror = -ret;
                      break;
                   }
@@ -910,7 +910,7 @@ static int $mfd_get_sn_steps(
          }
 
       } else {
-         $dlogi("Wrong flag!");
+         $dlogi("ERROR Wrong flag!");
          waserror = -EBADE;
       }
 

@@ -83,7 +83,7 @@ static int $sn_check_dir(struct $fsdata_t *fsdata) // $dlogi needs this to locat
    if(lstat(fsdata->sn_dir, &mystat) == 0) {
       // Check if it is a directory
       if(S_ISDIR(mystat.st_mode)) { return 0; }
-      $dlogi("Found something else than a directory at '%s'\n", fsdata->sn_dir);
+      $dlogi("ERROR Found something else than a directory at '%s'\n", fsdata->sn_dir);
       return 1;
    } else {
       ret = errno;
@@ -265,7 +265,7 @@ static int $sn_get_latest(struct $fsdata_t *fsdata)
 
    if(ret == 0) {
       fsdata->sn_is_any = 0;
-      $dlogi("'%s' not found, so there must be no snapshots\n", path);
+      $dlogdbg("'%s' not found, so there must be no snapshots\n", path);
       return 0;
    }
 
@@ -301,7 +301,7 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
    if(fd == -1) {
       fd = errno;
-      $dlogi("opening %s failed with %d = %s\n", path, fd, strerror(fd));
+      $dlogi("ERROR opening %s failed with %d = %s\n", path, fd, strerror(fd));
       return -fd;
    }
 
@@ -309,11 +309,11 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
    ret = pwrite(fd, newpath, len, 0);
    if(ret == -1) {
       ret = errno;
-      $dlogi("writing to %s failed with %d = %s\n", path, ret, strerror(ret));
+      $dlogi("ERROR writing to %s failed with %d = %s\n", path, ret, strerror(ret));
       return -ret;
    }
    if(ret != len) {
-      $dlogi("writing to %s returned %d bytes instead of %d\n", path, ret, len);
+      $dlogi("ERROR writing to %s returned %d bytes instead of %d\n", path, ret, len);
       return -EIO;
    }
 
@@ -350,7 +350,7 @@ int $sn_create(
    // Create root of snapshot
    if(unlikely(mkdir(path, S_IRWXU) != 0)) {
       ret = errno;
-      $dlogi("creating %s failed with %d = %s\n", path, ret, strerror(ret));
+      $dlogi("ERROR creating %s failed with %d = %s\n", path, ret, strerror(ret));
       return -ret;
    }
 
@@ -360,7 +360,7 @@ int $sn_create(
          // Set up pointer file to previos snapshot
          ret = $get_hid_path(hid, path);
          if(ret < 0) {
-            $dlogi("creating %s failed when getting hid path\n", path);
+            $dlogi("ERROR creating %s failed when getting hid path\n", path);
             waserror = -ret;
             break;
          }
@@ -368,7 +368,7 @@ int $sn_create(
          fd = open(hid, O_WRONLY | O_CREAT | O_EXCL, S_IRWXU);
          if(fd == -1) {
             fd = errno;
-            $dlogi("opening %s failed with %d = %s\n", hid, fd, strerror(fd));
+            $dlogi("ERROR opening %s failed with %d = %s\n", hid, fd, strerror(fd));
             waserror = fd;
             break;
          }
@@ -379,12 +379,12 @@ int $sn_create(
             ret = pwrite(fd, fsdata->sn_lat_dir, len, 0);
             if(ret == -1) {
                ret = errno;
-               $dlogi("writing to %s failed with %d = %s\n", hid, ret, strerror(ret));
+               $dlogi("ERROR writing to %s failed with %d = %s\n", hid, ret, strerror(ret));
                waserror = ret;
                break;
             }
             if(ret != len) {
-               $dlogi("writing to %s returned %d bytes instead of %d\n", hid, ret, len);
+               $dlogi("ERROR writing to %s returned %d bytes instead of %d\n", hid, ret, len);
                waserror = EIO;
                break;
             }
@@ -400,7 +400,7 @@ int $sn_create(
          close(fd);
 
          if(unlikely(waserror != 0)) {
-            $dlogi("Cleanup: removing %s\n", hid);
+            $dlogdbg("Cleanup: removing %s\n", hid);
             unlink(hid);
          }
 
@@ -416,7 +416,7 @@ int $sn_create(
    } while(0);
 
    if(unlikely(waserror != 0)) {
-      $dlogi("Cleanup: removing %s\n", path);
+      $dlogdbg("Cleanup: removing %s\n", path);
       rmdir(path);
       return -waserror;
    }

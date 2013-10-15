@@ -104,7 +104,7 @@ int $release(const char *path, struct fuse_file_info *fi)
 
    } else {
 
-      $dlogi("Wrong is_main!\n");
+      $dlogi("ERROR Wrong is_main!\n");
       ret = -EBADE;
 
    }
