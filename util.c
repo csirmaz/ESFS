@@ -71,7 +71,7 @@ FILE *log_open()
 
 /** Closes the logfile
  */
-log_close(FILE *logfile){
+void log_close(FILE *logfile){
    fclose(logfile);
 }
 
@@ -155,34 +155,22 @@ log_close(FILE *logfile){
    return -EFAULT;
 
 
-// TODO Check where these are used, and simplify them!
-/** Adds a prefix to a path (MAY RETURN)
- *
- * Needs $$PATH_LEN_T plen
- *
- * Returns: -ENAMETOOLONG - if the new path is too long
- * Otherwise CONTINUES
- */
-#define $$ADDNPREFIX_CONT(newpath, oldpath, fix, fixlen) \
-   plen = $$PATH_MAX - fixlen; \
-   if(unlikely(strlen(oldpath) >= plen)) { \
-      return -ENAMETOOLONG; \
-   } \
-   strcpy(newpath, fix); \
-   strncat(newpath, oldpath, plen); \
- 
-
-// TODO Use get_hid_path, get_map_path instead
-/** Adds a prefix to a path (STANDALONE - ALWAYS RETURNS!)
+/** Adds a prefix to a path
  *
  * Returns:
  * * 0 - success
  * * -ENAMETOOLONG - if the new path is too long
  */
-#define $$ADDNPREFIX_RET(newpath, oldpath, fix, fixlen) \
-   $$PATH_LEN_T plen; \
-   $$ADDNPREFIX_CONT(newpath, oldpath, fix, fixlen) \
-   return 0;
+static inline int $get_prefix_path(char *newpath, const char *oldpath, const char *prefix, int prefixlen)
+{
+   if(likely(strlen(oldpath) < $$PATH_MAX - prefixlen)) {
+      strncpy(newpath, prefix, prefixlen);
+      newpath[prefixlen] = '\0';
+      strcat(newpath, oldpath);
+      return 0;
+   }
+   return -ENAMETOOLONG;
+}
 
 
 /** Adds the "map" suffix and a prefix to a path
@@ -300,7 +288,13 @@ static inline int $get_dir_hid_path(char *newpath, const char *oldpath)
  */
 static inline int $map_path(char *fpath, const char *path, const struct $fsdata_t *fsdata)
 {
-   $$ADDNPREFIX_RET(fpath, path, fsdata->rootdir, fsdata->rootdir_len)
+   if(likely(strlen(path) < $$PATH_MAX - fsdata->rootdir_len)) {
+      strncpy(fpath, fsdata->rootdir, fsdata->rootdir_len);
+      fpath[fsdata->rootdir_len] = '\0';
+      strcat(fpath, path);
+      return 0;
+   }
+   return -ENAMETOOLONG;
 }
 
 
@@ -359,99 +353,37 @@ static int $decompose_sn_path(struct $snpath_t *snpath, const char *path)
 }
 
 
-/** Helper function for the implementation of rm -r
+/** Hash a string into a number
  *
- * Returns 0 or errno.
+ * This is a modified version of djb2.
+ * For djb2, please see
+ * http://stackoverflow.com/questions/1579721/can-anybody-explain-the-logic-behind-djb2-hash-function
  */
-int $_univ_rm(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+static inline unsigned long $djb2(const unsigned char *s)
 {
-   if(typeflag == FTW_DP || typeflag == FTW_D || typeflag == FTW_DNR) {
-      if(rmdir(fpath) != 0) { return errno; }
-      return 0;
-   }
+   unsigned long key = 5381;
+   int i;
+   $$PATH_LEN_T j;
 
-   if(unlink(fpath) != 0) { return errno; }
-   return 0;
-}
-
-/** Implementation of rm -r
- *
- * Returns 0 or -errno.
- */
-// TODO Make this atomic (and thread safe) by renaming the snapshot first -- see ESBD
-static inline int $recursive_remove(const char *path)
-{
-   int ret;
-   ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS); // TODO 1 nftw is not thread safe -- LOCK!
-   if(ret >= 0) { return -ret; } // success or errno
-   return -ENOMEM; // generic error encountered by nftw
-}
-
-
-/** Implementation of mkdir -p
- *
- * Creates the directory at *the parent of* path and any parent directories as needed
- *
- * If firstcreated != NULL, it is set to be the top directory created
- *
- * Returns:
- * * 0 if the directory already exists
- * * 1 if a directory has been created
- * * -errno on failure.
- */
-// NOTE: dirname() and basename() are not thread safe
-static int $mkpath(const char *path, char firstcreated[$$PATH_MAX], mode_t mode)
-{
-   int slashpos;
-   int statret;
-   int mkpathret;
-   int mkdirret;
-   char prepath[$$PATH_MAX];
-   struct stat mystat;
-
-   // find previous slash
-   slashpos = strlen(path) - 1;
-   while(slashpos >= 0 && path[slashpos] != $$DIRSEPCH) { slashpos--; }
-   if(slashpos > 0) { // found one
-      strncpy(prepath, path, slashpos);
-      prepath[slashpos] = '\0';
-   } else { // no slash or slash is first character
-      return -EBADE;
-   }
-
-   // $dlogdbg("mkpath: %s <- %s\n", path, prepath);
-
-   if(lstat(prepath, &mystat) != 0) {
-      statret = errno;
-      if(statret == ENOENT) { // the parent node does not exist
-
-         mkpathret = $mkpath(prepath, firstcreated, mode);
-         // $dlogdbg("mkpath: recursion returned with %d\n", p);
-         if(mkpathret < 0) { return mkpathret; } // error
-
-         // attempt to create the directory
-         if(mkdir(prepath, mode) != 0) {
-            mkdirret = errno;
-            // Don't abort on EEXIST as another thread might be busy creating
-            // the same directories. Simply assume success.
-            if(mkdirret != EEXIST) {
-               return -mkdirret;
-            }
-         }
-
-         // save first directory created
-         if(mkpathret == 0 && firstcreated != NULL) { strcpy(firstcreated, prepath); }
-
-         return 1;
+   for(i=0; i<5; i++){
+      for(j=0; s[j]; j++){
+         key = ((key << 5) + key) + s[j];
       }
-      return -statret;
    }
+   return key;
+}
 
-   if(S_ISDIR(mystat.st_mode)) {
-      return 0; // node exists and is a directory
-   }
 
-   return -ENOTDIR; // found a node but it isn't a directory
+/** Helper function to get a suitable lock label from a string
+ *
+ */
+static inline $$LOCKLABEL_T $string2locklabel(const char *s)
+{
+   unsigned long key;
+
+   key = $djb2((unsigned char*) s);
+   if(key != 0){ return key; } // 0 is a special value in the lock system
+   return 1;
 }
 
 
@@ -492,7 +424,7 @@ static int $read_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH
 
    close(fd);
 
-   // TODO check if the directory really exists before returning success?
+   // TODO 2 check if the directory really exists before returning success?
 
    return (ret - 1);
 }
@@ -504,7 +436,7 @@ static int $read_sndir_from_file(const struct $fsdata_t *fsdata, char buf[$$PATH
  * * 0 on success
  * * <0 on failure
  */
-int $check_params(void)
+static int $check_params(void)
 {
    // Check string lengths
    if(strlen($$SNDIR) != $$SNDIR_LEN) { return -51; }

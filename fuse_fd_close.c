@@ -95,7 +95,7 @@ int $release(const char *path, struct fuse_file_info *fi)
 
    if(mfd->is_main == $$mfd_main) {
 
-      ret = $mfd_close_sn(mfd);
+      ret = $mfd_close_sn(mfd, fsdata);
       if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
 
    } else if(mfd->is_main == $$mfd_sn_full) {

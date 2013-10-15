@@ -44,14 +44,14 @@
 // IMPORTANT: When changing these, update $check_params.
 
 /* About $$PATH_MAX
- * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html
- * suggests that operations need to be thread-safe, although pkg-config does
- * not return -D_REENTRANT on my system. // TODO
+ * Operations need to be thread-safe (although pkg-config does
+ * not return -D_REENTRANT on my system - please see
+ * http://sysdocs.stu.qmul.ac.uk/sysdocs/Comment/FuseUserFileSystems/FuseBase.html )
  * Using a constant-length string to store the mapped path appears to be the
  * simplest solution under these circumstances, even though incoming paths
  * can be of any length.
  */
-#define $$PATH_MAX PATH_MAX // we regularly use strings of this length
+#define $$PATH_MAX PATH_MAX /**< we store paths in strings of this length */
 #define $$PATH_LEN_T size_t // type to store path lengths in
 #define $$FILESIZE_T unsigned long // type to store file size in
 
@@ -60,7 +60,7 @@
 #define $$BLP_T size_t // block pointer type. Note: filesizes are stored in off_t
 #define $$BLP_S (sizeof($$BLP_T)) // block pointer size in bytes
 
-#define $$MAX_SNAPSHOTS 1024*1024 // this is currently only used to detect infinite loops // TODO Review this
+#define $$MAX_SNAPSHOTS 1024*1024 // this is currently only used to detect infinite loops // TODO 2 Review this
 
 // The snapshots directory
 //                  0123456789
@@ -76,16 +76,14 @@
 #define $$DIRSEP "/"
 #define $$DIRSEPCH '/'
 
-// Locking
-#define $$LOCK_NUM 64 // Number of locks; this determines the number of concurrent files that can be written
-#define $$LOCKLABEL_T ino_t // ==, & used on it. 0 is a special value
-
 #define $$RECURSIVE_RM_FDS 3 // number of filehandles to use when traversing directories
 
-// MFD open flags
-#define $$MFD_DEFAULTS 0
-#define $$MFD_NOFOLLOW 1
 
+// Locking
+#define $$LOCK_NUM 64 // Number of locks; this determines the number of concurrent files that can be written
+#define $$LOCKLABEL_T unsigned long // ==, & used on it. 0 is a special value
+
+#define $$LOCKLABEL_RMDIR "*rmdir"
 
 /** An element in the table used for file-based locking
  */
@@ -145,15 +143,6 @@ struct $mapheader_t {
 // TODO 2 To make FS files portable, the types used here should be reviewed, and proper (de)serialisation implemented.
 
 
-/** See $mfd_get_sn_steps */
-#define $$SN_STEPS_F_FILE           00000001
-#define $$SN_STEPS_F_DIR            00000002
-#define $$SN_STEPS_F_TYPE_UNKNOWN   00000004
-#define $$SN_STEPS_F_FIRSTONLY      00000010
-#define $$SN_STEPS_F_SKIPOPENDAT    00000020
-#define $$SN_STEPS_F_SKIPOPENDIR    00000040
-#define $$SN_STEPS_F_STATDIR        00000100
-
 #define $$SN_STEPS_UNUSED -8
 #define $$SN_STEPS_NOTOPEN -9
 #define $$SN_STEPS_MAIN -7
@@ -187,10 +176,10 @@ enum $$mfd_types {
 };
 
 
-#define $$MFD_FD_NOSN -1
+#define $$MFD_FD_NOSN   -1
 #define $$MFD_FD_RDONLY -2
 #define $$MFD_FD_ENOENT -3
-#define $$MFD_FD_ZLEN -4
+#define $$MFD_FD_ZLEN   -4
 
 /** Filehandle struct (mfd)
  *
@@ -210,14 +199,16 @@ struct $mfd_t {
 
    // MAIN FILE PART: (used when dealing with a file in the main space)
    int sn_number; /**< a number identifying the current snapshot; compared to fsdata->sn_number */
-   char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised */
+   char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised due to a new snapshot. This is the original vpath even if we have followed a write directive */
    int flags; /**< the flags the mfd was opened with; needed in case the map/dat files must be reinitalised */
    int mainfd; /**< filehandle for the main file */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
-   ino_t main_inode; /**< the inode number of the main file (which is possibly new, so not in mapheader.fstat), used for locking */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot. See $mfd_open_sn */
    int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
-   int is_renamed; /**< bool; 0 or 1 if we have followed a write directive. See $mfd_open_sn */
+   $$LOCKLABEL_T locklabel;
+   // USED FOR RENAMES
+   char write_vpath[$$PATH_MAX]; /**< the vpath the map/dat of which is actually open; or a zero-length string if we haven't followed a write directive */
+   int lock; /**< used when the lock is kept; -1 means the lock is not set */
 
    // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)
    int sn_current; /**< the largest index in sn_steps, representing the snapshot being read */
@@ -226,7 +217,7 @@ struct $mfd_t {
 };
 
 
-/** A path and a marker */
+/** A path for lists of paths */
 struct $pathmark_t {
    char path[$$PATH_MAX];
 };

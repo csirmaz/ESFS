@@ -34,13 +34,6 @@
  * in this file. To write $, use \$.
  */
 
-/*
- * Useful information
- * ==================
- *
- * Get the fuse command line arguments by passing -h to the compiled binary.
- *
- */
 
 #include "params_c.h"
 
@@ -66,9 +59,10 @@
 
 #include "types_c.h"
 #include "util_c.c"
+#include "mflock_c.c"
+#include "util_locking_c.c"
 #include "snapshot_c.c"
 #include "mfd_c.c"
-#include "mflock_c.c"
 #include "block_c.c"
 #include "stat_c.c"
 #include "fuse_fd_close_c.c"
@@ -234,8 +228,8 @@ int main(int argc, char *argv[])
       return 1;
    }
 
-   // If the first argument is "-h", call fuse to print help
-   if(strcmp(argv[1], "-h") == 0){
+   // If the first argument is "-h", call fuse to print the FUSE and mount options
+   if(argc > 1 && strcmp(argv[1], "-h") == 0){
       for(ret=2;ret<argc;ret++){ argv[ret] = NULL; }
       argc = 2;
       $usage();

@@ -155,7 +155,7 @@ static int $mflock_init(struct $fsdata_t *fsdata)
 
    pthread_mutexattr_init(&mutexattr);
    pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_ERRORCHECK_NP);
-   // TODO Later switch to the default by using NULL instead of mutexattr below
+   // TODO 1 Later switch to the default by using NULL instead of mutexattr below
 
    fsdata->mflocks = malloc(sizeof(struct $mflock_t) * $$LOCK_NUM);
    if(fsdata->mflocks == NULL) { return -ENOMEM; }
@@ -185,7 +185,9 @@ static int $mflock_destroy(struct $fsdata_t *fsdata)
 }
 
 
-/** Gets a lock on a particular file
+/** Gets a lock for a particular label
+ *
+ * label==0 means that the lock is not in use, so it cannot be used here
  *
  * Returns:
  * * lock number on success (>=0)
@@ -222,6 +224,7 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label)
          (mylock->want)--;
          if(likely(mylock->label == label)) { // recheck
             // We have (successfully taken over) the mutex and it's labelled with the label
+            $dlogdbg("_lock: got lock '%d' for label '%lu' (takeover)\n", ml, label);
             return ml;
          }
          // If recheck fails, retry from start
@@ -230,7 +233,7 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label)
       }
 
       // label is not in the table:
-      // get the modmutes and re-check that the label is still not in the table
+      // get the modmutex and re-check that the label is still not in the table
 
       if(modmutex == NULL) { // If we don't yet have the modmutex
          modmutex = &(fsdata->mflocks[label & ($$LOCK_NUM - 1)].mod_mutex);
@@ -262,6 +265,7 @@ static int $mflock_lock(struct $fsdata_t *fsdata, $$LOCKLABEL_T label)
                // Success
                fsdata->mflocks[ml].label = label;
                if(unlikely((ret = pthread_mutex_unlock(modmutex)) != 0)) { return -ret; }
+               $dlogdbg("_lock: got lock '%d' for label '%lu'\n", ml, label);
                return ml;
             }
             // if recheck fails, release the mutex and continue from FIND
@@ -291,6 +295,8 @@ static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid)
    struct $mflock_t *mylock;
    pthread_mutex_t *modmutex;
 
+   $dlogdbg("_lock: releasing lock '%d'\n", lockid);
+   
    mylock = &(fsdata->mflocks[lockid]);
 
    if(mylock->want == 0) { // no one wants a handover

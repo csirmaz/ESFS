@@ -57,9 +57,8 @@ int $open(const char *path, struct fuse_file_info *fi)
 {
    int fd;
    int flags;
-   int waserror = 0;
+   int waserror = 0; // positive on error
    struct $mfd_t *mfd;
-   struct stat mystat;
 
    $$IF_PATH_SN
 
@@ -127,7 +126,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
          // If the client wants to open O_WRONLY, we still need to read from the file to save
          // the overwritten blocks.
-         // TODO Should we get a new filehandle to do this?
+         // TODO 2 Should we get a new filehandle to do this?
          if((flags & O_ACCMODE) == O_WRONLY) {
             flags |= O_ACCMODE;
             flags ^= O_ACCMODE;
@@ -143,30 +142,14 @@ int $open(const char *path, struct fuse_file_info *fi)
             waserror = errno;
             break;
          }
+
          mfd->mainfd = fd;
-
-         do {
-
-            // We need to store the inode no of the file.
-            // We can only do that here after the open as it's possibly new
-            // TODO but if it's not (see mapheader.exists), we could get the inode from $mfd_open_sn!
-            if(fstat(fd, &mystat) == -1) {
-               waserror = errno;
-               break;
-            }
-            mfd->main_inode = mystat.st_ino;
-
-         } while(0);
-
-         if(waserror != 0) {
-            close(fd);
-         }
 
       } while(0);
 
       if(waserror != 0) {
-         // TODO CLEAN UP MAP/DAT FILES if they have just been created?
-         $mfd_close_sn(mfd);
+         // TODO 2 CLEAN UP MAP/DAT FILES if they have just been created?
+         $mfd_close_sn(mfd, fsdata);
          break;
       }
 
@@ -207,7 +190,6 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
    int fd;
    int waserror = 0;
    struct $mfd_t *mfd;
-   struct stat mystat;
 
    $$IF_PATH_MAIN_ONLY
 
@@ -232,28 +214,14 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
             waserror = errno;
             break;
          }
+
          mfd->mainfd = fd;
-
-         do {
-
-            // We need to store the inode no of the file. We can only do that here as it's new
-            if(fstat(fd, &mystat) == -1) {
-               waserror = errno;
-               break;
-            }
-            mfd->main_inode = mystat.st_ino;
-
-         } while(0);
-
-         if(waserror != 0) {
-            close(fd);
-         }
 
       } while(0);
 
       if(waserror != 0) {
          // TODO CLEAN UP MAP/DAT FILES
-         $mfd_close_sn(mfd);
+         $mfd_close_sn(mfd, fsdata);
          break;
       }
 
@@ -413,11 +381,6 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
       }
       mfd->mainfd = ret;
 
-      // Put the inode into mfd
-      // We have already stat'd the main file.
-      // mfd->mapheader.fstat has been initialised as mapheader.exists == 1.
-      mfd->main_inode = mfd->mapheader.fstat.st_ino;
-
       ret = $b_truncate(fsdata, mfd, newsize);
       if(unlikely(ret != 0)) {
          waserror = -ret;
@@ -429,7 +392,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
    } while(0);
 
    // TODO CLEAN UP MAP/DAT FILES unnecessarily created?
-   if(unlikely((ret = $mfd_close_sn(mfd)) != 0)) {
+   if(unlikely((ret = $mfd_close_sn(mfd, fsdata)) != 0)) {
       $dlogdbg("_open_truncate_close(%s): mfd_close_sn failed err %d = %s\n", fpath, -ret, strerror(-ret));
       return ret;
    }

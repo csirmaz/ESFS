@@ -55,6 +55,7 @@
  */
 int $mkdir(const char *path, mode_t mode)
 {
+   int ret;
    $$IF_PATH_SN
 
    // Create a new snapshot
@@ -71,7 +72,11 @@ int $mkdir(const char *path, mode_t mode)
 
    $dlogdbg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
-   // TODO mark dir as nonexistent in snapshot
+   // Mark dir as nonexistent in snapshot.
+   // This will create a DIRNAME.map file.
+   if(unlikely((ret = $mfd_init_sn(path, fpath, fsdata)) != 0)){
+      return ret;
+   }
 
    if(mkdir(fpath, mode) == 0) { return 0; }
    return -errno;
@@ -112,8 +117,16 @@ int $rmdir(const char *path)
 /** Rename a file
  *
  * See mfd.c for a detailed description of read and write directives.
+ *
+ * Locking: We keep the lock after opening the map/dat files as we want
+ * to prevent other threads from opening a file after it has been renamed,
+ * but before the affected headers are updated.
+ *
+ * At the same time, MFDs already open will not be affected, which is
+ * the correct behaviour, at the main FD will continue to point to the file
+ * renamed, and data from it will continue to be saved into the original map/dat
+ * files.
  */
-// TODO Do we need locking for the rename operations?
 int $rename(const char *path, const char *newpath)
 {
    struct $mfd_t mymfd; // The mfd of path, with follow
@@ -123,10 +136,11 @@ int $rename(const char *path, const char *newpath)
    int waserror = 0; // negative on error
    $$IF_MULTI_PATHS_MAIN_ONLY
 
-   $dlogdbg("  rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+   $dlogdbg("* rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
 
-   if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)) {
-      $dlogdbg("Rename: mfd_open_sn failed on %s with %d = %s\n", path, ret, strerror(-ret));
+   $dlogdbg("Rename: Opening '%s'... (mymfd)\n", path);
+   if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
+      $dlogi("Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", path, ret, strerror(-ret));
       // We do not allow moving/renaming directories,
       // to save the complexity of saving the file change of everything under them.
       if(ret == -EISDIR) {
@@ -139,8 +153,9 @@ int $rename(const char *path, const char *newpath)
 
       // If path is a file, newpath is a file as well (even if the command was to move a file under a directory).
       // Get the mfd for newpath.
-      if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS)) != 0)) {
-         $dlogdbg("Rename: mfd_open_sn failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
+      $dlogdbg("Rename: Opening '%s'... (mynewmfd)\n", newpath);
+      if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
+         $dlogi("Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", newpath, ret, strerror(-ret));
          waserror = ret;
          break;
       }
@@ -156,75 +171,86 @@ int $rename(const char *path, const char *newpath)
             }
          }
 
-         // Before we modify the read and write directives, we do the actual rename.
-         /* rename: If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
-          * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.
-          */
-         if(unlikely(rename(fpath, fnewpath) != 0)) {
-            waserror = -errno;
-            break;
-         }
-
-         // Add a write directive to the new path so that subsequently, data would be written
-         // to the dat file of the original path.
-         // This may replace an existing write directive, which is the correct behaviour.
-         strcpy(mynewmfd.mapheader.write_v, path);
-         // TODO 2 Skip saving the mapheader wile opening mfd if the map file has just been created here
-         if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
-            $dlogi("Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
-            // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
-            waserror = ret;
-            break;
-         }
-
          // If the old file has already been removed, we have followed a write directive
          // when opening mymfd.
          // That write directive needs to be removed, as writing oldpath no longer functions
          // like writing the old file.
-         if(mymfd.is_renamed != 0) {
-
-            if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW)) != 0)) {
+         // We open the MFD here to have a lock in place before the actual rename.
+         if(mymfd.write_vpath[0] != '\0') {
+            $dlogdbg("Rename: Opening '%s' with nofollow... (mydirectmfd)\n", path);
+            if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW | $$MFD_KEEPLOCK)) != 0)) {
                $dlogi("Rename: mfd_open_sn(nofollow) failed on %s with %d = %s\n", path, ret, strerror(-ret));
                waserror = ret;
                break;
             }
+         }
 
-            mydirectmfd.mapheader.write_v[0] = '\0';
+         do{
 
-            if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)) {
-               $dlogi("Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
-               waserror = ret;
-               // DO NOT break here as we want to close mydirectmfd anyway
-            }
-
-            if(unlikely((ret = $mfd_close_sn(&mydirectmfd)) != 0)) {
-               $dlogi("Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
-               waserror = ret;
-            }
-
-            if(waserror != 0) {
+            // Before we modify the read and write directives, we do the actual rename.
+            /* rename: If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
+            * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.
+            */
+            if(unlikely(rename(fpath, fnewpath) != 0)) {
+               waserror = -errno;
                break;
             }
 
+            // Add a write directive to the new path so that subsequently, data would be written
+            // to the dat file of the original path.
+            // This may replace an existing write directive, which is the correct behaviour.
+            if(mymfd.write_vpath[0] == '\0'){
+               strcpy(mynewmfd.mapheader.write_v, path);
+            }else{
+               strcpy(mynewmfd.mapheader.write_v, mymfd.write_vpath);
+            }
+            $dlogdbg("Rename: writing write directive '%s' into the map of '%s'\n", mynewmfd.mapheader.write_v, newpath);
+
+            // TODO 2 Skip saving the mapheader wile opening mfd if the map file has just been created here
+            if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
+               $dlogi("Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
+               // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
+               waserror = ret;
+               break;
+            }
+
+            // Now continue with removing the write directive
+            if(mymfd.write_vpath[0] != '\0') {
+               $dlogdbg("Rename: removing the write directive from the direct map of '%s'\n", path);
+               mydirectmfd.mapheader.write_v[0] = '\0';
+               if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)) {
+                  $dlogi("Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
+                  waserror = ret;
+                  break;
+               }
+            }
+
+            // Add a read directive to the old path so that when we step to the next snapshot,
+            // we know to search the new path.
+            strcpy(mymfd.mapheader.read_v, newpath);
+            $dlogdbg("Rename: writing the read directive '%s' into the map of '%s'\n", mymfd.mapheader.read_v, path);
+            if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)) {
+               $dlogi("Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
+               // We could restore mynewmfd.mapheader & mydirectmfd.mapheader here.
+               waserror = ret;
+               break;
+            }
+
+         }while(0);
+
+         if(mymfd.write_vpath[0] != '\0'){
+            // We want to close mydirectmfd on both success and failure
+            if(unlikely((ret = $mfd_close_sn(&mydirectmfd, fsdata)) != 0)) {
+               $dlogi("Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
+               waserror = ret;
+               break;
+            }
          }
 
-         // mymfd.is_renamed = 1;
-         // There's no need to set the is_renamed flag as it's in-memory only, and we'll close
-         // the mfd's anyway.
-
-         // Add a read directive to the old path so that when we step to the next snapshot,
-         // we know to search the new path.
-         strcpy(mymfd.mapheader.read_v, newpath);
-         if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)) {
-            $dlogi("Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
-            // We could restore mynewmfd.mapheader & mydirectmfd.mapheader here.
-            waserror = ret;
-            break;
-         }
 
       } while(0);
 
-      if((ret = $mfd_close_sn(&mynewmfd)) != 0) {
+      if((ret = $mfd_close_sn(&mynewmfd, fsdata)) != 0) {
          $dlogi("Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
          waserror = ret;
          break;
@@ -232,7 +258,7 @@ int $rename(const char *path, const char *newpath)
 
    } while(0);
 
-   if((ret = $mfd_close_sn(&mymfd)) != 0) {
+   if((ret = $mfd_close_sn(&mymfd, fsdata)) != 0) {
       $dlogi("Rename: mfd_close_sn(mymfd) failed with %d = %s\n", ret, strerror(-ret));
       waserror = ret;
    }
@@ -337,7 +363,7 @@ int $utimens(const char *path, const struct timespec tv[2])
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // TODO 2: for performance reasons, maybe we don't want to trigger a save here
+   // TODO 1: for performance reasons, maybe we don't want to trigger a save here
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
 
    /*

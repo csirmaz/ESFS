@@ -460,7 +460,7 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
       if(unlink(prevpointerpath) != 0) { return -errno; }
 
       // Remove the snapshot
-      if((ret = $recursive_remove(snpath)) != 0) { return ret; }
+      if((ret = $recursive_remove(fsdata, snpath)) != 0) { return ret; }
 
       fsdata->sn_is_any = 0;
 
@@ -473,7 +473,7 @@ static int $sn_destroy(struct $fsdata_t *fsdata)
    if(unlink(prevpointerpath) != 0) { return -errno; }
 
    // Remove the earliest snapshot
-   if((ret = $recursive_remove(snpath)) != 0) { return ret; }
+   if((ret = $recursive_remove(fsdata, snpath)) != 0) { return ret; }
 
    return 0;
 }

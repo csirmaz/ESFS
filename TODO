@@ -23,4 +23,4 @@ read it in $n_open and set datfd to negative if true
 
 * Ensure all functions are static
 
-* Cache part of the map in the mfd
+* Cache part of the map in the mfd (or fsdata) as a bitmap

@@ -287,7 +287,7 @@ static inline int $b_write(
       // So we lock here.
       if(lock == -1) { // If we already have the lock, the first read was for real.
 
-         if(unlikely((lock = $mflock_lock(fsdata, mfd->main_inode)) < 0)) {
+         if(unlikely((lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
             waserror = -lock;
             $dlogdbg("*** Error: lock for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
             break;
