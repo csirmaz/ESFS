@@ -37,6 +37,8 @@
 
 /** Possibly flush cached data
  *
+ * This is ignored in ESFS.
+ *
  * BIG NOTE: This is not equivalent to fsync().  It's not a
  * request to sync dirty data.
  *
@@ -58,15 +60,11 @@
  *
  * Changed in version 2.2
  */
-// TODO Implement snapshots
-//   int (*flush) (const char *, struct fuse_file_info *);
 int $flush(const char *path, struct fuse_file_info *fi)
 {
-   $$DFSDATA_MFD
+   $$DFSDATA
 
    $dlogdbg("flush(path=\"%s\")\n", path);
-
-   // TODO THIS IS IGNORED
 
    return 0;
 }
@@ -123,25 +121,32 @@ int $release(const char *path, struct fuse_file_info *fi)
  *
  * Changed in version 2.2
  */
-// TODO implement
-//   int (*fsync) (const char *, int, struct fuse_file_info *);
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
+   int waserror = 0;
+   int ret;
    $$DFSDATA_MFD
 
    $dlogdbg("fsync(path=\"%s\", datasync=%d)\n", path, datasync);
 
    if(datasync) {
-      if(fdatasync($$MFD->mainfd) == 0) { return 0; } // TODO sync other files
-      return -errno;
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed
+      waserror = fdatasync(mfd->mainfd);
+      if(mfd->is_main == $$mfd_main) {
+         if(unlikely(mfd->mapfd >= 0 && (ret = fdatasync(mfd->mapfd)) != 0)) { waserror = ret; }
+         if(unlikely(mfd->datfd >= 0 && (ret = fdatasync(mfd->datfd)) != 0)) { waserror = ret; }
+      }
+      return -waserror;
    }
 
-   if(fsync($$MFD->mainfd) == 0) { return 0; } // TODO sync other files
-   return -errno;
    // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for)
    // the file referred to by the file descriptor fd to the disk device
-
+   waserror = fsync(mfd->mainfd);
+   if(mfd->is_main == $$mfd_main) {
+      if(unlikely(mfd->mapfd >= 0 && (ret = fsync(mfd->mapfd)) != 0)) { waserror = ret; }
+      if(unlikely(mfd->datfd >= 0 && (ret = fsync(mfd->datfd)) != 0)) { waserror = ret; }
+   }
+   return -waserror;
 }
 
 
@@ -176,22 +181,24 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 
 /** Synchronize directory contents
  *
+ * This is currently ignored in ESFS.
+ *
+ * I am not sure when this is called; possibly when a user calls fsync
+ * on a directory.
+ * To implement this, maybe store the fd of the directory,
+ * dup, fsync or fdatasync, and then close it.
+ *
  * If the datasync parameter is non-zero, then only the user data
  * should be flushed, not the meta data
  *
  * Introduced in version 2.3
  */
-// TODO Implement snapshots
-//   int (*fsyncdir) (const char *, int, struct fuse_file_info *);
-// when exactly is this called?  when a user calls fsync and it
-// happens to be a directory? ???
+// TODO 2 Implement fsyncdir
 int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
-   $$DFSDATA_MFD
+   $$DFSDATA
 
    $dlogdbg("fsyncdir(path=\"%s\", datasync=%d)\n", path, datasync);
-
-   // TODO This is ignored
 
    return 0;
 }
