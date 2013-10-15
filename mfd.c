@@ -526,6 +526,7 @@ static inline void $mfd_open_sn_rdonly(
 {
    mfd->mapfd = $$MFD_FD_RDONLY;
    mfd->datfd = $$MFD_FD_RDONLY;
+   mfd->lock = -1;
    mfd->is_main = $$mfd_main; /* for safety's sake */
 }
 
