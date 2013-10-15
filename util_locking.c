@@ -61,9 +61,9 @@ static inline int $recursive_remove(struct $fsdata_t *fsdata, const char *path)
 {
    int ret, lock;
 
-   if((lock = $mflock_lock(fsdata, $string2locklabel($$LOCKLABEL_RMDIR))) < 0){ return lock; }
+   if((lock = $mflock_lock(fsdata, $string2locklabel($$LOCKLABEL_RMDIR))) < 0) { return lock; }
    ret = nftw(path, $_univ_rm, $$RECURSIVE_RM_FDS, FTW_DEPTH | FTW_PHYS);
-   if((lock = $mflock_unlock(fsdata, lock)) != 0){ return lock; }
+   if((lock = $mflock_unlock(fsdata, lock)) != 0) { return lock; }
    if(ret >= 0) { return -ret; } // success or errno
    return -ENOMEM; // generic error encountered by nftw
 }

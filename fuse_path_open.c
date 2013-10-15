@@ -68,7 +68,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 
    do {
 
-      if((flags & O_ACCMODE) != O_RDONLY){
+      if((flags & O_ACCMODE) != O_RDONLY) {
          snret = -EACCES;
          break;
       }

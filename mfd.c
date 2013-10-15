@@ -292,9 +292,9 @@ static int $mfd_open_sn(
    mfd->is_main = $$mfd_main; /* for safety's sake */
    mfd->lock = -1; // the lock number
    mfd->locklabel = $string2locklabel(vpath);
-   if(flags & $$MFD_RENAMED){
+   if(flags & $$MFD_RENAMED) {
       strcpy(mfd->write_vpath, vpath);
-   }else{
+   } else {
       mfd->write_vpath[0] = '\0';
       strcpy(mfd->vpath, vpath); /* to be able to reinitialise the mfd in case there is a new snapshot */
    }
@@ -325,12 +325,12 @@ static int $mfd_open_sn(
    // will be the one getting the lock, and so we'd need additional checks to decide who
    // needs to initialise the mapheader.
    $dlogdbg("mfd_open_sn: getting lock for label '%lu'... (vpath='%s', fpath='%s')\n", mfd->locklabel, vpath, fpath);
-   if(unlikely((mfd->lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)){
+   if(unlikely((mfd->lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
       $dlogi("ERROR mfd_open_sn: mflock_lock(%lu) failed with '%d'='%s'\n", mfd->locklabel, -mfd->lock, strerror(-mfd->lock));
       return mfd->lock;
    }
 
-   do{ // [A]
+   do { // [A]
 
       // Open or create the map file
       fd = open(fmap, O_RDWR | O_CREAT | O_EXCL | O_NOATIME, S_IRWXU);
@@ -343,7 +343,7 @@ static int $mfd_open_sn(
             waserror = fd;
             break; // [A]
          }
-      
+
          // The .map file already exists, which means that the main file is already dirty.
          // TODO 2 If we aren't actually to set up an mfd, just ensure that the mapheader is written, simply return here
 
@@ -377,8 +377,8 @@ static int $mfd_open_sn(
 
             // Release lock; mark as released.
             // Release the lock if we're following a redirect, even if $$MFD_KEEPLOCK
-            if((waserror == -1 ) || (!(flags & $$MFD_KEEPLOCK))){
-               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)){
+            if((waserror == -1) || (!(flags & $$MFD_KEEPLOCK))) {
+               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
                   waserror = -ret;
                   break; // [B]
                }
@@ -386,7 +386,7 @@ static int $mfd_open_sn(
             }
 
             // Skip opening the dat file if we're about to follow a redirect
-            if(waserror == -1){
+            if(waserror == -1) {
                break; // [B]
             }
 
@@ -402,7 +402,7 @@ static int $mfd_open_sn(
          if(waserror != 0) {  // Cleanup & follow
 
             close(fd);
-            
+
             if(waserror == -1) {  // Follow the write directive
                // The lock is already released at this point
                // Start again.
@@ -411,16 +411,16 @@ static int $mfd_open_sn(
                // fdat is a good candidate as it hasn't been used if we are here.
 #define $$RECURSION_PATH fdat
                strcpy($$RECURSION_PATH, maphead->write_v);
-               if(unlikely((ret = $mfd_open_sn(mfd, $$RECURSION_PATH, NULL, fsdata, flags | $$MFD_RENAMED)) != 0)){
+               if(unlikely((ret = $mfd_open_sn(mfd, $$RECURSION_PATH, NULL, fsdata, flags | $$MFD_RENAMED)) != 0)) {
                   waserror = -ret;
                   break; // [A]
                }
                waserror = 0; // waserror == -1 was not an error condition
 #undef $$RECURSION_PATH
-               
+
                break; // [A]
             }
-            
+
             break; // [A]
          }
 
@@ -473,10 +473,10 @@ static int $mfd_open_sn(
                waserror = -ret;
                break; // [C]
             }
-            
+
             // Release lock; mark as released.
-            if(!(flags & $$MFD_KEEPLOCK)){
-               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)){
+            if(!(flags & $$MFD_KEEPLOCK)) {
+               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
                   waserror = -ret;
                   break; // [C]
                }
@@ -498,18 +498,18 @@ static int $mfd_open_sn(
 
             // If the lock has already been released, the map file has been initialised successfully,
             // and other threads might be reading it. So don't delete it.
-            if(mfd->lock>=0){ unlink(fmap); }
+            if(mfd->lock >= 0) { unlink(fmap); }
             break; // [A]
          }
 
       } // end else
 
-   }while(0); // [A]
+   } while(0); // [A]
 
    // Release lock if it hasn't been released AND ( there was an error OR we don't need to keep it )
-   if(mfd->lock>=0 && ( waserror != 0 || (!(flags & $$MFD_KEEPLOCK)))){
+   if(mfd->lock >= 0 && (waserror != 0 || (!(flags & $$MFD_KEEPLOCK)))) {
       $dlogdbg("Releasing leftover lock\n");
-      if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)){
+      if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
          $dlogi("ERROR mflock_unlock failed with '%d'='%s'\n", -ret, strerror(-ret));
          waserror = -ret;
       }
@@ -549,8 +549,8 @@ static inline int $mfd_close_sn(struct $mfd_t *mfd, struct $fsdata_t *fsdata)
       if(unlikely(close(mfd->mapfd) != 0)) { waserror = errno; }
    }
 
-   if(mfd->lock >= 0){
-      if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)){ waserror = errno; }
+   if(mfd->lock >= 0) {
+      if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) { waserror = errno; }
    }
 
    return -waserror;

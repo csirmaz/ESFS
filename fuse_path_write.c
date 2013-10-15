@@ -74,7 +74,7 @@ int $mkdir(const char *path, mode_t mode)
 
    // Mark dir as nonexistent in snapshot.
    // This will create a DIRNAME.map file.
-   if(unlikely((ret = $mfd_init_sn(path, fpath, fsdata)) != 0)){
+   if(unlikely((ret = $mfd_init_sn(path, fpath, fsdata)) != 0)) {
       return ret;
    }
 
@@ -185,7 +185,7 @@ int $rename(const char *path, const char *newpath)
             }
          }
 
-         do{
+         do {
 
             // Before we modify the read and write directives, we do the actual rename.
             /* rename: If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
@@ -199,9 +199,9 @@ int $rename(const char *path, const char *newpath)
             // Add a write directive to the new path so that subsequently, data would be written
             // to the dat file of the original path.
             // This may replace an existing write directive, which is the correct behaviour.
-            if(mymfd.write_vpath[0] == '\0'){
+            if(mymfd.write_vpath[0] == '\0') {
                strcpy(mynewmfd.mapheader.write_v, path);
-            }else{
+            } else {
                strcpy(mynewmfd.mapheader.write_v, mymfd.write_vpath);
             }
             $dlogdbg("Rename: writing write directive '%s' into the map of '%s'\n", mynewmfd.mapheader.write_v, newpath);
@@ -236,9 +236,9 @@ int $rename(const char *path, const char *newpath)
                break;
             }
 
-         }while(0);
+         } while(0);
 
-         if(mymfd.write_vpath[0] != '\0'){
+         if(mymfd.write_vpath[0] != '\0') {
             // We want to close mydirectmfd on both success and failure
             if(unlikely((ret = $mfd_close_sn(&mydirectmfd, fsdata)) != 0)) {
                $dlogi("Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));

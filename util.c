@@ -71,7 +71,8 @@ FILE *log_open()
 
 /** Closes the logfile
  */
-void log_close(FILE *logfile){
+void log_close(FILE *logfile)
+{
    fclose(logfile);
 }
 
@@ -365,8 +366,8 @@ static inline unsigned long $djb2(const unsigned char *s)
    int i;
    $$PATH_LEN_T j;
 
-   for(i=0; i<5; i++){
-      for(j=0; s[j]; j++){
+   for(i = 0; i < 5; i++) {
+      for(j = 0; s[j]; j++) {
          key = ((key << 5) + key) + s[j];
       }
    }
@@ -381,8 +382,8 @@ static inline $$LOCKLABEL_T $string2locklabel(const char *s)
 {
    unsigned long key;
 
-   key = $djb2((unsigned char*) s);
-   if(key != 0){ return key; } // 0 is a special value in the lock system
+   key = $djb2((unsigned char *) s);
+   if(key != 0) { return key; } // 0 is a special value in the lock system
    return 1;
 }
 
