@@ -38,10 +38,24 @@
 #define $$TYPES_H_
 
 
-
 // Constants
 // ---------
-// IMPORTANT: When changing these, update $check_params.
+// IMPORTANT: When changing these, make sure $check_params is updated.
+
+
+/** Mutex type
+ * * PTHREAD_MUTEX_FAST_NP = the default, portable
+ * * PTHREAD_MUTEX_ERRORCHECK_NP = returns with EDEADLK if the thread attempts to lock a mutex it already owns
+ * instead of locking the thread forever
+ */
+#define $$MUTEXT_TYPE PTHREAD_MUTEX_ERRORCHECK_NP
+
+
+/** Whether to save the stat of a file in a snapshot on
+ * a utimensat call: 0 (no) or 1 (yes)
+ */
+#define $$SAVE_ON_UTIMENSAT 0
+
 
 /* About $$PATH_MAX
  * Operations need to be thread-safe (although pkg-config does

@@ -154,8 +154,7 @@ static int $mflock_init(struct $fsdata_t *fsdata)
    pthread_mutexattr_t mutexattr;
 
    pthread_mutexattr_init(&mutexattr);
-   pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_ERRORCHECK_NP);
-   // TODO 1 Later switch to the default by using NULL instead of mutexattr below
+   pthread_mutexattr_settype(&mutexattr, $$MUTEXT_TYPE);
 
    fsdata->mflocks = malloc(sizeof(struct $mflock_t) * $$LOCK_NUM);
    if(fsdata->mflocks == NULL) { return -ENOMEM; }

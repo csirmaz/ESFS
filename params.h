@@ -42,42 +42,37 @@
 #ifndef $$PARAMS_H_
 #define $$PARAMS_H_
 
+
 /** Debug level
- *
- * Available levels:
- * 0 = no logs
- * 1 = important messages
- * 2 = debug messages
+ * * 0 = no logs
+ * * 1 = important messages
+ * * 2 = debug messages
  */
 #define $$DEBUG 2
 
-// The FUSE API has been changed a number of times.  So, our code
-// needs to define the version of the API that we assume.  As of this
-// writing, the most current API version is 26
-#define FUSE_USE_VERSION 26 // TODO
 
 // For libraries
 // -------------
 
-// need this to get pwrite().  I have to use setvbuf() instead of
-// setlinebuf() later in consequence.
-// pwrite needs >= 500
-// pselect needs >= 600
-// nftw needs >= 500
+/** The FUSE API has been changed a number of times.  So, our code
+ *needs to define the version of the API that we assume.  As of this
+ * writing, the most current API version is 26
+ */
+#define FUSE_USE_VERSION 26
+
+//   Need this to get pwrite().  I have to use setvbuf() instead of
+//     setlinebuf() later in consequence.
+//   pwrite needs >= 500
+//   pselect needs >= 600
+//   nftw needs >= 500
 // define _XOPEN_SOURCE 600
 // Included in _GNU_SOURCE
 
-// Needed to get utimensat and AT_FDCWD
-// Backtrace: fcntl.h, sys/stat.h <- features.h 
+//   Needed to get utimensat and AT_FDCWD
 // define _ATFILE_SOURCE 1
 // Included in _GNU_SOURCE
 
 // Needed for O_NOATIME
 #define _GNU_SOURCE 1
-
-// In case it matters
-// ------------------
-#define likely(x) (__builtin_expect((x), 1))
-#define unlikely(x) (__builtin_expect((x), 0))
 
 #endif

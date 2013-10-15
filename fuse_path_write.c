@@ -363,8 +363,9 @@ int $utimens(const char *path, const struct timespec tv[2])
    int ret;
    $$IF_PATH_MAIN_ONLY
 
-   // TODO 1: for performance reasons, maybe we don't want to trigger a save here
+#if $$SAVE_ON_UTIMENSAT > 0
    if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
+#endif
 
    /*
     int utimensat(int dirfd, const char *pathname,

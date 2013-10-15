@@ -36,6 +36,13 @@
 
 // This file contains low-level tools.
 
+
+// In case it matters
+// ------------------
+#define likely(x) (__builtin_expect((x), 1))
+#define unlikely(x) (__builtin_expect((x), 0))
+
+
 // Logging
 // -------
 // important log lines
