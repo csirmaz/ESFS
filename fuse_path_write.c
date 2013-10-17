@@ -310,7 +310,7 @@ int $unlink(const char *path)
 
    $$IF_PATH_MAIN_ONLY
 
-   // $dlogdbg("  unlink(path=\"%s\")\n", path);
+   $dlogdbg("* unlink(path=\"%s\")\n", path);
 
    if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)) {
       $dlogi("ERROR _open_truncate_close failed with '%s'\n", strerror(-ret));
@@ -318,7 +318,6 @@ int $unlink(const char *path)
    }
 
    // Actually do the unlink
-   $dlogdbg("About to unlink '%s'\n", fpath);
    if(unlink(fpath) == 0) { return 0; }
    ret = errno;
    $dlogi("ERROR unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
@@ -335,7 +334,7 @@ int $truncate(const char *path, off_t newsize)
 
    $$IF_PATH_MAIN_ONLY
 
-   $dlogdbg("  trunc(path=\"%s\" size=%zu)\n", path, newsize);
+   $dlogdbg("* trunc(path=\"%s\" size=%zu)\n", path, newsize);
 
    if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, newsize)) != 0)) {
       $dlogi("ERROR _open_truncate_close failed with '%s'\n", strerror(-ret));

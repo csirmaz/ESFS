@@ -107,7 +107,11 @@ static int $b_read(
    $$B_SNSIZE = mfd->mapheader.fstat.st_size;
    if(readoffset + readsize > $$B_SNSIZE) {
       if(readoffset >= $$B_SNSIZE) {
-         return -EINVAL;
+         $dlogdbg("Requested offset='%zu' beyond file size='%zu'\n", readoffset, $$B_SNSIZE);
+         // The man page for pread suggests it can return the errors of lseek,
+         // and for lseek, EINVAL means: "whence is not valid.  Or: the resulting file offset would be negative, or beyond the end of a seekable device".
+         // On the other hand, a 0 return value is supposed to signal EOF, and cp appears to expect this.
+         return 0;
       }
       readsize = $$B_SNSIZE - readoffset; // warning: size_t is unsigned and can underflow
    }
@@ -261,7 +265,8 @@ static inline int $b_write(
 
    // See which blocks we need to write
    blockoffset = (writeoffset >> $$BL_SLOG);
-   blocknumber = (writesize >> $$BL_SLOG) + 1;
+   blocknumber = (writesize >> $$BL_SLOG);
+   if((blocknumber << $$BL_SLOG) != writesize) { blocknumber++; }
 
    $dlogdbg("b_write: bloffs %zu blockno %td (%td,%td)\n", blockoffset, blocknumber, writesize, (writesize >> $$BL_SLOG));
 
