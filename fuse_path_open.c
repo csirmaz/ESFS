@@ -367,6 +367,11 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
 
    do {
 
+      // Return here if there are no snapshots
+      if(mfd->mapfd == $$MFD_FD_NOSN) {
+         break;
+      }
+
       // Return here if the file did not exist.
       if(mfd->mapheader.exists == 0) {
          waserror = ENOENT;
@@ -376,7 +381,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
       ret = open(fpath, O_RDONLY);
       if(unlikely(ret == -1)) {
          waserror = errno;
-         $dlogdbg("truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
+         $dlogi("ERROR truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
          break;
       }
       mfd->mainfd = ret;
@@ -384,6 +389,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
       ret = $b_truncate(fsdata, mfd, newsize);
       if(unlikely(ret != 0)) {
          waserror = -ret;
+         $dlogi("ERROR truncate(%s): b_truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
          // Don't break here, we want to close mainfd anyway
       }
 

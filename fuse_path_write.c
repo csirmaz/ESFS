@@ -275,7 +275,10 @@ int $chmod(const char *path, mode_t mode)
 
    $dlogdbg("   chmod(path=%s fpath=\"%s\", mode=0%03o)\n", path, fpath, mode);
 
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) {
+      $dlogi("ERROR mfd_init_sn failed with '%s'\n", strerror(-ret));
+      return ret;
+   }
 
    if(chmod(fpath, mode) == 0) { return 0; }
    return -errno;
@@ -290,7 +293,10 @@ int $chown(const char *path, uid_t uid, gid_t gid)
 
    $dlogdbg("  chown(path=\"%s\", uid=%d, gid=%d)\n", path, uid, gid);
 
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) {
+      $dlogi("ERROR mfd_init_sn failed with '%s'\n", strerror(-ret));
+      return ret;
+   }
 
    if(chown(fpath, uid, gid) == 0) { return 0; }
    return -errno;
@@ -307,14 +313,15 @@ int $unlink(const char *path)
    // $dlogdbg("  unlink(path=\"%s\")\n", path);
 
    if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)) {
+      $dlogi("ERROR _open_truncate_close failed with '%s'\n", strerror(-ret));
       return ret;
    }
 
    // Actually do the unlink
+   $dlogdbg("About to unlink '%s'\n", fpath);
    if(unlink(fpath) == 0) { return 0; }
-
    ret = errno;
-   $dlogdbg("ERROR unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogi("ERROR unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: move file to snapshot if feasible
@@ -331,6 +338,7 @@ int $truncate(const char *path, off_t newsize)
    $dlogdbg("  trunc(path=\"%s\" size=%zu)\n", path, newsize);
 
    if(unlikely((ret = $_open_truncate_close(fsdata, path, fpath, newsize)) != 0)) {
+      $dlogi("ERROR _open_truncate_close failed with '%s'\n", strerror(-ret));
       return ret;
    }
 
@@ -338,7 +346,7 @@ int $truncate(const char *path, off_t newsize)
    if(truncate(fpath, newsize) == 0) { return 0; }
 
    ret = errno;
-   $dlogdbg("ERROR truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogi("ERROR truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: copy file to snapshot if that's faster?
@@ -364,7 +372,10 @@ int $utimens(const char *path, const struct timespec tv[2])
    $$IF_PATH_MAIN_ONLY
 
 #if $$SAVE_ON_UTIMENSAT > 0
-   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) { return ret; }
+   if((ret = $mfd_init_sn(path, fpath, fsdata)) != 0) {
+      $dlogi("ERROR mfd_init_sn failed with '%s'\n", strerror(-ret));
+      return ret;
+   }
 #endif
 
    /*
