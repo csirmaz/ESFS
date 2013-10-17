@@ -89,14 +89,12 @@ int $release(const char *path, struct fuse_file_info *fi)
    int ret = 0;
    $$DFSDATA_MFD
 
-   mfd = $$MFD;
-
    $dlogdbg("release(path=\"%s\")\n", path);
 
    if(mfd->is_main == $$mfd_main) {
 
       ret = $mfd_close_sn(mfd, fsdata);
-      if(unlikely(close(mfd->mainfd) != 0)) { ret = errno; }
+      if(unlikely(close(mfd->mainfd) != 0)) { ret = -errno; }
 
    } else if(mfd->is_main == $$mfd_sn_full) {
 
@@ -131,20 +129,20 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 
    if(datasync) {
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed
-      waserror = fdatasync(mfd->mainfd);
+      if(fdatasync(mfd->mainfd) != 0) { waserror = errno; }
       if(mfd->is_main == $$mfd_main) {
-         if(unlikely(mfd->mapfd >= 0 && (ret = fdatasync(mfd->mapfd)) != 0)) { waserror = ret; }
-         if(unlikely(mfd->datfd >= 0 && (ret = fdatasync(mfd->datfd)) != 0)) { waserror = ret; }
+         if(unlikely(mfd->mapfd >= 0 && fdatasync(mfd->mapfd) != 0)) { waserror = errno; }
+         if(unlikely(mfd->datfd >= 0 && fdatasync(mfd->datfd) != 0)) { waserror = errno; }
       }
       return -waserror;
    }
 
    // fsync() transfers ("flushes") all modified in-core data of (i.e., modified buffer cache pages for)
    // the file referred to by the file descriptor fd to the disk device
-   waserror = fsync(mfd->mainfd);
+   if(fsync(mfd->mainfd) != 0) { waserror = errno; }
    if(mfd->is_main == $$mfd_main) {
-      if(unlikely(mfd->mapfd >= 0 && (ret = fsync(mfd->mapfd)) != 0)) { waserror = ret; }
-      if(unlikely(mfd->datfd >= 0 && (ret = fsync(mfd->datfd)) != 0)) { waserror = ret; }
+      if(unlikely(mfd->mapfd >= 0 && fsync(mfd->mapfd) != 0)) { waserror = errno; }
+      if(unlikely(mfd->datfd >= 0 && fsync(mfd->datfd) != 0)) { waserror = errno; }
    }
    return -waserror;
 }
@@ -156,10 +154,8 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
  */
 int $releasedir(const char *path, struct fuse_file_info *fi)
 {
-   struct $mfd_t *mfd;
    int waserror = 0;
-   $$DFSDATA
-   mfd = $$MFD;
+   $$DFSDATA_MFD
 
    if((mfd->is_main == $$mfd_main) || (mfd->is_main == $$mfd_sn_root)) {
 

@@ -60,7 +60,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 
    if(mfd->is_main == $$mfd_main) {
 
-      ret = pread($$MFD->mainfd, buf, size, offset);
+      ret = pread(mfd->mainfd, buf, size, offset);
       if(ret >= 0) { return ret; }
       return -errno;
 

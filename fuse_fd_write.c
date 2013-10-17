@@ -54,11 +54,8 @@ int $write(
    struct fuse_file_info *fi
 )
 {
-   struct $mfd_t *mfd;
    int ret;
-   $$DFSDATA
-
-   mfd = $$MFD;
+   $$DFSDATA_MFD
 
    // Only allow writes on main FDs
    if(mfd->is_main != $$mfd_main) { return -EACCES; }
@@ -91,11 +88,8 @@ int $write(
  */
 int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 {
-   struct $mfd_t *mfd;
    int ret;
-   $$DFSDATA
-
-   mfd = $$MFD;
+   $$DFSDATA_MFD
 
    $dlogdbg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
 

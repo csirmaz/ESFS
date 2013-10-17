@@ -64,7 +64,6 @@
 #include "snapshot_c.c"
 #include "mfd_c.c"
 #include "block_c.c"
-#include "stat_c.c"
 #include "fuse_fd_close_c.c"
 #include "fuse_fd_read_c.c"
 #include "fuse_fd_write_c.c"

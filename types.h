@@ -48,7 +48,7 @@
  * * PTHREAD_MUTEX_ERRORCHECK_NP = returns with EDEADLK if the thread attempts to lock a mutex it already owns
  * instead of locking the thread forever
  */
-#define $$MUTEXT_TYPE PTHREAD_MUTEX_ERRORCHECK_NP
+#define $$MUTEXT_TYPE PTHREAD_MUTEX_FAST_NP
 
 
 /** Whether to save the stat of a file in a snapshot on
