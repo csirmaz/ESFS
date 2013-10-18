@@ -372,9 +372,8 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
          break;
       }
 
-      // Return here if the file did not exist.
+      // Return here if the file did not exist, as we don't need to save the data
       if(mfd->mapheader.exists == 0) {
-         waserror = ENOENT;
          break;
       }
 
