@@ -295,7 +295,7 @@ static int $mflock_unlock(struct $fsdata_t *fsdata, int lockid)
    pthread_mutex_t *modmutex;
 
    $dlogdbg("_lock: releasing lock '%d'\n", lockid);
-   
+
    mylock = &(fsdata->mflocks[lockid]);
 
    if(mylock->want == 0) { // no one wants a handover

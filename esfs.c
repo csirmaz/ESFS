@@ -228,8 +228,8 @@ int main(int argc, char *argv[])
    }
 
    // If the first argument is "-h", call fuse to print the FUSE and mount options
-   if(argc > 1 && strcmp(argv[1], "-h") == 0){
-      for(ret=2;ret<argc;ret++){ argv[ret] = NULL; }
+   if(argc > 1 && strcmp(argv[1], "-h") == 0) {
+      for(ret = 2; ret < argc; ret++) { argv[ret] = NULL; }
       argc = 2;
       $usage();
       fprintf(stderr, "FUSE AND MOUNT OPTIONS:\n\n");
@@ -241,7 +241,7 @@ int main(int argc, char *argv[])
    // there are enough arguments, and that neither of the last two
    // start with a hyphen (this will break if you actually have a
    // rootpoint or mountpoint whose name starts with a hyphen)
-   if((argc < 3) || (argv[argc - 2][0] == '-') || (argv[argc - 1][0] == '-')){
+   if((argc < 3) || (argv[argc - 2][0] == '-') || (argv[argc - 1][0] == '-')) {
       $usage();
       return 1;
    }
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
    argc--;
 
 #if $$DEBUG > 0
-   if((fsdata->logfile = log_open()) == NULL){
+   if((fsdata->logfile = log_open()) == NULL) {
       fprintf(stderr, "Could not open the logfile. Aborting.\n");
       return 1;
    }
