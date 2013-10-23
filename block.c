@@ -79,6 +79,10 @@
  */
 
 
+#define $$B_CALC_BLOCKS(blockoffset, blocknumber, byteoffset, bytesize) \
+   blockoffset = (byteoffset >> $$BL_SLOG); \
+   blocknumber = ((bytesize + (byteoffset & ($$BL_S - 1)) - 1) >> $$BL_SLOG) + 1;
+
 /** Reads data from a snapshot file
  *
  * Returns:
@@ -99,7 +103,7 @@ static int $b_read(
    ssize_t copyto;
    int sni, ret, waserror, copyfd;
 
-   $dlogdbg("b_read: About to read offset='%zu' size='%td'\n", readoffset, readsize);
+   $dlogdbg("b_read: begin offset='%zu' size='%td'\n", readoffset, readsize);
    if(readsize == 0) { return 0; }
 
    // Adjust how many bytes we can read based on the filesize
@@ -107,7 +111,7 @@ static int $b_read(
    $$B_SNSIZE = mfd->mapheader.fstat.st_size;
    if(readoffset + readsize > $$B_SNSIZE) {
       if(readoffset >= $$B_SNSIZE) {
-         $dlogdbg("Requested offset='%zu' beyond file size='%zu'\n", readoffset, $$B_SNSIZE);
+         $dlogdbg("b_read: Requested offset='%zu' beyond file size='%zu'\n", readoffset, $$B_SNSIZE);
          // The man page for pread suggests it can return the errors of lseek,
          // and for lseek, EINVAL means: "whence is not valid.  Or: the resulting file offset would be negative, or beyond the end of a seekable device".
          // On the other hand, a 0 return value is supposed to signal EOF, and cp appears to expect this.
@@ -118,10 +122,9 @@ static int $b_read(
 #undef $$B_SNSIZE
 
    // See which blocks we need to read
-   blockoffset = (readoffset >> $$BL_SLOG);
-   blocknumber = (readsize >> $$BL_SLOG) + 1;
+   $$B_CALC_BLOCKS(blockoffset, blocknumber, readoffset, readsize)
 
-   $dlogdbg("b_read: adjusted readoffs='%zu' readsize='%td' bloffs='%zu' blockno='%td'\n", readoffset, readsize, blockoffset, blocknumber);
+   $dlogdbg("b_read: adjusted readoffs='%zu' readsize='%td' blockoffs='%zu' blockno='%td'\n", readoffset, readsize, blockoffset, blocknumber);
 
    copyto = 0;
 
@@ -134,7 +137,7 @@ static int $b_read(
       // copylength -- bytes to copy from file to buf
       // copyfd -- fd to use
 
-      $dlogdbg("b_read: reading block no '%zu'\n", blockoffset);
+      $dlogdbg("b_read: reading block no='%zu'\n", blockoffset);
 
       mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO 2 There shouldn't be overflow as blockoffset is off_t
 
@@ -160,7 +163,7 @@ static int $b_read(
       // Now see where we can read the block from
       for(sni = mfd->sn_first_file; sni >= 0; sni--) {
 
-         $dlogdbg("b_read: trying snapshot '%d' = '%s'\n", sni, mfd->sn_steps[sni].path);
+         $dlogdbg("b_read: trying snapshot='%d' = '%s'\n", sni, mfd->sn_steps[sni].path);
 
          if(sni > 0) { // a snapshot file
 
@@ -171,7 +174,7 @@ static int $b_read(
             ret = pread(mfd->sn_steps[sni].mapfd, &pointer, $$BLP_S, mapoffset);
             if(unlikely(ret != $$BLP_S && ret != 0)) {
                waserror = (ret == -1 ? errno : ENXIO);
-               $dlogi("*** Error: pread on map ret=%d err=%s\n", ret, strerror(waserror));
+               $dlogi("*** ERROR pread on map ret=%d err=%s\n", ret, strerror(waserror));
                return -waserror;
             }
             if(ret == 0) { pointer = 0; }
@@ -191,12 +194,12 @@ static int $b_read(
 
          }
 
-         $dlogdbg("b_read: final copyfrom='%zu', copyto='%td', copylength='%td'\n", copyfrom, copyto, copylength);
+         $dlogdbg("b_read: final copyfrom='%zu' copyto='%td' copylength='%td'\n", copyfrom, copyto, copylength);
 
          ret = pread(copyfd, buf + copyto, copylength, copyfrom);
          if(unlikely(ret != copylength)) {
             waserror = (ret == -1 ? errno : ENXIO);
-            $dlogi("*** Error: pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
+            $dlogi("*** ERROR pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
             return -waserror;
          }
 
@@ -207,7 +210,7 @@ static int $b_read(
 
    } // end for block
 
-   $dlogdbg("b_read: Read '%zu' bytes\n", copyto);
+   $dlogdbg("b_read: read '%zu' bytes\n", copyto);
    return (int)copyto;
 }
 
@@ -248,7 +251,7 @@ static inline int $b_write(
    // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
    if(mfd->datfd < 0 || writesize == 0) { return 0; }
 
-   $dlogdbg("b_write: woffset: %zu wsize: %td size_in_sn: %zu\n", writeoffset, writesize, mfd->mapheader.fstat.st_size);
+   $dlogdbg("b_write: woffset='%zu' wsize='%td' filesize_in_sn='%zu'\n", writeoffset, writesize, mfd->mapheader.fstat.st_size);
 
    // Don't save blocks outside original length of main file
    // Because datfd>=0, we know the file existed when the snapshot was taken, so mapheader.fstat should be valid.
@@ -264,17 +267,16 @@ static inline int $b_write(
 #undef $$B_SNSIZE
 
    // See which blocks we need to write
-   blockoffset = (writeoffset >> $$BL_SLOG);
-   blocknumber = (writesize >> $$BL_SLOG);
-   if((blocknumber << $$BL_SLOG) != writesize) { blocknumber++; }
+   $$B_CALC_BLOCKS(blockoffset, blocknumber, writeoffset, writesize)
 
-   $dlogdbg("b_write: bloffs %zu blockno %td (%td,%td)\n", blockoffset, blocknumber, writesize, (writesize >> $$BL_SLOG));
+   // We cannot use %m$ here because additional data is added later
+   $dlogdbg("b_write: blockoffs='%zu'=o'%zo' woffset='%zu'=o'%zo' blockno='%td'=o'%to' wsize='%td'=o'%to' :: blocksize='%d'=o'%o' log='%d'\n", blockoffset, blockoffset, writeoffset, writeoffset, blocknumber, blocknumber, writesize, writesize, $$BL_S, $$BL_S, $$BL_SLOG);
 
    for(; blocknumber > 0; blocknumber--, blockoffset++) {
 
       // ============== BLOCK LOOP =================
 
-      $dlogdbg("b_write: Processing block no %zu from main FD %d\n", blockoffset, mfd->mainfd);
+      $dlogdbg("b_write: processing block no '%zu' from main FD '%d'\n", blockoffset, mfd->mainfd);
 
       mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO 2 There shouldn't be overflow as blockoffset is off_t
 
@@ -294,7 +296,7 @@ static inline int $b_write(
 
          if(unlikely((lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
             waserror = -lock;
-            $dlogi("*** Error: lock for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+            $dlogi("*** ERROR lock for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
             break;
          }
          $dlogdbg("b_write: Got lock %d for main file FD %d\n", lock, mfd->mainfd);
@@ -321,20 +323,21 @@ static inline int $b_write(
       ret = pread(mfd->mainfd, buf, $$BL_S, (blockoffset << $$BL_SLOG)); // TODO check all left shifts for potential overflow. Here, blockoffset is off_t
       if(unlikely(ret < 1)) { // We should be able to read from the main file at least 1 byte
          waserror = (ret == -1 ? errno : ENXIO);
-         $dlogi("*** Error: pread from main file FD %d count %d offset %td, ret %d err %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
+         $dlogi("*** ERROR pread from main file FD %d count %d offset %td, ret %d err %d = %s\n", mfd->mainfd, $$BL_S, (blockoffset << $$BL_SLOG), ret, waserror, strerror(waserror));
          break;
       }
+      $dlogdbg("b_write: read old block from offs='%td' size='%d' fd='%d'\n", (blockoffset << $$BL_SLOG), $$BL_S, mfd->mainfd);
 
       // Get the size of the dat file -- this is where we'll write
       if(unlikely((datsize = lseek(mfd->datfd, 0, SEEK_END)) == -1)) {
          waserror = errno;
-         $dlogi("*** Error: lseek on dat for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
+         $dlogi("*** ERROR lseek on dat for main file FD %d, err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
          break;
       }
 
       // Sanity check: the size of the dat file should be divisible by $$BL_S
       if(unlikely((datsize & ($$BL_S - 1)) != 0)) {
-         $dlogi("*** Error: Size of dat file (%td) is not divisible by block size (%d = 2^%d) for main FD '%d', path '%s'; datfd '%d'.\n", datsize, $$BL_S, $$BL_SLOG, mfd->mainfd, mfd->vpath, mfd->datfd);
+         $dlogi("*** ERROR Size of dat file (%td) is not divisible by block size (%d = 2^%d) for main FD '%d', path '%s'; datfd '%d'.\n", datsize, $$BL_S, $$BL_SLOG, mfd->mainfd, mfd->vpath, mfd->datfd);
          waserror = EFAULT;
          break;
       }
@@ -343,9 +346,10 @@ static inline int $b_write(
       ret = write(mfd->datfd, buf, $$BL_S);
       if(unlikely(ret != $$BL_S)) {
          waserror = (ret == -1 ? errno : ENXIO);
-         $dlogi("*** Error: write into .dat for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
+         $dlogi("*** ERROR write into .dat for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
+      $dlogdbg("b_write: appended block to fd '%d' for main fd '%d'\n", mfd->datfd, mfd->mainfd);
 
       pointer = (datsize >> $$BL_SLOG); // Get where we've written the block
       pointer++; // We save pointer+1 in the map
@@ -353,11 +357,10 @@ static inline int $b_write(
       ret = pwrite(mfd->mapfd, &pointer, $$BLP_S, mapoffset);
       if(unlikely(ret != $$BLP_S)) {
          waserror = (ret == -1 ? errno : ENXIO);
-         $dlogi("*** Error: pwrite on .map for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
+         $dlogi("*** ERROR pwrite on .map for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
-
-      $dlogdbg("b_write: wrote pointer %zu to fd %d offs %td for main fd %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
+      $dlogdbg("b_write: wrote pointer '%zu' to fd '%d' offs '%td' for main fd '%d'\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
    } // end for
 
@@ -365,7 +368,7 @@ static inline int $b_write(
    if(lock != -1) {
       $dlogdbg("b_write: Releasing lock %d for main file FD %d\n", lock, mfd->mainfd);
       if(unlikely((lock = $mflock_unlock(fsdata, lock)) < 0)) {
-         $dlogi("*** Error: unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
+         $dlogi("*** ERROR unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
          return -lock;
       }
 

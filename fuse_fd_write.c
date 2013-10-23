@@ -43,8 +43,8 @@
  *
  * Changed in version 2.2
  *
- * BBFS: As  with read(), the documentation above is inconsistent
- * with the documentation for the write() system call.
+ * BBFS: "As  with read(), the documentation above is inconsistent
+ * with the documentation for the write() system call."
  */
 int $write(
    const char *path,
@@ -60,7 +60,7 @@ int $write(
    // Only allow writes on main FDs
    if(mfd->is_main != $$mfd_main) { return -EACCES; }
 
-   $dlogdbg("  write(path=\"%s\", size=%d, offset=%lld, main df=%d)\n", path, (int)size, (long long int)offset, mfd->mainfd);
+   $dlogdbg("* write(path=\"%s\", size=%d, offset=%lld, main fd=%d)\n", path, (int)size, (long long int)offset, mfd->mainfd);
 
    // Verify that we're writing into the latest snapshot
    if(unlikely((ret = $mfd_validate(mfd, fsdata)) != 0)) { return ret; }
@@ -91,7 +91,7 @@ int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
    int ret;
    $$DFSDATA_MFD
 
-   $dlogdbg("  ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
+   $dlogdbg("* ftruncate(path=\"%s\", newsize=%zu, FD = %d)\n", path, newsize, mfd->mainfd);
 
    // Verify that we're writing into the latest snapshot
    if(unlikely((ret = $mfd_validate(mfd, fsdata)) != 0)) { return ret; }

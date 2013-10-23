@@ -64,7 +64,7 @@ int $flush(const char *path, struct fuse_file_info *fi)
 {
    $$DFSDATA
 
-   $dlogdbg("flush(path=\"%s\")\n", path);
+   $dlogdbg("* flush(path=\"%s\")\n", path);
 
    return 0;
 }
@@ -89,7 +89,7 @@ int $release(const char *path, struct fuse_file_info *fi)
    int ret = 0;
    $$DFSDATA_MFD
 
-   $dlogdbg("release(path=\"%s\")\n", path);
+   $dlogdbg("* release(path=\"%s\")\n", path);
 
    if(mfd->is_main == $$mfd_main) {
 
@@ -125,7 +125,7 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
    int ret;
    $$DFSDATA_MFD
 
-   $dlogdbg("fsync(path=\"%s\", datasync=%d)\n", path, datasync);
+   $dlogdbg("* fsync(path=\"%s\", datasync=%d)\n", path, datasync);
 
    if(datasync) {
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed
@@ -159,7 +159,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 
    if((mfd->is_main == $$mfd_main) || (mfd->is_main == $$mfd_sn_root)) {
 
-      $dlogdbg("releasedir.main(path=\"%s\")\n", path);
+      $dlogdbg("* releasedir.main(path=\"%s\")\n", path);
       if(unlikely(closedir(mfd->maindir) != 0)) { waserror = -errno; }
       free(mfd);
       $dlogdbg("  releasedir.main ends with %d\n", waserror);
@@ -167,7 +167,7 @@ int $releasedir(const char *path, struct fuse_file_info *fi)
 
    }
 
-   $dlogdbg("releasedir.sn(path=\"%s\")\n", path);
+   $dlogdbg("* releasedir.sn(path=\"%s\")\n", path);
    waserror = $mfd_destroy_sn_steps(mfd, fsdata);
    free(mfd);
    $dlogdbg("  releasedir.sn ends with %d\n", waserror);
@@ -194,7 +194,7 @@ int $fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
    $$DFSDATA
 
-   $dlogdbg("fsyncdir(path=\"%s\", datasync=%d)\n", path, datasync);
+   $dlogdbg("* fsyncdir(path=\"%s\", datasync=%d)\n", path, datasync);
 
    return 0;
 }

@@ -45,18 +45,19 @@
  * this operation.
  *
  * Changed in version 2.2
+ *
+ * BBFS: "I don't fully understand the documentation above -- it doesn't
+ * match the documentation for the read() system call which says it
+ * can return with anything up to the amount of data requested. nor
+ * with the fusexmp code which returns the amount of data also
+ * returned by read."
  */
-// BBFS: I don't fully understand the documentation above -- it doesn't
-// match the documentation for the read() system call which says it
-// can return with anything up to the amount of data requested. nor
-// with the fusexmp code which returns the amount of data also
-// returned by read.
 int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
    int ret;
    $$DFSDATA_MFD
 
-   $dlogdbg("* read(path=\"%s\")\n", path);
+   $dlogdbg("* read(path=\"%s\", size=%d, offset=%lld, main fd=%d)\n", path, (int)size, (long long int)offset, mfd->mainfd);
 
    if(mfd->is_main == $$mfd_main) {
 
