@@ -167,10 +167,10 @@ static int $b_read(
 
          $dlogdbg("b_read: trying snapshot='%d' = '%s'\n", sni, mfd->sn_steps[sni].path);
 
-         do{
+         do {
 
             // Acquire the lock if we're reading the latest snapshot or the main file
-            if(sni <= 1 && lock == -1){
+            if(sni <= 1 && lock == -1) {
                if(unlikely((lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
                   waserror = -lock;
                   $dlogi("*** ERROR getting lock err %d = %s\n", waserror, strerror(waserror));
@@ -218,15 +218,15 @@ static int $b_read(
             // We found the block
             waserror = -1;
 
-         }while(0);
+         } while(0);
 
          // Continue if we need to, without releasing the lock
-         if(waserror == 0){ // We haven't found the block
+         if(waserror == 0) { // We haven't found the block
             continue;
          }
 
          // Release the lock
-         if(lock != -1){
+         if(lock != -1) {
             $dlogdbg("b_read: Releasing lock %d\n", lock);
             if(unlikely((lock = $mflock_unlock(fsdata, lock)) < 0)) {
                $dlogi("*** ERROR unlock err %d = %s\n", lock, strerror(lock));
@@ -236,7 +236,7 @@ static int $b_read(
          }
 
          // In case of an error
-         if(waserror > 0){ return -waserror; }
+         if(waserror > 0) { return -waserror; }
 
          // We've found the block -- no need to look further
          // if(waserror == -1) {
