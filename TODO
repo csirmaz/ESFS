@@ -1,4 +1,10 @@
 
+* Add datetime to log lines
+
+* Cache the index of the latest block saved in the mfd
+
+* Add permission checking to all sn read operations
+
 * Add "all_already_saved" flag to mapheader; set in truncate if newsize==0 and rm,
 read it in $n_open and set datfd to negative if true
 

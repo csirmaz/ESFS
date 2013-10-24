@@ -122,7 +122,6 @@ int $release(const char *path, struct fuse_file_info *fi)
 int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
    int waserror = 0;
-   int ret;
    $$DFSDATA_MFD
 
    $dlogdbg("* fsync(path=\"%s\", datasync=%d)\n", path, datasync);

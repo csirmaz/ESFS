@@ -91,7 +91,7 @@
  */
 static int $b_read(
    char *buf,
-   const struct $fsdata_t *fsdata,
+   struct $fsdata_t *fsdata,
    const struct $mfd_t *mfd,
    size_t readsize,
    off_t readoffset
@@ -101,7 +101,9 @@ static int $b_read(
    off_t blockoffset, mapoffset, copyfrom;
    size_t blocknumber, copylength;
    ssize_t copyto;
-   int sni, ret, waserror, copyfd;
+   int sni, ret, copyfd;
+   int lock = -1;
+   int waserror = 0; // positive on error, or -1 if the block was found
 
    $dlogdbg("b_read: begin offset='%zu' size='%td'\n", readoffset, readsize);
    if(readsize == 0) { return 0; }
@@ -165,45 +167,80 @@ static int $b_read(
 
          $dlogdbg("b_read: trying snapshot='%d' = '%s'\n", sni, mfd->sn_steps[sni].path);
 
-         if(sni > 0) { // a snapshot file
+         do{
 
-            // TODO do we need any locking when reading?
-
-            if(mfd->sn_steps[sni].mapfd < 0) { continue; } // go the next snapshot if there is not map file here
-
-            ret = pread(mfd->sn_steps[sni].mapfd, &pointer, $$BLP_S, mapoffset);
-            if(unlikely(ret != $$BLP_S && ret != 0)) {
-               waserror = (ret == -1 ? errno : ENXIO);
-               $dlogi("*** ERROR pread on map ret=%d err=%s\n", ret, strerror(waserror));
-               return -waserror;
+            // Acquire the lock if we're reading the latest snapshot or the main file
+            if(sni <= 1 && lock == -1){
+               if(unlikely((lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
+                  waserror = -lock;
+                  $dlogi("*** ERROR getting lock err %d = %s\n", waserror, strerror(waserror));
+                  break;
+               }
+               $dlogdbg("b_read: Got lock %d\n", lock);
             }
-            if(ret == 0) { pointer = 0; }
-            $dlogdbg("b_read: pointer read from map at mapoffs='%td', ret='%d', pointer='%td'\n", mapoffset, ret, pointer);
 
-            if(pointer == 0) { continue; } // go to next snapshot
+            if(sni > 0) { // a snapshot file
 
-            $dlogdbg("b_read: block found in snapshot '%d' at '%td'\n", sni, pointer - 1);
-            copyfd = mfd->sn_steps[sni].datfd;
-            copyfrom += ((pointer - 1) << $$BL_SLOG);
+               if(mfd->sn_steps[sni].mapfd < 0) { break; } // go the next snapshot if there is no map file here
 
-         } else { // we are reading from the main file
+               ret = pread(mfd->sn_steps[sni].mapfd, &pointer, $$BLP_S, mapoffset);
+               if(unlikely(ret != $$BLP_S && ret != 0)) {
+                  waserror = (ret == -1 ? errno : ENXIO);
+                  $dlogi("*** ERROR pread on map ret=%d err=%s\n", ret, strerror(waserror));
+                  break;
+               }
+               if(ret == 0) { pointer = 0; }
+               $dlogdbg("b_read: pointer read from map at mapoffs='%td', ret='%d', pointer='%td'\n", mapoffset, ret, pointer);
 
-            $dlogdbg("b_read: reading block from main file\n");
-            copyfd = mfd->sn_steps[sni].datfd;
-            copyfrom += (blockoffset << $$BL_SLOG);
+               if(pointer == 0) { break; } // go to next snapshot
 
+               $dlogdbg("b_read: block found in snapshot '%d' at '%td'\n", sni, pointer - 1);
+               copyfd = mfd->sn_steps[sni].datfd;
+               copyfrom += ((pointer - 1) << $$BL_SLOG);
+
+            } else { // we are reading from the main file
+
+               $dlogdbg("b_read: reading block from main file\n");
+               copyfd = mfd->sn_steps[sni].datfd;
+               copyfrom += (blockoffset << $$BL_SLOG);
+
+            }
+
+            $dlogdbg("b_read: final copyfrom='%zu' copyto='%td' copylength='%td'\n", copyfrom, copyto, copylength);
+
+            ret = pread(copyfd, buf + copyto, copylength, copyfrom);
+            if(unlikely(ret != copylength)) {
+               waserror = (ret == -1 ? errno : ENXIO);
+               $dlogi("*** ERROR pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
+               break;
+            }
+
+            // We found the block
+            waserror = -1;
+
+         }while(0);
+
+         // Continue if we need to, without releasing the lock
+         if(waserror == 0){ // We haven't found the block
+            continue;
          }
 
-         $dlogdbg("b_read: final copyfrom='%zu' copyto='%td' copylength='%td'\n", copyfrom, copyto, copylength);
-
-         ret = pread(copyfd, buf + copyto, copylength, copyfrom);
-         if(unlikely(ret != copylength)) {
-            waserror = (ret == -1 ? errno : ENXIO);
-            $dlogi("*** ERROR pread from file '%d' sni='%d' ret='%d' err='%s'\n", copyfd, sni, ret, strerror(waserror));
-            return -waserror;
+         // Release the lock
+         if(lock != -1){
+            $dlogdbg("b_read: Releasing lock %d\n", lock);
+            if(unlikely((lock = $mflock_unlock(fsdata, lock)) < 0)) {
+               $dlogi("*** ERROR unlock err %d = %s\n", lock, strerror(lock));
+               return -lock;
+            }
+            lock = -1;
          }
+
+         // In case of an error
+         if(waserror > 0){ return -waserror; }
 
          // We've found the block -- no need to look further
+         // if(waserror == -1) {
+         waserror = 0;
          break;
 
       } // end for sni

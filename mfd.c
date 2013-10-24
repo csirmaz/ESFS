@@ -291,7 +291,7 @@ static int $mfd_open_sn(
    mfd->flags = flags; /* to be able to reinitialise the mfd */
    mfd->is_main = $$mfd_main; /* for safety's sake */
    mfd->lock = -1; // the lock number
-   mfd->locklabel = $string2locklabel(vpath);
+   mfd->locklabel = $string2locklabel(fpath);
    if(flags & $$MFD_RENAMED) {
       strcpy(mfd->write_vpath, vpath);
    } else {
@@ -668,6 +668,7 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
  * * mfd->sn_steps
  * * mfd->mapheader - from the first map file found, or
  * * mfd->mapheader.fstat - from a main file or a directory
+ * * mfd->locklabel
  *
  * Returns:
  * * 0 - on success
@@ -720,7 +721,7 @@ static int $mfd_get_sn_steps(
          waserror = -ENAMETOOLONG;
          break;
       }
-      strcat(s, mypath);
+      strcat(s, mypath); // s is a pointer!
 
       $dlogdbg("sn_step %d: '%s'\n", sni, s);
 
@@ -864,6 +865,9 @@ static int $mfd_get_sn_steps(
          } else { // a main file
 
             mfd->sn_steps[sni].mapfd = $$SN_STEPS_MAIN;
+
+            // Initialise the lock label
+            mfd->locklabel = $string2locklabel(mfd->sn_steps[sni].path);
 
             if(flags & $$SN_STEPS_F_SKIPOPENDAT) {
 

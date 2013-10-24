@@ -78,6 +78,8 @@ int $open(const char *path, struct fuse_file_info *fi)
          break;
       }
 
+      // TODO 2 Implement permission checking here. See $access
+
       mfd = malloc(sizeof(struct $mfd_t));
       if(mfd == NULL) {
          snret =  -ENOMEM;

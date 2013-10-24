@@ -58,6 +58,8 @@ int $getattr(const char *path, struct stat *statbuf)
 
    } else {
 
+      // TODO 2 Check search permission on parent directories
+
       $dlogdbg("* getattr.sn.full(path=\"%s\")\n", path);
       if(unlikely((snret = $mfd_get_sn_steps(&mfd, snpath, fsdata,
                                              $$SN_STEPS_F_TYPE_UNKNOWN | $$SN_STEPS_F_FIRSTONLY | $$SN_STEPS_F_SKIPOPENDAT | $$SN_STEPS_F_SKIPOPENDIR
@@ -166,15 +168,18 @@ int $access(const char *path, int mask)
          }
 
          // TODO 2 This permission checking is incomplete:
-         // We only check the 'user' and 'other' bits.
-         filemode = mfd.mapheader.fstat.st_mode;
+         // We only check the 'user' and 'other' bits,
+         // and we don't check search permission on the directories.
          p = 1;
-         if(getuid() == mfd.mapheader.fstat.st_uid) {
-            if((mask & R_OK) && (!(S_IRUSR & filemode))) { p = 0; }
-            if((mask & X_OK) && (!(S_IXUSR & filemode))) { p = 0; }
-         } else {
-            if((mask & R_OK) && (!(S_IROTH & filemode))) { p = 0; }
-            if((mask & X_OK) && (!(S_IXOTH & filemode))) { p = 0; }
+         if(getuid() != 0) {
+            filemode = mfd.mapheader.fstat.st_mode;
+            if(getuid() == mfd.mapheader.fstat.st_uid) {
+               if((mask & R_OK) && (!(S_IRUSR & filemode))) { p = 0; }
+               if((mask & X_OK) && (!(S_IXUSR & filemode))) { p = 0; }
+            } else {
+               if((mask & R_OK) && (!(S_IROTH & filemode))) { p = 0; }
+               if((mask & X_OK) && (!(S_IXOTH & filemode))) { p = 0; }
+            }
          }
 
          snret = (p == 1 ? 0 : -EACCES);
