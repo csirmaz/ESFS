@@ -270,18 +270,28 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
 static int $mfd_open_sn(
    struct $mfd_t *mfd,
    const char *vpath, /**< the virtual path in the main space */
-   const char *fpath, /**< the real path of the file in the main space, or NULL  */
+   const char *fpath_in, /**< the real path of the file in the main space, or NULL  */
    struct $fsdata_t *fsdata, // cannot be const because of the locking
    int flags /**< $$MFD_DEFAULTS or $$MFD_NOFOLLOW | $$MFD_KEEPLOCK */
 )
 {
    char fmap[$$PATH_MAX];
    char fdat[$$PATH_MAX];
+   char fpath_redo[$$PATH_MAX];
+   char *fpath_use;
    int fd; // map file FD
    int fd_dat; // dat file FD
    int ret;
    int waserror = 0; // positive on error
    struct $mapheader_t *maphead;
+
+   // Calculate fpath if needed
+   if(fpath_in == NULL) { // We need to re-calculate fpath if we're re-initialising as it is not cached
+      if($map_path(fpath_redo, vpath, fsdata) != 0) { return -ENAMETOOLONG; }
+      fpath_use = fpath_redo;
+   } else {
+      fpath_use = fpath_in;
+   }
 
    // Pointers
    maphead = &(mfd->mapheader);
@@ -291,7 +301,7 @@ static int $mfd_open_sn(
    mfd->flags = flags; /* to be able to reinitialise the mfd */
    mfd->is_main = $$mfd_main; /* for safety's sake */
    mfd->lock = -1; // the lock number
-   mfd->locklabel = $string2locklabel(fpath);
+   mfd->locklabel = $string2locklabel(fpath_use); // We use fpath and not vpath here as the same label needs to be generated from sn_steps
    if(flags & $$MFD_RENAMED) {
       strcpy(mfd->write_vpath, vpath);
    } else {
@@ -324,7 +334,7 @@ static int $mfd_open_sn(
    // and two threads race to create a new map file, it might not be sure that the one creating it
    // will be the one getting the lock, and so we'd need additional checks to decide who
    // needs to initialise the mapheader.
-   $dlogdbg("mfd_open_sn: getting lock for label '%lu'... (vpath='%s', fpath='%s')\n", mfd->locklabel, vpath, fpath);
+   $dlogdbg("mfd_open_sn: getting lock for label '%lu'... (vpath='%s', fpath='%s')\n", mfd->locklabel, vpath, fpath_use);
    if(unlikely((mfd->lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
       $dlogi("ERROR mfd_open_sn: mflock_lock(%lu) failed with '%d'='%s'\n", mfd->locklabel, -mfd->lock, strerror(-mfd->lock));
       return mfd->lock;
@@ -441,25 +451,19 @@ static int $mfd_open_sn(
             maphead->read_v[0] = '\0';
             maphead->write_v[0] = '\0';
 
-#define $$FPATH_TMP fdat
             // stat the main file
-            if(fpath == NULL) { // We need to re-calculate fpath if we're re-initialising as it is not cached
-               if($map_path($$FPATH_TMP, vpath, fsdata) != 0) { waserror = -ENAMETOOLONG; break; }
-            }
-
-            $dlogdbg("mfd_open_sn: stating '%s'\n", (fpath == NULL ? $$FPATH_TMP : fpath));
-            if(lstat((fpath == NULL ? $$FPATH_TMP : fpath), &(maphead->fstat)) != 0) {
+            $dlogdbg("mfd_open_sn: stating '%s'\n", fpath_use);
+            if(lstat(fpath_use, &(maphead->fstat)) != 0) {
                ret = errno;
                if(ret == ENOENT) {  // main file does not exist (yet?)
                   // WARNING In this case, mfd.mapheader.fstat remains uninitialised!
                   maphead->exists = 0;
                } else { // some other error
-                  $dlogi("ERROR mfd_open_sn: Failed to stat main file at %s, error %d = %s\n", fpath, ret, strerror(ret));
+                  $dlogi("ERROR mfd_open_sn: Failed to stat main file at %s, error %d = %s\n", fpath_use, ret, strerror(ret));
                   waserror = ret;
                   break; // [C]
                }
             }
-#undef $$FPATH_TMP
 
             // mfd's are not currently allowed for directories.
             // We rely on this return value to disallow moving/renaming directories
