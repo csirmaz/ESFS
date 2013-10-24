@@ -62,7 +62,7 @@
 
 /** Opens the logfile
  */
-FILE *log_open()
+static FILE *log_open()
 {
    FILE *logfile;
 
@@ -78,7 +78,7 @@ FILE *log_open()
 
 /** Closes the logfile
  */
-void log_close(FILE *logfile)
+static void log_close(FILE *logfile)
 {
    fclose(logfile);
 }

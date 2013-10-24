@@ -334,7 +334,7 @@ static int $sn_set_latest(struct $fsdata_t *fsdata, char *newpath)
  * * 0 - on success
  * * -errno - on failure
  */
-int $sn_create(
+static int $sn_create(
    struct $fsdata_t *fsdata,
    char *path /**< path is a real path in the form .../snapshots/ID */
 )
