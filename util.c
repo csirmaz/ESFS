@@ -93,11 +93,11 @@ static inline void $_log(const struct $fsdata_t *fsdata, const char *format, ...
 
 /** Opens the logfile
  */
-static FILE *log_open()
+static FILE *log_open(const char *filename)
 {
    FILE *logfile;
 
-   logfile = fopen("esfs.log", "w");
+   logfile = fopen(filename, "w");
    if(logfile != NULL) {
       // set logfile to line buffering
       setvbuf(logfile, NULL, _IOLBF, 0);

@@ -200,13 +200,14 @@ struct fuse_operations $oper = {
 
 void $usage(void)
 {
-   fprintf(stderr, "USAGE:  esfs [ FUSE and mount options ] (RootDir) (MountPoint)\n\n");
+   fprintf(stderr, "USAGE:  esfs [ FUSE and mount options ] [--local-log] (RootDir) (MountPoint)\n\n");
 }
 
 
 int main(int argc, char *argv[])
 {
    int ret;
+   int local_log = 0;
    struct $fsdata_t *fsdata;
 
    // The FS doesn't do any access checking on its own (the comment
@@ -235,7 +236,7 @@ int main(int argc, char *argv[])
       $usage();
       fprintf(stderr, "FUSE AND MOUNT OPTIONS:\n\n");
       fuse_main(argc, argv, NULL, NULL);
-      return 2;
+      return 1;
    }
 
    // Perform some sanity checking on the command line:  make sure
@@ -267,9 +268,17 @@ int main(int argc, char *argv[])
    argv[argc - 1] = NULL;
    argc--;
 
+   // Pull the optional local-log argument out of the argument list
+   if(strcmp(argv[argc - 2], "--local-log") == 0) {
+      local_log = 1;
+      argv[argc - 2] = argv[argc - 1];
+      argv[argc - 1] = NULL;
+      argc--;
+   }
+
 #if $$DEBUG > 0
-   if((fsdata->logfile = log_open()) == NULL) {
-      fprintf(stderr, "Could not open the logfile. Aborting.\n");
+   if((fsdata->logfile = log_open(local_log == 0 ? "/var/log/esfs.log" : "esfs.log")) == NULL) {
+      fprintf(stderr, "Could not open the logfile at '%s'. Aborting.\n", (local_log == 0 ? "/var/log/esfs.log" : "esfs.log"));
       return 1;
    }
 #endif
@@ -283,7 +292,7 @@ int main(int argc, char *argv[])
    }
 
    if($sn_check_dir(fsdata) != 0) {
-      fprintf(stderr, "Snapshot dirextory check failed, please check the logs. Aborting.\n");
+      fprintf(stderr, "Snapshot directory check failed, please check the logs. Aborting.\n");
       return 1;
    }
 
