@@ -46,6 +46,7 @@
 #include <limits.h> // PATH_MAX
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h> // va_list, &c.
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>

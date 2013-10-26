@@ -47,18 +47,49 @@
 // -------
 // important log lines
 #if $$DEBUG > 0
-#   define $dlogi(...) fprintf(fsdata->logfile, __VA_ARGS__)
+#   define $dlogi(...) $_log(__VA_ARGS__)
 #else
 #   define $dlogi(...)
 #endif
 
 // debug messages
 #if $$DEBUG > 1
-#   define $dlogdbg(...) fprintf(fsdata->logfile, __VA_ARGS__)
+#   define $dlogdbg(...) $_log(__VA_ARGS__)
 #else
 #   define $dlogdbg(...)
 #endif
 
+static inline void $_log(const struct $fsdata_t *fsdata, const char *format, ...)
+{
+   time_t mytime;
+   struct tm timeinfo;
+   int havetime = 0;
+   va_list args;
+
+   if(likely(time(&mytime) != -1)) {
+      if(likely(gmtime_r(&mytime, &timeinfo) != NULL)) {
+         havetime = 1;
+      }
+   }
+
+   fprintf(
+      fsdata->logfile,
+      "\%04d-\%02d-\%02d \%02d:\%02d:\%02d[\%05d]",
+      (havetime == 1 ? (1900 + timeinfo.tm_year) : 0),
+      (havetime == 1 ? timeinfo.tm_mon : 0),
+      (havetime == 1 ? timeinfo.tm_mday : 0),
+      (havetime == 1 ? timeinfo.tm_hour : 0),
+      (havetime == 1 ? timeinfo.tm_min : 0),
+      (havetime == 1 ? timeinfo.tm_sec : 0),
+      (pid_t)syscall(SYS_gettid)
+   );
+
+   va_start(args, format);
+
+   vfprintf(fsdata->logfile, format, args);
+
+   va_end(args);
+}
 
 /** Opens the logfile
  */
