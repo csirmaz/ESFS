@@ -244,7 +244,6 @@ int $readlink(const char *path, char *link, size_t size)
 /** Get extended attributes (unsupported) */
 int $getxattr(const char *path, const char *name, char *value, size_t size)
 {
-   // Xattr is not supported by ext4; for now, we disable it.
    return -ENOTSUP;
 
    /*

@@ -278,7 +278,7 @@ static int $mfd_open_sn(
    char fmap[$$PATH_MAX];
    char fdat[$$PATH_MAX];
    char fpath_redo[$$PATH_MAX];
-   char *fpath_use;
+   const char *fpath_use;
    int fd; // map file FD
    int fd_dat; // dat file FD
    int ret;

@@ -488,7 +488,7 @@ int $mknod(const char *path, mode_t mode, dev_t dev)
 
 /** Set extended attributes
  *
- * Xattr is not supported by ext4; for now, we disable it.
+ * Xattr is not supported.
  */
 int $setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
@@ -516,7 +516,7 @@ int $setxattr(const char *path, const char *name, const char *value, size_t size
 
 /** Remove extended attributes
  *
- * Xattr is not supported by ext4; for now, we disable it.
+ * Xattr is not supported.
  */
 int $removexattr(const char *path, const char *name)
 {
