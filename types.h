@@ -121,6 +121,7 @@ struct $fsdata_t {
    $$PATH_LEN_T sn_lat_dir_len; /**< the length of the latest snapshot dir string */
    int sn_is_any; /**< whether there are any snapshots, 1 or 0 */
    struct $mflock_t *mflocks; /**< file-based locks */
+   // CACHE
    char *block_buffer; /**< A buffer that can be used for copy on write without having to allocate/free memory. Useful especially if ESFS handles a single file */
 };
 
@@ -225,7 +226,7 @@ struct $mfd_t {
    char write_vpath[$$PATH_MAX]; /**< the vpath the map/dat of which is actually open; or a zero-length string if we haven't followed a write directive */
    int lock; /**< used when the lock is kept; -1 means the lock is not set */
    // CACHE
-   $$BLP_T latest_written_block_cache; /**< Used to cache the index+1 of the latest block written */
+   $$BLP_T latest_written_block_cache; /**< Used to cache the index+1 of the latest block written (not the position+1 in the dat file). 0 if there is nothing cached. */
 
    // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)
    int sn_current; /**< the largest index in sn_steps, representing the snapshot being read */

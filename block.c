@@ -433,8 +433,8 @@ static inline int $b_write(
          break;
       }
 
-      // Save the last written block in the mfd for caching (pointer has already been incremented)
-      mfd->latest_written_block_cache = pointer;
+      // Save the last written block in the mfd for caching
+      mfd->latest_written_block_cache = blockoffset + 1;
 
       $dlogdbg("b_write: wrote pointer '%zu' to fd '%d' offs '%td' for main fd '%d'\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
@@ -445,7 +445,7 @@ static inline int $b_write(
       $dlogdbg("b_write: Releasing lock %d for main file FD %d\n", lock, mfd->mainfd);
       if(unlikely((lock = $mflock_unlock(fsdata, lock)) < 0)) {
          $dlogi("*** ERROR unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
-         return -lock;
+         if(waserror == 0) { waserror = -lock; }
       }
 
       if(buf != NULL && lock != 0) { free(buf); }

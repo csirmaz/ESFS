@@ -1,4 +1,6 @@
 
+*** in-snapshot mfd's also need revalidation when a new snapshot is created
+
 (!) ESFS is single-threaded for first writes over a single file
 
 * Try mmap for the map files.
