@@ -617,6 +617,25 @@ static inline int $mfd_validate(
 }
 
 
+/** Ensures that a snapshot has not been created since the in-snapshot mfd was initialised.
+ * For now, only returns an error if there is a new snapshot.
+ *
+ * Returns:
+ * * 0 - on success
+ * * -errno - on error
+ */
+// TODO 2 Save the necessary data and reinitialise mfd
+static inline int $mfd_in_sn_validate(
+   struct $mfd_t *mfd,
+   struct $fsdata_t *fsdata
+)
+{
+   if(fsdata->sn_number == mfd->sn_number) { return 0; }
+   $dlogi("ERROR: A snapshot has been created since this in-snapshot file was opened.\n");
+   return -EREMCHG;
+}
+
+
 /** See $mfd_get_sn_steps */
 #define $$SN_STEPS_F_FILE           00000001
 #define $$SN_STEPS_F_DIR            00000002

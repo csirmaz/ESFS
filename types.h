@@ -213,11 +213,9 @@ struct $mfd_t {
    enum $$mfd_types is_main; /**< what this node is */
    struct $mapheader_t mapheader; /**< The whole mapheader loaded into memory for main files, and from the first map file for snapshot files */
    $$LOCKLABEL_T locklabel;
+   int sn_number; /**< a number identifying the current snapshot; compared to fsdata->sn_number */
 
    // MAIN FILE PART: (used when dealing with a file in the main space)
-   int sn_number; /**< a number identifying the current snapshot; compared to fsdata->sn_number */
-   char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised due to a new snapshot. This is the original vpath even if we have followed a write directive */
-   int flags; /**< the flags the mfd was opened with; needed in case the map/dat files must be reinitalised */
    int mainfd; /**< filehandle for the main file */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot. See $mfd_open_sn */
@@ -225,6 +223,9 @@ struct $mfd_t {
    // USED FOR RENAMES
    char write_vpath[$$PATH_MAX]; /**< the vpath the map/dat of which is actually open; or a zero-length string if we haven't followed a write directive */
    int lock; /**< used when the lock is kept; -1 means the lock is not set */
+   // USED FOR REINITIALISATION
+   char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised due to a new snapshot. This is the original vpath even if we have followed a write directive */
+   int flags; /**< the flags the mfd was opened with; needed in case the map/dat files must be reinitalised */
    // CACHE
    $$BLP_T latest_written_block_cache; /**< Used to cache the index+1 of the latest block written (not the position+1 in the dat file). 0 if there is nothing cached. */
 

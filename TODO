@@ -1,7 +1,5 @@
 
-*** in-snapshot mfd's also need revalidation when a new snapshot is created
-
-(!) ESFS is single-threaded for first writes over a single file
+* revalidate in-snapshot mfds when a new snapshot is created
 
 * Try mmap for the map files.
 
@@ -9,7 +7,5 @@
 
 * Add "all_already_saved" flag to mapheader; set in truncate if newsize==0 and rm,
 read it in $n_open and set datfd to negative if true
-
-* Ensure all functions are static
 
 * Cache part of the map in the mfd (or fsdata) as a bitmap
