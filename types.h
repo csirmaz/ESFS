@@ -121,6 +121,7 @@ struct $fsdata_t {
    $$PATH_LEN_T sn_lat_dir_len; /**< the length of the latest snapshot dir string */
    int sn_is_any; /**< whether there are any snapshots, 1 or 0 */
    struct $mflock_t *mflocks; /**< file-based locks */
+   char *block_buffer; /**< A buffer that can be used for copy on write without having to allocate/free memory. Useful especially if ESFS handles a single file */
 };
 
 

@@ -1,7 +1,7 @@
 
-* Add datetime to log lines
+(!) ESFS is single-threaded for first writes over a single file
 
-* Cache the index of the latest block saved in the mfd
+* Try mmap for the map files.
 
 * Add permission checking to all sn read operations
 

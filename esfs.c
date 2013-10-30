@@ -147,6 +147,7 @@ void $destroy(void *privdata)
    fsdata = ((struct $fsdata_t *) privdata);
 
    $mflock_destroy(fsdata);
+   $b_destroy_block_buffer(fsdata);
 
    $dlogi("Bye!\n");
 
@@ -298,6 +299,11 @@ int main(int argc, char *argv[])
 
    if($sn_get_latest(fsdata) != 0) {
       fprintf(stderr, "Getting the latest snapshot failed, please check the logs. Aborting.\n");
+      return 1;
+   }
+
+   if($b_init_block_buffer(fsdata) != 0){
+      fprintf(stderr, "Failed to initialise the global block buffer. Aborting.\n");
       return 1;
    }
 

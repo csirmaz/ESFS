@@ -252,6 +252,27 @@ static int $b_read(
 }
 
 
+/** Initialiases the global block buffer in fsdata
+ */
+static inline int $b_init_block_buffer(struct $fsdata_t *fsdata)
+{
+   fsdata->block_buffer = malloc($$BL_S);
+   if(unlikely(fsdata->block_buffer == NULL)) {
+      return -ENOMEM;
+   }
+   return 0;
+}
+
+
+/** Releases the global block buffer in fsdata
+ */
+static inline int $b_destroy_block_buffer(struct $fsdata_t *fsdata)
+{
+   free(fsdata->block_buffer);
+   return 0;
+}
+
+
 #define $$BLOCK_READ_POINTER \
       ret = pread(mfd->mapfd, &pointer, $$BLP_S, mapoffset); \
       if(unlikely(ret != $$BLP_S && ret != 0)){ \
@@ -358,10 +379,15 @@ static inline int $b_write(
       // We need to save the block
       // TODO implement a list of buffers various threads can lock and use
       if(buf == NULL) { // only allocate once in the loop
-         buf = malloc($$BL_S);
-         if(unlikely(buf == NULL)) {
-            waserror = ENOMEM;
-            break;
+         if(lock == 0) { // If lock==0, use the global block buffer to save malloc/free
+            $dlogdbg("b_write: Using global block buffer\n");
+            buf = fsdata->block_buffer;
+         } else {
+            buf = malloc($$BL_S);
+            if(unlikely(buf == NULL)) {
+               waserror = ENOMEM;
+               break;
+            }
          }
       }
 
@@ -422,7 +448,7 @@ static inline int $b_write(
          return -lock;
       }
 
-      if(buf != NULL) { free(buf); }
+      if(buf != NULL && lock != 0) { free(buf); }
    }
 
    return -waserror; // this is 0 if waserror==0
