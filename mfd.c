@@ -302,6 +302,7 @@ static int $mfd_open_sn(
    mfd->is_main = $$mfd_main; /* for safety's sake */
    mfd->lock = -1; // the lock number
    mfd->locklabel = $string2locklabel(fpath_use); // We use fpath and not vpath here as the same label needs to be generated from sn_steps
+   mfd->latest_written_block_cache = 0;
    if(flags & $$MFD_RENAMED) {
       strcpy(mfd->write_vpath, vpath);
    } else {

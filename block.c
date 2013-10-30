@@ -313,7 +313,13 @@ static inline int $b_write(
 
       // ============== BLOCK LOOP =================
 
-      $dlogdbg("b_write: processing block no '%zu' from main FD '%d'\n", blockoffset, mfd->mainfd);
+      $dlogdbg("b_write: processing block no '%zu' from main FD '%d' (cache %zu)\n", blockoffset, mfd->mainfd, mfd->latest_written_block_cache);
+
+      // Check the cache to see if this block is already saved
+      if(mfd->latest_written_block_cache == blockoffset + 1) {
+         $dlogdbg("b_write: written block cache hit\n");
+         continue; // We don't need to save again, so go to the next block
+      }
 
       mapoffset = (sizeof(struct $mapheader_t)) + blockoffset * $$BLP_S; // TODO 2 There shouldn't be overflow as blockoffset is off_t
 
@@ -322,7 +328,10 @@ static inline int $b_write(
       // save ourselves the trouble of getting the lock.
       $$BLOCK_READ_POINTER
 
-      if(pointer != 0) { continue; } // We don't need to save again, so go to next block
+      if(pointer != 0) {
+         mfd->latest_written_block_cache = blockoffset + 1; // Cache that this block has been saved
+         continue; // We don't need to save again, so go to next block
+      }
 
       // Read the pointer from the map file - for real.
       // For this to work correctly, we need to make sure that the underlying FS is POSIX conforming,
@@ -397,6 +406,10 @@ static inline int $b_write(
          $dlogi("*** ERROR pwrite on .map for main file FD %d, ret %d err %d = %s\n", mfd->mainfd, ret, waserror, strerror(waserror));
          break;
       }
+
+      // Save the last written block in the mfd for caching (pointer has already been incremented)
+      mfd->latest_written_block_cache = pointer;
+
       $dlogdbg("b_write: wrote pointer '%zu' to fd '%d' offs '%td' for main fd '%d'\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
    } // end for

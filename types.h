@@ -223,6 +223,8 @@ struct $mfd_t {
    // USED FOR RENAMES
    char write_vpath[$$PATH_MAX]; /**< the vpath the map/dat of which is actually open; or a zero-length string if we haven't followed a write directive */
    int lock; /**< used when the lock is kept; -1 means the lock is not set */
+   // CACHE
+   $$BLP_T latest_written_block_cache; /**< Used to cache the index+1 of the latest block written */
 
    // SNAPSHOT FILE PART: (used when dealing with a file in the snapshot space)
    int sn_current; /**< the largest index in sn_steps, representing the snapshot being read */
