@@ -259,6 +259,7 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
  * * mfd->is_renamed, 0 or 1
  * * mfd->mapheader
  * * mfd->locklabel, optionally mfd->lock
+ * * mfd->sn_number, mfd->flags, mfd->write_vpath
  *
  * Saves:
  * * stats of the file into the map file, unless the map file already exists.
@@ -705,6 +706,7 @@ static int $mfd_destroy_sn_steps(struct $mfd_t *mfd, const struct $fsdata_t *fsd
  * * mfd->mapheader - from the first map file found, or
  * * mfd->mapheader.fstat - from a main file or a directory
  * * mfd->locklabel
+ * * mfd->sn_number
  *
  * Returns:
  * * 0 - on success
@@ -726,6 +728,9 @@ static int $mfd_get_sn_steps(
    DIR *dirfd;
    struct $mapheader_t maphead;
    struct stat mystat;
+
+   // Default values
+   mfd->sn_number = fsdata->sn_number;
 
    // Get the roots of the snapshots and the main space
    if(unlikely((ret = $sn_get_paths_to(mfd, snpath, fsdata)) != 0)) {
