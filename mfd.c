@@ -320,6 +320,7 @@ static int $mfd_open_sn(
 
    // Get the paths of the map file
    if($get_map_prefix_path(fmap, vpath, fsdata->sn_lat_dir, fsdata->sn_lat_dir_len) != 0) {
+      $dlogi("ERROR file name too long\n");
       return -ENAMETOOLONG;
    }
 
@@ -391,6 +392,7 @@ static int $mfd_open_sn(
             if((waserror == -1) || (!(flags & $$MFD_KEEPLOCK))) {
                if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
                   waserror = -ret;
+                  $dlogi("ERROR during unlock; err %d = %s\n", waserror, strerror(waserror));
                   break; // [B]
                }
                mfd->lock = -1;
@@ -424,6 +426,7 @@ static int $mfd_open_sn(
                strcpy($$RECURSION_PATH, maphead->write_v);
                if(unlikely((ret = $mfd_open_sn(mfd, $$RECURSION_PATH, NULL, fsdata, flags | $$MFD_RENAMED)) != 0)) {
                   waserror = -ret;
+                  $dlogi("ERROR during recursion; err %d = %s\n", waserror, strerror(waserror));
                   break; // [A]
                }
                waserror = 0; // waserror == -1 was not an error condition
@@ -470,12 +473,14 @@ static int $mfd_open_sn(
             // We rely on this return value to disallow moving/renaming directories
             if(unlikely(S_ISDIR(maphead->fstat.st_mode))) {
                waserror = EISDIR;
+               $dlogi("mfds are not allowed for directories\n");
                break; // [C]
             }
 
             // write into the map file
             if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)) {
                waserror = -ret;
+               $dlogi("ERROR during saving mapheader; err %d = %s\n", waserror, strerror(waserror));
                break; // [C]
             }
 
@@ -483,6 +488,7 @@ static int $mfd_open_sn(
             if(!(flags & $$MFD_KEEPLOCK)) {
                if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
                   waserror = -ret;
+                  $dlogi("ERROR during unlock; err %d = %s\n", waserror, strerror(waserror));
                   break; // [C]
                }
                mfd->lock = -1;
@@ -609,8 +615,14 @@ static inline int $mfd_validate(
 
    $dlogdbg("! Reinitialising the mfd\n");
 
-   if((ret = $mfd_close_sn(mfd, fsdata)) != 0) { return ret; }
-   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata, mfd->flags)) != 0) { return ret; }
+   if((ret = $mfd_close_sn(mfd, fsdata)) != 0) {
+      $dlogi("ERROR mfd_close_sn failed with err %d = %s\n", -ret, strerror(-ret));
+      return ret;
+   }
+   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata, mfd->flags)) != 0) {
+      $dlogi("ERROR mfd_open_sn failed with err %d = %s\n", -ret, strerror(-ret));
+      return ret;
+   }
 
    mfd->sn_number = fsdata->sn_number;
    return 0;
@@ -743,6 +755,7 @@ static int $mfd_get_sn_steps(
       s = mfd->sn_steps[sni].path;
       if(unlikely(strlen(mypath) + strlen(s) >= $$PATH_MAX)) {
          waserror = -ENAMETOOLONG;
+         $dlogi("ERROR filename too long\n");
          break;
       }
       strcat(s, mypath); // s is a pointer!
@@ -784,7 +797,7 @@ static int $mfd_get_sn_steps(
                   mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                   continue;
                } else {
-                  $dlogi("ERROR opendir on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+                  $dlogi("ERROR opendir on '%s' failed with err %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                   waserror = -ret;
                   break;
                }
@@ -806,7 +819,7 @@ static int $mfd_get_sn_steps(
                         mfd->sn_steps[sni].mapfd = $$SN_STEPS_UNUSED;
                         mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                      } else {
-                        $dlogi("ERROR lstat on '%s' failed with %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
+                        $dlogi("ERROR lstat on '%s' failed with err %d = %s/n", mfd->sn_steps[sni].path, ret, strerror(ret));
                         waserror = -ret;
                         break;
                      }
@@ -837,7 +850,7 @@ static int $mfd_get_sn_steps(
                   mfd->sn_steps[sni].datfd = $$SN_STEPS_UNUSED;
                   continue;
                } else {
-                  $dlogi("ERROR open on '%s' failed with %d = %s/n", mysnpath, ret, strerror(ret));
+                  $dlogi("ERROR open on '%s' failed with err %d = %s/n", mysnpath, ret, strerror(ret));
                   waserror = -ret;
                   break;
                }
@@ -849,6 +862,7 @@ static int $mfd_get_sn_steps(
             do {
 
                if(unlikely((ret = $mfd_load_mapheader(&maphead, fd, fsdata)) != 0)) {
+                  $dlogi("ERROR mfd_load_mapheader failed with err %d = %s\n", -ret, strerror(-ret));
                   waserror = ret;
                   break;
                }
@@ -932,6 +946,7 @@ static int $mfd_get_sn_steps(
                $dlogdbg("stating the main file '%s'\n", mfd->sn_steps[sni].path);
                if(unlikely(lstat(mfd->sn_steps[sni].path, &(mfd->mapheader.fstat)) != 0)) {
                   waserror = -errno;
+                  $dlogi("ERROR stating '%s' failed with err %d = %s\n", mfd->sn_steps[sni].path, -waserror, strerror(-waserror));
                   break;
                }
             }
