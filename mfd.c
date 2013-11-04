@@ -162,6 +162,9 @@ static inline int $mfd_save_mapheader(const struct $mfd_t *mfd, const struct $fs
 {
    int ret;
 
+   // Return if there are no snapshots or the file was opened for read-only
+   if(mfd->mapfd < 0) { return 0; }
+
    ret = pwrite(mfd->mapfd, &(mfd->mapheader), sizeof(struct $mapheader_t), 0);
    if(unlikely(ret == -1)) {
       ret = errno;

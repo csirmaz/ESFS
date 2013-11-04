@@ -196,6 +196,11 @@ int $rename(const char *path, const char *newpath)
                break;
             }
 
+            // Shortcut: return here if there are no snapshots
+            if(mymfd.mapfd == $$MFD_FD_NOSN) {
+               break;
+            }
+
             // Add a write directive to the new path so that subsequently, data would be written
             // to the dat file of the original path.
             // This may replace an existing write directive, which is the correct behaviour.
