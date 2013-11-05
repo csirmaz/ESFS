@@ -70,6 +70,7 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
    if(mfd->is_main == $$mfd_sn_full) {
 
       if(unlikely((ret = $mfd_in_sn_validate(mfd, fsdata)) != 0)) {
+         $dlogi("ERROR: read(%s): mfd_in_sn_validate failed with %d = %s\n", path, -ret, strerror(-ret));
          return ret;
       }
 

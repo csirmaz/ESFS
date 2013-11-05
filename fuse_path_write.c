@@ -61,8 +61,10 @@ int $mkdir(const char *path, mode_t mode)
    // Create a new snapshot
 
    if(snpath->is_there != $$snpath_id) {
+      $dlogi("ERROR mkdir: bad path given\n");
       snret = -EFAULT; // "Bad address" if wrong path was used
    } else if($sn_create(fsdata, fpath) != 0) {
+      $dlogi("ERROR Could not create snapshot\n");
       snret = -EIO; // If error occurred while trying to create snapshot; check logs.
    } else {
       snret = 0;
@@ -70,11 +72,12 @@ int $mkdir(const char *path, mode_t mode)
 
    $$ELIF_PATH_MAIN
 
-   $dlogdbg("  mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
+   $dlogdbg("* mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
 
    // Mark dir as nonexistent in snapshot.
    // This will create a DIRNAME.map file.
    if(unlikely((ret = $mfd_init_sn(path, fpath, fsdata)) != 0)) {
+      $dlogi("ERROR mfd_init_sn failed with %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
 
@@ -97,7 +100,7 @@ int $rmdir(const char *path)
    $dlogdbg("About to remove snapshot path: %s fpath: %s is_there: %d\n", path, fpath, snpath->is_there);
 
    if(snpath->is_there != $$snpath_root) {
-      $dlogdbg("Bad path\n");
+      $dlogi("ERROR rmdir: Bad path given\n");
       snret = -EFAULT;
    } else {
       snret = $sn_destroy(fsdata);
@@ -105,7 +108,7 @@ int $rmdir(const char *path)
 
    $$ELIF_PATH_MAIN
 
-   $dlogdbg("rmdir(path=\"%s\")\n", path);
+   $dlogdbg("* rmdir(path=\"%s\")\n", path);
    if(rmdir(fpath) == 0) { return 0; }
    return -errno;
 
@@ -140,12 +143,12 @@ int $rename(const char *path, const char *newpath)
 
    $dlogdbg("Rename: Opening '%s'... (mymfd)\n", path);
    if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
-      $dlogi("ERROR Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", path, ret, strerror(-ret));
       // We do not allow moving/renaming directories,
       // to save the complexity of saving the file change of everything under them.
       if(ret == -EISDIR) {
          return -EOPNOTSUPP;
       }
+      $dlogi("ERROR Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", path, ret, strerror(-ret));
       return ret;
    }
 
@@ -325,7 +328,7 @@ int $unlink(const char *path)
    // Actually do the unlink
    if(unlink(fpath) == 0) { return 0; }
    ret = errno;
-   $dlogi("ERROR unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogi("WARNING unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: move file to snapshot if feasible
@@ -350,7 +353,7 @@ int $truncate(const char *path, off_t newsize)
    if(truncate(fpath, newsize) == 0) { return 0; }
 
    ret = errno;
-   $dlogi("ERROR truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogi("WARNING truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: copy file to snapshot if that's faster?
