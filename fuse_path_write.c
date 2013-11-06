@@ -328,7 +328,7 @@ int $unlink(const char *path)
    // Actually do the unlink
    if(unlink(fpath) == 0) { return 0; }
    ret = errno;
-   $dlogi("WARNING unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogdbg("WARNING unlink(%s): unlink failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: move file to snapshot if feasible
@@ -353,7 +353,7 @@ int $truncate(const char *path, off_t newsize)
    if(truncate(fpath, newsize) == 0) { return 0; }
 
    ret = errno;
-   $dlogi("WARNING truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
+   $dlogdbg("WARNING truncate(%s): truncate failed err %d = %s\n", fpath, ret, strerror(ret));
    return -ret;
 
    // TODO 2 Add optimisation: copy file to snapshot if that's faster?

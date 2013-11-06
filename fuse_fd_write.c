@@ -75,8 +75,17 @@ int $write(
    }
 
    ret = pwrite(mfd->mainfd, buf, size, offset);
-   if(ret >= 0) { return ret; }
+   if(ret >= 0) { 
+      $dlogdbg("pwrite wrote %d bytes\n", ret);
+      return ret;
+   }
+#if $$DEBUG > 1
+   ret = errno;
+   $dlogdbg("WARNING pwrite failed with %d = %s\n", ret, strerror(ret));
+   return -ret;
+#else
    return -errno;
+#endif
 }
 
 

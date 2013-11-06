@@ -336,7 +336,7 @@ static int $mfd_open_sn(
       return ret;
    }
 
-   // We need to clok here. Even if O_CREAT | O_EXCL is thread-safe, if we lock afterwards,
+   // We need to lock here. Even if O_CREAT | O_EXCL is thread-safe, if we lock afterwards,
    // and two threads race to create a new map file, it might not be sure that the one creating it
    // will be the one getting the lock, and so we'd need additional checks to decide who
    // needs to initialise the mapheader.

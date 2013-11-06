@@ -89,15 +89,16 @@ int $release(const char *path, struct fuse_file_info *fi)
    int ret = 0;
    $$DFSDATA_MFD
 
-   $dlogdbg("* release(path=\"%s\")\n", path);
 
    if(mfd->is_main == $$mfd_main) {
 
+      $dlogdbg("* release.main(path=\"%s\", fd=%d)\n", path, mfd->mainfd);
       ret = $mfd_close_sn(mfd, fsdata);
       if(unlikely(close(mfd->mainfd) != 0)) { ret = -errno; }
 
    } else if(mfd->is_main == $$mfd_sn_full) {
 
+      $dlogdbg("* release.sn(path=\"%s\")\n", path);
       ret = $mfd_destroy_sn_steps(mfd, fsdata);
 
    } else {
@@ -125,6 +126,11 @@ int $fsync(const char *path, int datasync, struct fuse_file_info *fi)
    $$DFSDATA_MFD
 
    $dlogdbg("* fsync(path=\"%s\", datasync=%d)\n", path, datasync);
+
+   if(mfd->is_main != $$mfd_main) {
+      $dlogi("ERROR Attempted to fsync a non-main mfd\n");
+      return -EBADE;
+   }
 
    if(datasync) {
       // fdatasync()  is  similar  to  fsync(),  but  does  not flush modified metadata unless that metadata is needed

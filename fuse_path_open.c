@@ -178,10 +178,12 @@ int $open(const char *path, struct fuse_file_info *fi)
 /**
  * Create and open a file
  *
- * If the file does not exist, first create it with the specified
+ * FUSE: If the file does not exist, first create it with the specified
  * mode, and then open it.
  *
- * If this method is not implemented or under Linux kernel
+ * Here, we use a single open to create the file.
+ *
+ * FUSE: If this method is not implemented or under Linux kernel
  * versions earlier than 2.6.15, the mknod() and open() methods
  * will be called instead.
  *
@@ -195,7 +197,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
    $$IF_PATH_MAIN_ONLY
 
-   $dlogdbg("* create(path=\"%s\", mode=0%03o)\n", path, mode);
+   $dlogdbg("* create(path=\"%s\", flags=%d, mode=0%03o)\n", path, fi->flags, mode);
 
    mfd = malloc(sizeof(struct $mfd_t));
    if(mfd == NULL) { return -ENOMEM; }
@@ -211,12 +213,14 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
       do {
 
-         fd = creat(fpath, mode);
+         fd = open(fpath, fi->flags | O_CREAT | O_TRUNC, mode);
          if(fd < 0) {
             waserror = errno;
+            $dlogdbg("WARNING open[create](%s) failed with %d = %s\n", fpath, waserror, strerror(waserror));
             break;
          }
 
+         $dlogdbg("opened[created] '%s' fd=%d\n", fpath, fd);
          mfd->mainfd = fd;
 
       } while(0);
