@@ -35,6 +35,65 @@
  */
 
 
+/* Helper function: Opens a file, saves the part to be truncated, closes it.
+ * Returns 0 or -errno.
+ */
+static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *path, const char *fpath, off_t newsize)
+{
+   struct $mfd_t myfd;
+   struct $mfd_t *mfd;
+   int ret;
+   int waserror = 0;
+
+   mfd = &myfd;
+
+   if(unlikely((ret = $mfd_open_sn(mfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)) {
+      return ret;
+   }
+
+   do {
+
+      // Return here if there are no snapshots
+      if(mfd->mapfd == $$MFD_FD_NOSN) {
+         break;
+      }
+
+      // Return here if the file did not exist, as we don't need to save the data
+      if(mfd->mapheader.exists == 0) {
+         break;
+      }
+
+      ret = open(fpath, O_RDONLY);
+      if(unlikely(ret == -1)) {
+         waserror = errno;
+         $dlogi("ERROR truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
+         break;
+      }
+      mfd->mainfd = ret;
+
+      ret = $b_truncate(fsdata, mfd, newsize);
+      if(unlikely(ret != 0)) {
+         waserror = -ret;
+         $dlogi("ERROR truncate(%s): b_truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
+         // Don't break here, we want to close mainfd anyway
+      }
+
+      close(mfd->mainfd);
+
+   } while(0);
+
+   // TODO CLEAN UP MAP/DAT FILES unnecessarily created?
+   if(unlikely((ret = $mfd_close_sn(mfd, fsdata)) != 0)) {
+      $dlogi("ERROR _open_truncate_close(%s): mfd_close_sn failed err %d = %s\n", fpath, -ret, strerror(-ret));
+      return ret;
+   }
+
+   return -waserror;
+
+   // TODO add optimisation: set whole_saved if newsize==0
+}
+
+
 /** File open operation
  *
  * No creation (O_CREAT, O_EXCL) and by default also no
@@ -192,7 +251,7 @@ int $open(const char *path, struct fuse_file_info *fi)
 int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
    int fd;
-   int waserror = 0;
+   int waserror = 0; // positive on error
    struct $mfd_t *mfd;
 
    $$IF_PATH_MAIN_ONLY
@@ -212,6 +271,16 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       }
 
       do {
+
+         // If there are snapshots and the file exists
+         if(mfd->mapfd >= 0 && mfd->mapheader.exists == 1) {
+            // This is somewhat wasteful as it sets up a new mfd
+            if(unlikely((fd = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)) { // fd only stores a success flag here
+               waserror = -fd;
+               $dlogi("ERROR create(%s): _open_truncate_close failed err %d = %s\n", fpath, waserror, strerror(waserror));
+               break;
+            }
+         }
 
          fd = open(fpath, fi->flags | O_CREAT | O_TRUNC, mode);
          if(fd < 0) {
@@ -350,65 +419,4 @@ int $opendir(const char *path, struct fuse_file_info *fi)
    return 0;
 
    $$FI_PATH
-}
-
-
-/* =================== Helper functions ===================== */
-
-/* Opens a file, saves the part to be truncated, closes it.
- * Returns 0 or -errno.
- */
-static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *path, const char *fpath, off_t newsize)
-{
-   struct $mfd_t myfd;
-   struct $mfd_t *mfd;
-   int ret;
-   int waserror = 0;
-
-   mfd = &myfd;
-
-   if(unlikely((ret = $mfd_open_sn(mfd, path, fpath, fsdata, $$MFD_DEFAULTS)) != 0)) {
-      return ret;
-   }
-
-   do {
-
-      // Return here if there are no snapshots
-      if(mfd->mapfd == $$MFD_FD_NOSN) {
-         break;
-      }
-
-      // Return here if the file did not exist, as we don't need to save the data
-      if(mfd->mapheader.exists == 0) {
-         break;
-      }
-
-      ret = open(fpath, O_RDONLY);
-      if(unlikely(ret == -1)) {
-         waserror = errno;
-         $dlogi("ERROR truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
-         break;
-      }
-      mfd->mainfd = ret;
-
-      ret = $b_truncate(fsdata, mfd, newsize);
-      if(unlikely(ret != 0)) {
-         waserror = -ret;
-         $dlogi("ERROR truncate(%s): b_truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
-         // Don't break here, we want to close mainfd anyway
-      }
-
-      close(mfd->mainfd);
-
-   } while(0);
-
-   // TODO CLEAN UP MAP/DAT FILES unnecessarily created?
-   if(unlikely((ret = $mfd_close_sn(mfd, fsdata)) != 0)) {
-      $dlogi("ERROR _open_truncate_close(%s): mfd_close_sn failed err %d = %s\n", fpath, -ret, strerror(-ret));
-      return ret;
-   }
-
-   return -waserror;
-
-   // TODO add optimisation: set whole_saved if newsize==0
 }
