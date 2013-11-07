@@ -75,7 +75,7 @@ int $write(
    }
 
    ret = pwrite(mfd->mainfd, buf, size, offset);
-   if(ret >= 0) { 
+   if(ret >= 0) {
       $dlogdbg("pwrite wrote %d bytes\n", ret);
       return ret;
    }

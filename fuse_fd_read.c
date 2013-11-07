@@ -63,8 +63,8 @@ int $read(const char *path, char *buf, size_t size, off_t offset, struct fuse_fi
 
       ret = pread(mfd->mainfd, buf, size, offset);
       if(ret >= 0) {
-        $dlogdbg("pread returned %d bytes\n", ret);
-        return ret; 
+         $dlogdbg("pread returned %d bytes\n", ret);
+         return ret;
       }
 #if $$DEBUG > 1
       ret = errno;
