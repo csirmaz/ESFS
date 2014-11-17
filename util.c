@@ -122,6 +122,9 @@ static void log_close(FILE *logfile)
 #define $$DFSDATA struct $fsdata_t *fsdata; fsdata = $$FSDATA;
 
 /** Extracts and casts mfd */
+// Here we cast a unit64_t to a pointer.
+// This triggers warnings where a pointer is less than 8 bytes, like on 32-bit architecture.
+// The reverse conversion is done by casting to intptr_t.
 #define $$MFD ((struct $mfd_t *) fi->fh)
 
 /** Defines and extracts fsdata and mfd */

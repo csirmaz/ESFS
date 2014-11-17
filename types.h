@@ -71,7 +71,7 @@
 
 #define $$BL_S 131072 // blocksize in bytes. 128K = 2^17 // TODO Determine this based on stat.st_blksize
 #define $$BL_SLOG 17 // log2(blocksize)
-#define $$BLP_T size_t // block pointer type. Note: filesizes are stored in off_t
+#define $$BLP_T off_t // block pointer type. Note: filesizes are stored in off_t
 #define $$BLP_S (sizeof($$BLP_T)) // block pointer size in bytes
 
 #define $$MAX_SNAPSHOTS 1024*1024 // this is currently only used to detect infinite loops // TODO 2 Review this
