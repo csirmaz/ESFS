@@ -1,0 +1,474 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\newcommand{\bxt}{\boxtimes}
+\newcommand{\bdt}{\bot\!_*}
+\newcommand{\varn}{\bot\!_\circ}
+\newcommand{\setp}{\mathbb{P}}
+\newcommand{\setn}{\mathbb{N}}
+
+\begin{document}
+
+\title{Storing Renames in ESFS}
+
+\author{Elod Pal Csirmaz\thanks{I would like to thank Laszlo Csirmaz and Andras Komaromy for their helpful comments.}}
+
+\maketitle
+
+\section{Introduction}
+
+ESFS\footnote{See $\langle$https://github.com/csirmaz/ESFS$\rangle$}
+is a snapshotting (versioning) filesystem
+using copy-on-write to
+minimize disk operations and disk space while maintaining snapshots of a filesystem.
+One of its features is that it stores the file renames
+(moves) that happened since the latest snapshot was taken
+instead of treating the rename as deleting the old file and creating a new one.
+This way, it can avoid copying and storing the contents of the renamed file in the snapshot
+as long as the contents do not change.
+
+This note defines a formal model of how ESFS stores renames
+in order to be able to prove the correctness of the algorithms used.
+The model consists of three functions mapping file paths to Boolean values and
+other paths ($N, F$ and $S$), and a number of operations that convert a
+valid state of a filesystem determined by a $(N, F_i, S_i)$ vector into another
+valid $(N, F_{i+1}, S_{i+1})$ state.
+We describe a number of properties that are true of all valid states.
+(When we use $N, F, S$ without a subscript, we consider any valid state of the filesystem,
+and $\forall i\in\setn$ or a given $i$ is implied.
+We use subscripts when we focus on an initial state or compare the states before
+and after an operation.)
+
+In order to make the filesystem functional, we need algorithms that determine how to
+store data when contents of files are modified, and how to read data back from the filesystem.
+ESFS works by forwarding all file operations it receives to an underlying filesystem.
+However, it intercepts modifications (writes, deletes, renames, truncation, \&c.) and
+stores data that would be overwritten in a special data structure to be able to recreate
+the state of the filesystem when the snapshots were taken.
+
+This arrangement means that reading from the current files (those not in a snapshot) is straightforward.
+However, we need to define algorithms that determine whether and how to store old data
+before it is modified, and how to read this data back when a file is being read from a snapshot.
+
+In ESFS only the earliest snapshot can be deleted.
+This makes it possible to only store data for the latest snapshot, and only store changes there that
+occur after that snapshot was taken but before the next snapshot is taken.
+Therefore, in this note we only concern ourselves with the latest snapshot.
+This arrangement also means that snapshots become overlays,
+and if one applies the overlay for snapshot $k$ to the current
+filesystem combined with all later snapshots, one gets the state of the filesystem at the time when
+$k$ was taken.
+
+ESFS stores old data from a file in the latest snapshot in data structures addressed by the path of the file.
+In this note we are not concerned by the exact mechanism of storing the modified blocks
+of data inside the file; rather, we are concerned with keeping this path-based addressing
+mechanism working even if a file has been renamed.
+We therefore define algorithms that determine which path to use to store old data,
+or which path to use to read old data from, based on $(S, N, F)$.
+
+We continue by translating $S$ into two new functions, $(w, r)$, which are identical
+to how mappings between paths are actually stored by ESFS.
+We redefine the algorithms for reading and writing in terms of $(w, r, N, F)$,
+and prove that these new algorithms are equivalent to the original ones.
+We also determine how the operations on $(S, N, F)$ modify $(w, r)$.
+These results were used directly when implementing this feature in ESFS.
+
+\section{Definitions}
+
+The domains of $N, F, S$ and $S^*$ are the set of all possible paths of files, $\setp$.
+Usually, $p, a$ and $b$ denote a path of a current file (outside the snapshots), while $x, a^*$ and $b^*$
+denote a path in the latest snapshot.
+$$
+N(x)\triangleq\left\{ \begin{array}{ll}
+1 & \mbox{if $x$ did not exist when the latest snapshot was taken} \\
+0 & \mbox{otherwise}
+\end{array}\right.
+$$
+$$
+F(x)\triangleq\left\{ \begin{array}{ll}
+1 & \mbox{if $x$ is fully stored in the latest snapshot} \\
+0 & \mbox{otherwise}
+\end{array}\right.
+$$
+
+$S$ maps paths of current files to paths in the latest
+snapshot.
+$$
+S(p)\triangleq\left\{ \begin{array}{ll}
+x & \mbox{where } x\in\setp\\
+\bot & \mbox{if the path is not mapped to anything}
+\end{array}\right.
+$$
+$$
+S^*(x)\triangleq\left\{ \begin{array}{ll}
+p & \mbox{if there is one and only one $p$ such that } S(p)=x \\
+\bxt & \mbox{if there are multiple $p$'s such that } S(p)=x \\
+\bdt & \mbox{otherwise}
+\end{array}\right.
+$$
+
+Note that $S$ and $S^*$ (and later $w$ and $r$) can have a special value
+similar to an undefined, invalid or out-of-bound value
+(we shall immediately see that $S^*(x)=\bxt$ can never occur).
+We use $\bot$ to signify this value, but for convenience we distinguish
+between different flavours of this value depending on which function it is a value of.
+$\bot$ is not a valid argument for any of the functions.
+
+Right after a snapshot is taken,
+\begin{equation}
+\forall p\in\setp: F_0(p)=0
+\end{equation}
+\begin{equation}
+\forall p\in\setp:N_0(p)=\left\{ \begin{array}{rl}
+1 & \mbox{if $p$ did not exist} \\
+0 & \mbox{otherwise}
+\end{array}\right.
+\end{equation}
+\begin{equation}
+\forall p\in\setp:S_0(p)=\left\{ \begin{array}{rl}
+\bot & \mbox{if } N_0(p)=1 \\
+p & \mbox{otherwise}
+\end{array}\right.
+\end{equation}
+
+Such an initial state is a valid state.
+
+\section{Operations}
+
+There are some operations defined over $S$ and $F$ which change the values
+of $S$ and $F$ at certain paths,
+and create a new, valid filesystem state.
+These operations correspond to deleting and
+moving (renaming) a file (when creating a file, $S$ and $F$ do not change).
+We
+consider two versions of the delete operation, where one also changes $S$.
+$$
+\begin{array}{ll}
+\mbox{Delete}_1(p) & F_{i+1}(S_{i}(p)):=1 \mbox{ if } S_i(p)\neq\bot \\
+\hline
+\mbox{Delete}_2(p) & F_{i+1}(S_{i}(p)):=1 \mbox{ if } S_i(p)\neq\bot \\
+   & S_{i+1}(p):=\bot \\
+\hline
+\mbox{Rename}(a \rightarrow b) & F_{i+1}(S_{i}(b)):=1 \mbox{ if } S_i(b)\neq\bot \\
+   & S_{i+1}(b):=S_i(a) \\
+   & S_{i+1}(a):=\bot
+\end{array}
+$$
+
+\section{Reversibility}
+
+We prove that in valid states, $S$ is reversible (it is injective), that is,
+
+\begin{equation}
+\forall x\in\setp,i\in\setn:
+S^*_i(x)\neq\bxt
+\end{equation}
+
+This is true right after a snapshot is taken ($i=0$).
+
+Reversibility is preserved by the operations.
+Changes to $F$ are irrelevant, so we only need to consider the second version
+of delete. However, when it sets $S_{i+1}(p)$ to
+$\bot$, it only reduces the times $S$ has a particular value.
+
+If before renaming $a$ to $b$, $S_i(a)=a^*$, then after renaming, $S_{i+1}$ will have the value
+$a^*$ at $b$, but it will no longer have this value at $a$, so $a^*$ as
+value will continue to occur only once.
+
+\section{$S$ Cannot Gain New Values}
+
+It is easy to see that no operation extends the set of values $S$ has over $\setp$, that is,
+\begin{equation}
+\forall b\in\setp, i\in\setn: \exists a\in\setp:
+S_i(b)\neq\bot \Rightarrow S_0(a) = S_i(b)
+\end{equation}
+
+A consequence of this is that the values of $S$ all existed, that is,
+\begin{equation}
+\forall p\in\setp, i\in\setn: S_i(p)\neq\bot \Rightarrow N(S_i(p)) = 0
+\end{equation}
+It is true right after the latest snapshot was taken ($i=0$) as
+$N_0(p)=1 \Leftrightarrow S_0(p)=\bot$, so
+$N_0(p)=0 \Leftrightarrow S_0(p)\neq\bot \Leftrightarrow S_0(p)=p$.
+When operations are applied, $N$ does not change, and $S$ will have no new value.
+
+\section{Accessibility}
+
+We prove that in a valid state if a path existed when the snapshot was taken, and it is not stored fully,
+then there is a path mapping to it.
+
+\begin{equation}
+\forall x\in\setp,i\in\setn:
+N(x)=0 \wedge F_i(x)=0 \Rightarrow S^*_i(x) \neq \bdt
+\end{equation}
+
+This is true right after a snapshot is taken ($i=0$).
+
+Accessibility is preserved by the operations. Deleting can only make
+accessibility apply to fewer paths, as it can only change $F$ to $1$.
+If deletion also involves setting $S_{i+1}(p)$ to $\bot$, it is still true.
+This is because if before the operation $S_i(p)=\bot$, there is no change.
+If $S_i(p)\neq\bot$, then let $x=S_i(p)$. $S^*$ only changes
+value at $x$, but accessibility will be true at $x$ as $F_{i+1}(x)=F_{i+1}(S_i(p))=1$.
+
+For renaming $a$ to $b$, let us consider the $S_i(b)=\bot$ case first.
+$F$ does not change, and if $S_i(a)=\bot$, $S$ and $S^*$ do not change.
+If $S_i(a)\neq\bot$, let $a^*=S_i(a)$. $S^*$ will change its value at $a^*$,
+and it is easy to see that $S^*_{i+1}(a^*)=b$.
+
+If $S_i(b)\neq\bot$, let $b^*=S_i(b)$; accessibility will continue to be true at
+$b^*$ as $F_{i+1}(b^*)=1$. If $S_i(a)=\bot$, $S^*_{i+1}(b^*)$ will be $\bdt$,
+but we already know that $F_{i+1}(b^*)=1$.
+If $S_i(a)\neq\bot$, let $a^*=S_i(a)$; accessibility will continue to be true at $a^*$
+as $S^*_{i+1}(a^*)=b$. $S^*$ remains unchanged everywhere else.
+
+\section{Reverse Accessibility}
+
+We prove that $S(p)=\bot$ only if $p$ did not exist when the snapshot was taken,
+or it is fully stored, or there is a different file stored at $p$ in the snapshot:
+\begin{multline}
+\forall p\in\setp,i\in\setn: \\
+S_i(p)=\bot \Rightarrow N(p)=1 \vee F_i(p)=1 \vee \left(
+S^*_i(p)\neq\bdt \wedge S^*_i(p)\neq p \right)
+\end{multline}
+
+Note that $N(p)=1 \vee F_i(p)=1$ will not always be true. For example,
+if after taking a snapshot the file at $a$ exists, then after
+renaming $a$ to $b$, $S_{i+1}(a)=\bot$ while $N(a)=0$ and $F(a)=0$
+if no other operation has taken place.
+
+If $N(p)=1 \vee F_i(p)=1$ then the statement is true. If it is false,
+that is,
+$N(p)=0 \wedge F_i(p)=0$, then from the accessibility property
+we know that $S^*_i(p)\neq\bdt$.
+We also know that $S^*_i(p)\neq p$ as $S_i(p)=\bot$, so the statement is true.
+
+\section{Reading and Writing Based on $S$}
+
+We now define the algorithms for saving old data when writing a file at path $p$, and reading a file at path $x$
+from the latest snapshot.
+
+When writing into file $p$, (the order of cases is important)
+
+$$
+\mbox{if }\left\{ \begin{array}{ll}
+S(p)=\bot & \mbox{do nothing} \\
+N(S(p))=1 & \mbox{do nothing} \\
+F(S(p))=1 & \mbox{do nothing} \\
+\mbox{else} & \mbox{save old data into the snapshot at $S(p)$}
+\end{array}\right.
+$$
+
+When reading the file at $x$ from a snapshot,
+
+$$
+\mbox{if }N(x)=\left\{ \begin{array}{rl}
+1 & \mbox{return that the file did not exist} \\
+0 &
+
+\mbox{read data from snapshot. If it is not there, then } \\
+&
+
+\mbox{if }S^*(x)=\left\{ \begin{array}{ll}
+y & \mbox{read from the next snapshot} \\
+& \mbox{or the current file at $y$} \\
+\bdt & \mbox{error: should have found data} 
+\end{array}\right.
+
+\end{array}\right.
+$$
+
+\section{Correctness of Reading and Writing}
+
+When writing, we want the following to be true:
+
+If we are saving old data when writing $a$, then after renaming $a$ to $b$
+(and before any other operation)
+we continue to save old data when writing $b$, and to the same file as
+before. This is true as after
+renaming, $S_{i+1}(b)=S_i(a)$,
+therefore conditions on $S(b)$, $N(S(b))$ and $F(S(b))$ will evaluate in the
+same way.
+
+After deleting $p$ (and before any other operation),
+writing into $p$ should not entail saving old data. This
+is true as $F(S(p))$ will be $1$, and potentially even $S(p)$ will be
+$\bot$.
+
+After renaming $a$ to $b$ (and before any other operation), writing into $a$
+should not entail saving old data. This is true as $S(a)$ will be $\bot$.
+
+When reading from the latest snapshot, we want the following to be true:
+If we read $a$ in the main part of the filesystem when reading $a^*$ in the
+snapshot, then after renaming $a$ to $b$ (and before any other operation),
+we should be reading $b$ instead. This is true as before the rename
+$S^*_i(a^*)=a$ and so $S_i(a)=a^*$, therefore after the rename $S_{i+1}(b)=a^*$ and
+$S^*_{i+1}(a^*)=b$.
+
+Moreover, when reading, the $S^*(x)=\bdt$ case cannot happen as here $F(x)=0$ (as we
+haven't found the data) and $N(x)=0$, and then from
+the accessibility property we know that $S^*(x)\neq\bdt$ is also true.
+
+\section{Storing $S$ in $w$ and $r$}
+
+ESFS uses two pointers stored at each path ($w$ and $r$) to store the
+mapping defined by $S$. We investigate how these pointers should be used and
+that this usage is equivalent to the algorithms based on $S$ investigated above.
+
+For all $p$, ESFS follows the strategy below:
+
+$$
+\mbox{if }S(p)=\left\{ \begin{array}{ll}
+p & \mbox{do nothing} \\
+x\neq p & \mbox{mark $p$ with ``$w:x$'' and mark $x$ with ``$r:p$''}
+\end{array}\right.
+$$
+
+This is equivalent to the following definitions. The domains of $w$ and $r$
+are the set of paths $\setp$.
+
+\begin{equation}
+w_i(p)\triangleq\left\{ \begin{array}{ll}
+S_i(p) & \mbox{if }S_i(p)\neq\bot \wedge S_i(p)\neq p\\
+\varn & \mbox{otherwise}
+\end{array}\right.
+\end{equation}
+
+\begin{equation}
+r_i(x)\triangleq\left\{ \begin{array}{ll}
+S^*_i(x) & \mbox{if }S^*_i(x)\neq\bdt \wedge S^*_i(x)\neq x \\
+\varn & \mbox{otherwise}
+\end{array}\right.
+\end{equation}
+
+Notice that
+\begin{equation} \forall p\in\setp: w(p)=\varn \Leftrightarrow S(p)=\bot \vee S(p)=p \end{equation}
+\begin{equation} \forall x\in\setp: r(x)=\varn \Leftrightarrow S^*(x)=\bdt \vee S^*(x)=x \end{equation}
+and then reverse accessibility can be reformulated as
+\begin{equation} \forall p\in\setp: S(p)=\bot \Rightarrow N(p)=1 \vee F(p)=1 \vee r(p)\neq\varn \end{equation}
+
+\section{Equivalence of $w$ and $r$}
+
+Because $S$ is injective, it is easy to see that $w$ and $r$ are each other's inverse:
+\begin{multline}
+\forall p\in\setp:
+w(p)\neq\varn \Leftrightarrow w(p)=S(p) \Leftrightarrow S(p)\neq\bot \wedge S(p)\neq p \\
+\Leftrightarrow S^*(w(p))=p \wedge w(p)\neq p \Leftrightarrow r(w(p)) = p
+\end{multline}
+\begin{multline}
+\forall x\in\setp:
+r(x)\neq\varn \Leftrightarrow r(x)=S^*(x) \Leftrightarrow S^*(x)\neq\bdt \wedge S^*(x)\neq x \\
+\Leftrightarrow S(r(x))=x \wedge r(x)\neq x \Leftrightarrow w(r(x)) = x
+\end{multline}
+
+\section{Reading and Writing Based on $w$ and $r$}
+
+We provide alternative definitions for the reading and writing algorithms,
+but now based on $w$ and $r$, not $S$.
+
+When writing into $p$,
+let $p^*$ be $p$ if $w(p)=\varn$, otherwise let $p^*$ be $w(p)$.
+
+$$
+\left\{ \begin{array}{lll}
+(i) & \mbox{If } w(p)=\varn \wedge r(p)\neq\varn & \mbox{do nothing} \\
+(ii) & \mbox{If } N(p^*)=1 & \mbox{do nothing} \\
+(iii) & \mbox{If } F(p^*)=1 & \mbox{do nothing} \\
+(iv) & \mbox{Else} & \mbox{save old data into $p^*$}
+\end{array}\right.
+$$
+
+This is equivalent to the writing algorithm based on the value of $S$. To prove this,
+consider the value of $S(p)$. If $S(p)\neq p$ but it is a path, then $w(p)=p^*=S(p)$; ($i$) is
+false, and the steps ($ii$--$iv$) are equivalent to those in the $S$-based algorithm.
+
+If $S(p)=p$, then $w(p)=\varn$ and $p^*=p=S(p)$. Also, $S^*(p)=p$ and so
+$r(p)=\varn$, so ($i$) is false, and steps ($ii$--$iv$) are again equivalent to
+those in the $S$-based algorithm.
+
+If $S(p)=\bot$, then $w(p)=\varn$ and $p^*=p$, and we should not store
+anything. From
+reverse accessibility we know that $N(p)=1$, or $F(p)=1$, or $S^*(p)\neq\bdt
+\wedge S^*(p)\neq p$ which is equivalent to $r(p)\neq\varn$. Consider these
+cases.
+If $N(p)=1$ then $N(p^*)=1$, so we will not store anything. The same
+consideration holds for $F(p)=1$. If $r(p)\neq\varn$ then ($i$) is true, so we
+will not store anything, either.
+
+\bigskip
+
+\noindent
+When reading the file at $x$ in a snapshot,
+
+$$\mbox{if }N(x)=\left\{ \begin{array}{rl}
+1 & \mbox{return that the file did not exist} \\
+0 &
+
+\mbox{read data from snapshot. If it's not there, then } \\
+&
+
+\mbox{if }r(x)=\left\{ \begin{array}{ll}
+y & \mbox{read from $y$ in next snapshot or main part} \\
+\varnothing & \mbox{read from $x$ in the next snapshot or main part} 
+\end{array}\right.
+
+\end{array}\right.$$
+
+This is also equivalent to the reading algorithm based on the value of $S$.
+The top level condition is the same. Consider the value of $S^*(x)$ in the
+inner condition. If $S^*(x)=x$, then $r(x)=\varn$, and we read the data from
+$x=S^*(x)$. If $S^*(x)\neq x$ but it is a path, then $r(x)=S^*(x)$ and we
+read from the expected path. Finally, from the accessibility property we know that
+$S^*(x)\neq\bdt$.
+
+\section{Updating $w$ and $r$}
+
+When the operations change $S$, $w$ and $r$ need to be updated in the
+following way.
+
+If deletion sets $S_{i+1}(p)$ to $\bot$, then there are three cases based on the
+value of $S_i(p)$:
+
+$$\mbox{If } S_i(p)=\left\{ \begin{array}{ll}
+\bot & \mbox{do nothing} \\
+p & \mbox{do nothing as $w_i(p)$ and $r_i(p)$ were $\varn$} \\
+p^*\neq p & \mbox{set } w_{i+1}(p):=\varn, r_{i+1}(p^*):=\varn
+\end{array}\right.$$
+
+We also know that in the first two cases, $w_i(p)$ was $\varn$, so the update
+procedure is the following:
+
+$$\mbox{If } w_i(p)\neq\varn \mbox{ then set } r_{i+1}(w_i(p)):=\varn, w_{i+1}(p):=\varn$$
+
+For renaming $a$ to $b$, we consider 9 cases.
+
+% \begin{tabular}{l|l||l|l||l}
+% $S(a)_{old}$ & $S(b)_{old}$ & $S(a)_{new}$ & $S(b)_{new}$ & \\
+% \hline \hline
+% \bot & \bot & \bot & \bot & \\
+% \bot & $a$ & \bot & \bot & \\
+% \bot & $b$ & \bot & \bot & \\
+% \bot & $x$ & \bot & \bot & \\
+% $a$ & \bot & \bot & $a$ & \\
+% $b$ & \bot & \bot & $b$ & \\
+% $x$ & \bot & \bot & $x$ & \\
+% 
+% \end{tabular}
+... ... ... ... ... ... ... ... ... ...
+
+\section{Other Properties}
+
+$$\forall p,i: N(p)=1 \Rightarrow S_i(p)\neq p$$
+because it is true after a snapshot is taken, and $S$ cannot gain new values.
+
+$$\forall p,i: N(p)=1 \wedge w_i(p)=\varn \Rightarrow S_i(p)=\bot$$
+because $N(p)=1 \Rightarrow S_i(p)\neq p$ and $w_i(p)=\varn \Leftrightarrow
+S_i(p)=\bot \vee S_i(p)=p$.
+
+$$\forall x,i: S^*_i(x)=\bdt \wedge N(x)=0 \Rightarrow F_i(x)=1$$
+because $\forall x,i: S^*_i(x)=\bdt \Rightarrow N(x)=1 \vee F_i(x)=1$,
+which is the negation of the accessibility property.
+
+\end{document}
