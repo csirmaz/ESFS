@@ -69,7 +69,7 @@ int $write(
    }
 
    // Save blocks into snapshot
-   if(unlikely((ret = $b_write(fsdata, mfd, size, offset)) != 0)) {
+   if(unlikely((ret = $b_write(fsdata, mfd, size, offset, $$B_WRITE_DEFAULTS)) != 0)) {
       $dlogi("ERROR write(%s): b_write failed with %d = %s\n", path, -ret, strerror(-ret));
       return ret;
    }
@@ -114,12 +114,21 @@ int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
       return ret;
    }
 
-   if(unlikely((ret = $b_truncate(fsdata, mfd, newsize)) != 0)) {
+   if(unlikely((ret = $b_truncate(fsdata, mfd, newsize, $$B_WRITE_DEFAULTS)) != 0)) {
       $dlogi("ERROR ftruncate(%s): b_truncate failed with %d = %s\n", path, -ret, strerror(-ret));
       return ret;
    }
 
-   if(ftruncate(mfd->mainfd, newsize) == 0) { return 0; }
-   return -errno;
+   if(unlikely(ftruncate(mfd->mainfd, newsize) != 0)) { return -errno; }
+
+   if(newsize == 0 && mfd->mapheader.all_saved == 0) {
+      mfd->mapheader.all_saved = 1;
+      if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)) {
+         $dlogi("ERROR mfd_save_mapheader(_open_truncate_close) failed with %d = %s\n", ret, strerror(-ret));
+         return -ret;
+      }
+   }
+
+   return 0;
 }
 

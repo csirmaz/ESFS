@@ -137,6 +137,7 @@ int $rename(const char *path, const char *newpath)
    struct $mfd_t mynewmfd; // The mfd of newpath, with follow
    int ret;
    int waserror = 0; // negative on error
+   int save_new_maphead = 0;
    $$IF_MULTI_PATHS_MAIN_ONLY
 
    $dlogdbg("* rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
@@ -165,13 +166,32 @@ int $rename(const char *path, const char *newpath)
 
       do {
 
-         // If newpath exists, it will be replaced, so we need to save it.
-         if(mynewmfd.mapheader.exists != 0) {
-            if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0)) != 0)) {
-               $dlogi("ERROR Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
-               waserror = ret;
+         // If newpath exists (existed), it will be replaced, so we need to save it.
+         if(mynewmfd.mapheader.exists != 0 && mynewmfd.mapheader.all_saved == 0) {
+            $dlogdbg("Rename: Saving '%s'...\n", newpath);
+
+            ret = open(fnewpath, O_RDONLY);
+            if(unlikely(ret == -1)) {
+               waserror = -errno;
+               $dlogi("ERROR Rename: failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
                break;
             }
+            mynewmfd.mainfd = ret;
+
+            if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0, $$B_WRITE_HAS_LOCK)) != 0)) {
+               $dlogi("ERROR Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
+               waserror = ret;
+            }
+
+            close(mynewmfd.mainfd);
+            mynewmfd.mainfd = $$MFD_FD_SAVED;
+
+            if(waserror != 0){ break; }
+
+            mynewmfd.mapheader.all_saved = 1;
+            save_new_maphead = 1;
+
+            $dlogdbg("Rename: Saving '%s' done.\n", newpath);
          }
 
          // If the old file has already been removed, we have followed a write directive
@@ -221,6 +241,7 @@ int $rename(const char *path, const char *newpath)
                waserror = ret;
                break;
             }
+            save_new_maphead = 0;
 
             // Now continue with removing the write directive
             if(mymfd.write_vpath[0] != '\0') {
@@ -258,6 +279,14 @@ int $rename(const char *path, const char *newpath)
 
       } while(0);
 
+      if(save_new_maphead == 1){
+         if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
+            $dlogi("ERROR Rename: mfd_save_mapheader(mynewmfd) (2) failed with %d = %s\n", ret, strerror(-ret));
+            // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
+            waserror = ret;
+         }
+      }
+
       if((ret = $mfd_close_sn(&mynewmfd, fsdata)) != 0) {
          $dlogi("ERROR Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
          waserror = ret;
@@ -271,6 +300,7 @@ int $rename(const char *path, const char *newpath)
       waserror = ret;
    }
 
+   $dlogdbg("Renaming done\n", newpath);
    return waserror;
 }
 

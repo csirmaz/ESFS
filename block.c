@@ -283,7 +283,14 @@ static inline int $b_destroy_block_buffer(struct $fsdata_t *fsdata)
       if(ret == 0){ pointer = 0; } \
       $dlogdbg("b_write: Read %zu as pointer from fd %d offs %td for main FD %d\n", pointer, mfd->mapfd, mapoffset, mfd->mainfd);
 
+
+#define $$B_WRITE_DEFAULTS 0
+#define $$B_WRITE_HAS_LOCK 1
+
 /** Saves the overwritten part of a file
+ *
+ * Flags:
+ * * $$B_WRITE_HAS_LOCK -- the lock has already been acquired & don't release it
  *
  * Returns:
  * * 0 - on success
@@ -293,7 +300,8 @@ static inline int $b_write(
    struct $fsdata_t *fsdata, // not const as locks are written
    struct $mfd_t *mfd,
    size_t writesize,
-   off_t writeoffset
+   off_t writeoffset,
+   int flags /**< $$B_WRITE_DEFAULTS or $$B_WRITE_HAS_LOCK */
 )
 {
    $$BLP_T pointer;
@@ -308,6 +316,8 @@ static inline int $b_write(
 
    // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
    if(mfd->datfd < 0 || writesize == 0) { return 0; }
+
+   if(flags & $$B_WRITE_HAS_LOCK){ lock = -2; }
 
    $dlogdbg("b_write: woffset='%zu' wsize='%td' filesize_in_sn='%zu'\n", writeoffset, writesize, mfd->mapheader.fstat.st_size);
 
@@ -361,6 +371,7 @@ static inline int $b_write(
       // So we lock here.
       if(lock == -1) { // If we already have the lock, the first read was for real.
 
+         $dlogdbg("b_write: Getting lock...\n");
          if(unlikely((lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
             waserror = -lock;
             $dlogi("ERROR lock for main file FD %d; err %d = %s\n", mfd->mainfd, waserror, strerror(waserror));
@@ -441,7 +452,7 @@ static inline int $b_write(
    } // end for
 
    // Cleanup
-   if(lock != -1) {
+   if(lock != -1 && (!(flags & $$B_WRITE_HAS_LOCK))) {
       $dlogdbg("b_write: Releasing lock %d for main file FD %d\n", lock, mfd->mainfd);
       if(unlikely((lock = $mflock_unlock(fsdata, lock)) < 0)) {
          $dlogi("ERROR unlock for main file FD %d, err %d = %s\n", mfd->mainfd, lock, strerror(lock));
@@ -461,14 +472,14 @@ static inline int $b_write(
  * * 0 - on success
  * * -errno - on failure
  */
-static inline int $b_truncate(struct $fsdata_t *fsdata, struct $mfd_t *mfd, off_t newsize)
+static inline int $b_truncate(struct $fsdata_t *fsdata, struct $mfd_t *mfd, off_t newsize, int flags)
 {
    int ret;
 
    // If the file existed and was larger than newsize, save the blocks
    // NB Any blocks outside the current main file should have already been saved
-   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size) { // TODO check, but in all cases we should know that mfd->mapheader.exists == 1
-      ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize);
+   if(mfd->mapheader.exists == 1 && mfd->mapheader.all_saved == 0 && newsize < mfd->mapheader.fstat.st_size) { // TODO check, but in all cases we should know that mfd->mapheader.exists == 1
+      ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize, flags);
       if(ret == 0) {
          return 0;
       }

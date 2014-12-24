@@ -48,7 +48,7 @@
  * * 1 = important messages
  * * 2 = debug messages
  */
-#define $$DEBUG 1
+#define $$DEBUG 2
 
 
 // For libraries

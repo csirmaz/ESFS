@@ -219,6 +219,10 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
                mfd->datfd = $$MFD_FD_ENOENT; \
                break; \
             } \
+            if(maphead->all_saved == 1) { \
+               mfd->datfd = $$MFD_FD_SAVED; \
+               break; \
+            } \
             if(unlikely(maphead->fstat.st_size == 0)) { \
                mfd->datfd = $$MFD_FD_ZLEN; \
                break; \
@@ -407,6 +411,27 @@ static int $mfd_open_sn(
                break; // [B]
             }
 
+            // Check if there is a "read" directive.
+            // If there is, there used to be a file on this path which has been moved away.
+            // We deal with this by simulating a mapheader that says that the file did not exist in the snapshot.
+            // (But we expect a read directive if we've followed a write directive!)
+            if(maphead->read_v[0] != '\0' && (!(flags & $$MFD_RENAMED))){
+               $dlogdbg("mfd_open_sn: read directive found, so simulating empty mfd/mapheader\n");
+               mfd->mapfd = $$MFD_FD_NOSN;
+               mfd->datfd = $$MFD_FD_NOSN;
+               maphead->exists = 0;
+
+               // Release lock; mark as released (even if we wanted to keep it!)
+               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
+                  waserror = -ret;
+                  $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
+                  break; // [B]
+               }
+               mfd->lock = -1;
+
+               break; // [B] skip opening the dat file
+            }
+
             // There's no write directive
 
             // Read information about the file as it was at the time of the snapshot
@@ -456,6 +481,7 @@ static int $mfd_open_sn(
             maphead->$version = 10000;
             strncpy(maphead->signature, "ESFS", 4);
             maphead->exists = 1;
+            maphead->all_saved = 0;
             maphead->read_v[0] = '\0';
             maphead->write_v[0] = '\0';
 
@@ -885,6 +911,7 @@ static int $mfd_get_sn_steps(
                }
 
                if(maphead.read_v[0] != '\0') { // there is a read directive
+                  $dlogdbg("mfd_get_sn_steps: found read directive to '%s'\n", maphead.read_v);
                   strcpy(mypath, maphead.read_v);
                }
 

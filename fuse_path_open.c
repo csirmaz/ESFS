@@ -43,7 +43,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
    struct $mfd_t myfd;
    struct $mfd_t *mfd;
    int ret;
-   int waserror = 0;
+   int waserror = 0; /* positive on error */
 
    mfd = &myfd;
 
@@ -58,27 +58,35 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
          break;
       }
 
-      // Return here if the file did not exist, as we don't need to save the data
-      if(mfd->mapheader.exists == 0) {
+      // Return here if the file did not exist, or we've saved all data, as we don't need to save the data
+      if(mfd->mapheader.exists == 0 || mfd->mapheader.all_saved == 1) {
          break;
       }
 
       ret = open(fpath, O_RDONLY);
       if(unlikely(ret == -1)) {
          waserror = errno;
-         $dlogi("ERROR truncate(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
+         $dlogi("ERROR _open_truncate_close(%s): failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
          break;
       }
       mfd->mainfd = ret;
 
-      ret = $b_truncate(fsdata, mfd, newsize);
+      ret = $b_truncate(fsdata, mfd, newsize, $$B_WRITE_DEFAULTS);
       if(unlikely(ret != 0)) {
          waserror = -ret;
-         $dlogi("ERROR truncate(%s): b_truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
+         $dlogi("ERROR _open_truncate_close(%s): b_truncate failed err %d = %s\n", fpath, waserror, strerror(waserror));
          // Don't break here, we want to close mainfd anyway
       }
 
       close(mfd->mainfd);
+
+      if(newsize == 0){
+         mfd->mapheader.all_saved = 1;
+         if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)) {
+            $dlogi("ERROR mfd_save_mapheader(_open_truncate_close) failed with %d = %s\n", ret, strerror(-ret));
+            waserror = -ret;
+         }
+      }
 
    } while(0);
 
@@ -264,6 +272,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
    do {
       // Save the current status of the file by initialising the map file.
       // We don't delete this even if the subsequent operation fails.
+      $dlogdbg("Create: opening mfd...\n");
       fd = $mfd_open_sn(mfd, path, fpath, fsdata, $$MFD_DEFAULTS); // fd only stores a success flag here
       if(fd < 0) {
          waserror = -fd; // Converting -errno to +errno;
@@ -273,8 +282,9 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       do {
 
          // If there are snapshots and the file exists
-         if(mfd->mapfd >= 0 && mfd->mapheader.exists == 1) {
+         if(mfd->mapfd >= 0 && mfd->mapheader.exists == 1 && mfd->mapheader.all_saved == 0) {
             // This is somewhat wasteful as it sets up a new mfd
+            $dlogdbg("Create: saving the file...\n");
             if(unlikely((fd = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)) { // fd only stores a success flag here
                waserror = -fd;
                $dlogi("ERROR create(%s): _open_truncate_close failed err %d = %s\n", fpath, waserror, strerror(waserror));

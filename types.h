@@ -151,6 +151,7 @@ struct $snpath_t {
 struct $mapheader_t {
    int $version;
    int exists; /**< whether the file exists, 0 or 1 */
+   int all_saved; /**< whether the whole file has been saved, 0 or 1 */
    struct stat fstat; /**< saved parameters of the file (only if exists==1) */
    char read_v[$$PATH_MAX]; // the read directive: going forward, read the dest instead. Contains a virtual path or an empty string.
    char write_v[$$PATH_MAX]; // the write directive: in this snapshot, write the dest instead. Contains a virtual path or an empty string.
@@ -196,6 +197,7 @@ enum $$mfd_types {
 #define $$MFD_FD_RDONLY -2
 #define $$MFD_FD_ENOENT -3
 #define $$MFD_FD_ZLEN   -4
+#define $$MFD_FD_SAVED  -5
 
 /** Filehandle struct (mfd)
  *
@@ -208,6 +210,9 @@ enum $$mfd_types {
  * [B] = can also be < 0:
  * * $$MFD_FD_ENOENT - if the file didn't exist when the snapshot was taken
  * * $$MFD_FD_ZLEN - if the file was 0 length when the snapshot was taken
+ *
+ * [C] = can also be < 0:
+ * * $$MFD_FD_SAVED - if the file has alredy been fully saved
  */
 struct $mfd_t {
    enum $$mfd_types is_main; /**< what this node is */
@@ -216,10 +221,10 @@ struct $mfd_t {
    int sn_number; /**< a number identifying the current snapshot; compared to fsdata->sn_number */
 
    // MAIN FILE PART: (used when dealing with a file in the main space)
-   int mainfd; /**< filehandle for the main file */
+   int mainfd; /**< filehandle for the main file[C] */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot. See $mfd_open_sn */
-   int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
+   int datfd; /**< filehandle to the dat file[A,B,C] in the latest snapshot. See $mfd_open_sn */
    // USED FOR RENAMES
    char write_vpath[$$PATH_MAX]; /**< the vpath the map/dat of which is actually open; or a zero-length string if we haven't followed a write directive */
    int lock; /**< used when the lock is kept; -1 means the lock is not set */

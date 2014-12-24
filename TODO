@@ -5,7 +5,13 @@
 
 * Add permission checking to all sn read operations
 
-* Add "all_already_saved" flag to mapheader; set in truncate if newsize==0 and rm,
-read it in $n_open and set datfd to negative if true
-
 * Cache part of the map in the mfd (or fsdata) as a bitmap
+
+
+
+
+- After a file has been moved away, pretend that the path didn't exist in the snapshot by setting up an empty MFD
+- Avoid getting lock when saving a file getting overwritten by a rename
+- Introduced an all_saved flag which prevents trying to open a main file if it has been deleted since the snapshot
+
+# memory leak
