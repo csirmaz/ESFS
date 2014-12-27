@@ -140,7 +140,7 @@ int $rename(const char *path, const char *newpath)
    int save_new_maphead = 0;
    $$IF_MULTI_PATHS_MAIN_ONLY
 
-   $dlogdbg("* rename(fpath=\"%s\", newpath=\"%s\")\n", path, newpath);
+   $dlogdbg("* rename(path=\"%s\", newpath=\"%s\")\n", path, newpath);
 
    $dlogdbg("Rename: Opening '%s'... (mymfd)\n", path);
    if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {

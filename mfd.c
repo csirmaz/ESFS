@@ -96,21 +96,10 @@
  *
  * C.map:write B   C(B)
  *
- * If C(B) is renamed again:
- *
- * A.dat
- * A.map           A(A)
- *
- * B.dat
- * B.map:read D
- *
- * C.map
- *
- * D.map:write B   D(B)
- *
- * When opening the map file, follow the "write" directive.
- * On subsequent renames, update the read directive in the map.
- * On rename/delete, remove the write directive.
+ * These read and write directives are actually added every time,
+ * except when changes do not need to be written (or there should
+ * be nothing else to read in subsequent snapshots or the main part
+ * of the filesystem.
  *
  * Reading a snapshot
  * ==================
@@ -121,13 +110,13 @@
  * Get the map file.
  * If there is no map file, or it is too short, or it contains
  * 0 for the block, go to the next snapshot (forward in time).
- * But before doing so, if there is a "read" directive in the map,
- * switch the path.
+ * But before doing so, if there is a different path in the "read"
+ * directive in the map, switch the path.
  *
  * File stats come from the first map file, so "read" directives
  * play no role there.
  *
- * Ultimately, the main file can be used.
+ * Ultimately, the main file can be used to read data.
  */
 
 
@@ -386,8 +375,20 @@ static int $mfd_open_sn(
                break; // [B]
             }
 
-            // We need to check if there is a "write" directive in here.
-            if(maphead->write_v[0] != '\0' && (!(flags & $$MFD_NOFOLLOW))) {
+            // Check if the write directive is BOT (empty string)
+            // This means we don't need to save any data.
+            if(maphead->write_v[0] == '\0'){
+               $dlogdbg("mfd_open_sn: BOT write directive, so simulating empty mfd/mapheader\n");
+               mfd->mapfd = $$MFD_FD_NOSN;
+               mfd->datfd = $$MFD_FD_NOSN;
+               maphead->exists = 0;
+
+               // TODO Release lock and break?
+               
+            }
+
+            // Check if there is a "write" directive to a different path.
+            if(maphead->write_v[0] != '\0' && (!(flags & $$MFD_NOFOLLOW)) && strcmp(maphead->write_v, vpath) != 0 ) {
                // Found a write directive, which we need to follow. This is a virtual path.
                $dlogdbg("mfd_open_sn: Found a write directive from '%s' (map: '%s') to '%s'\n", vpath, fmap, maphead->write_v);
                // mfd->is_renamed = 1; // This will be set when we call ourselves again
@@ -410,29 +411,6 @@ static int $mfd_open_sn(
             if(waserror == -1) {
                break; // [B]
             }
-
-            // Check if there is a "read" directive.
-            // If there is, there used to be a file on this path which has been moved away.
-            // We deal with this by simulating a mapheader that says that the file did not exist in the snapshot.
-            // (But we expect a read directive if we've followed a write directive!)
-            if(maphead->read_v[0] != '\0' && (!(flags & $$MFD_RENAMED))){
-               $dlogdbg("mfd_open_sn: read directive found, so simulating empty mfd/mapheader\n");
-               mfd->mapfd = $$MFD_FD_NOSN;
-               mfd->datfd = $$MFD_FD_NOSN;
-               maphead->exists = 0;
-
-               // Release lock; mark as released (even if we wanted to keep it!)
-               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
-                  waserror = -ret;
-                  $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
-                  break; // [B]
-               }
-               mfd->lock = -1;
-
-               break; // [B] skip opening the dat file
-            }
-
-            // There's no write directive
 
             // Read information about the file as it was at the time of the snapshot
             // and open or create the dat file if necessary
@@ -482,8 +460,8 @@ static int $mfd_open_sn(
             strncpy(maphead->signature, "ESFS", 4);
             maphead->exists = 1;
             maphead->all_saved = 0;
-            maphead->read_v[0] = '\0';
-            maphead->write_v[0] = '\0';
+            maphead->read_v[0] = '\0'; // See below
+            maphead->write_v[0] = '\0'; // See below
 
             // stat the main file
             $dlogdbg("mfd_open_sn: stating '%s'\n", fpath_use);
@@ -497,6 +475,12 @@ static int $mfd_open_sn(
                   waserror = ret;
                   break; // [C]
                }
+            }
+
+            // Set up the read and write directives if the file exists
+            if(maphead->exists == 1){
+               strcpy(maphead->read_v, vpath);
+               strcpy(maphead->write_v, vpath);
             }
 
             // mfd's are not currently allowed for directories.

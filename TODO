@@ -1,4 +1,11 @@
 
+** Set read/write directives to BOT=empty string where needed
+** Remove all-saved (should be replaced by write=BOT)
+** Document BOT
+** TODO flags
+
+
+
 * revalidate in-snapshot mfds when a new snapshot is created
 
 * Try mmap for the map files.
