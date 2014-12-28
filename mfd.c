@@ -59,47 +59,41 @@
  * The presence of the .map file means that the file in the main space is
  * already dirty, and dentry changes need not be saved again in the snapshot.
  *
- * Renames
- * =======
+ * Path mapping
+ * ============
  *
- * Suppose files A and B have already been modified since the last snapshot:
+ * To avoid having to copy large amounts of data, renames are stored
+ * using a map that connects paths in the main part of the filesystem
+ * or a later snapshot with paths in the current snapshot.
  *
- * A.dat    A(A)
- * A.map
+ * Initially, paths of existing files are mapped to themselves (A to A),
+ * but when B is renamed to C, C will be mapped to B.
+ * This means that when modifying C, old data needs to be saved at B
+ * in the snapshot, and when reading from B in the snapshot, we may need
+ * to access unmodified data one level up, at C.
  *
- * B.dat    B(B)
- * B.map
+ *   main part or    A      B     C     D
+ *   snapshot[i-1]   |      :   / :     :
+ *                   |      : /   :     :
+ *   snapshot[i]     A      B     C     D
+ *                  r:A    r:C   r:-   r:-
+ *                  w:A    w:-   w:B   w:-
+ * 
+ * This fact is stored by storing "B" in the "write" field of C,
+ * and "C" in the "read" field of B.
+ * The "write" field of B becomes BOT (invalid), or an empty string;
+ * this means that no subsequent changes to B need to be stored.
+ * The "read" field of C becomes BOT as well, but this is not
+ * actually relevant as C is truncated in the process and so
+ * all of its blocks will be available in the snapshot and there
+ * is no need to read from anywhere else.
  *
- * Now B is renamed to C.
- * We don't want to handle it as delete(B) and create(C).
- * Then we need to know that when we write C, any old blocks need to be saved
- * in B.dat. This is saved in the header of C.map (in addition to anything
- * else that might have already been there!).
+ * When truncating or deleting a file, this link is also severed
+ * as no more writing is necessary; see D.
  *
- * A.dat            A(A)
- * A.map
- *
- * B.dat
- * B.map
- *
- * C.map:write B    C(B)
- *
- * When we want to read B from the snapshot, we also need to know that
- * some of the data might be in C (going forward, if this is not
- * the latest snapshot):
- *
- * A.dat
- * A.map           A(A)
- *
- * B.dat
- * B.map:read C
- *
- * C.map:write B   C(B)
- *
- * These read and write directives are actually added every time,
- * except when changes do not need to be written (or there should
- * be nothing else to read in subsequent snapshots or the main part
- * of the filesystem.
+ * The "direct" mapfile of a file is at the same path,
+ * while the real mapfile used to save data is the one stored
+ * at the path in the "write" field.
  *
  * Reading a snapshot
  * ==================
@@ -111,10 +105,10 @@
  * If there is no map file, or it is too short, or it contains
  * 0 for the block, go to the next snapshot (forward in time).
  * But before doing so, if there is a different path in the "read"
- * directive in the map, switch the path.
+ * field in the map, switch the path.
  *
- * File stats come from the first map file, so "read" directives
- * play no role there.
+ * ??? TODO File stats come from the first map file, so "read" directives
+ * ??? TODO play no role there.
  *
  * Ultimately, the main file can be used to read data.
  */
