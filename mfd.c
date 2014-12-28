@@ -59,42 +59,6 @@
  * The presence of the .map file means that the file in the main space is
  * already dirty, and dentry changes need not be saved again in the snapshot.
  *
- * Path mapping
- * ============
- *
- * To avoid having to copy large amounts of data, renames are stored
- * using a map that connects paths in the main part of the filesystem
- * or a later snapshot with paths in the current snapshot.
- *
- * Initially, paths of existing files are mapped to themselves (A to A),
- * but when B is renamed to C, C will be mapped to B.
- * This means that when modifying C, old data needs to be saved at B
- * in the snapshot, and when reading from B in the snapshot, we may need
- * to access unmodified data one level up, at C.
- *
- *   main part or    A      B     C     D
- *   snapshot[i-1]   |      :   / :     :
- *                   |      : /   :     :
- *   snapshot[i]     A      B     C     D
- *                  r:A    r:C   r:-   r:-
- *                  w:A    w:-   w:B   w:-
- * 
- * This fact is stored by storing "B" in the "write" field of C,
- * and "C" in the "read" field of B.
- * The "write" field of B becomes BOT (invalid), or an empty string;
- * this means that no subsequent changes to B need to be stored.
- * The "read" field of C becomes BOT as well, but this is not
- * actually relevant as C is truncated in the process and so
- * all of its blocks will be available in the snapshot and there
- * is no need to read from anywhere else.
- *
- * When truncating or deleting a file, this link is also severed
- * as no more writing is necessary; see D.
- *
- * The "direct" mapfile of a file is at the same path,
- * while the real mapfile used to save data is the one stored
- * at the path in the "write" field.
- *
  * Reading a snapshot
  * ==================
  *
@@ -104,11 +68,6 @@
  * Get the map file.
  * If there is no map file, or it is too short, or it contains
  * 0 for the block, go to the next snapshot (forward in time).
- * But before doing so, if there is a different path in the "read"
- * field in the map, switch the path.
- *
- * ??? TODO File stats come from the first map file, so "read" directives
- * ??? TODO play no role there.
  *
  * Ultimately, the main file can be used to read data.
  */
@@ -186,7 +145,7 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
    }
 
    // Check the version and the signature
-   if(maphead->$version != 10000 || strncmp(maphead->signature, "ESFS", 4) != 0) {
+   if(maphead->$version != 12000 || strncmp(maphead->signature, "ESFS", 4) != 0) {
       $dlogi("ERROR version or signature bad in map file. Broken FS?\n");
       return -EFAULT;
    }
@@ -225,31 +184,18 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
             mfd->datfd = fd_dat;
 
 
-// MFD open flags
-#define $$MFD_DEFAULTS 0
-#define $$MFD_NOFOLLOW 1
-#define $$MFD_KEEPLOCK 2
-#define $$MFD_RENAMED  4
-
 /** Opens (and initialises) the snapshot-related parts of a main MFD
  *
  * This is done by
  * opening (and creating and initialising, if necessary) the .map and .dat files.
  * Call this before modifying any file, including renaming it.
  *
- * Flags:
- * * $$MFD_DEFAULTS
- * * $$MFD_NOFOLLOW -- do not follow write directives
- * * $$MFD_KEEPLOCK -- keep the file lock on success, until $mfd_close_sn is called
- * * $$MFD_RENAMED  -- only used internally when a write directive is followed
- *
  * Sets:
  * * mfd->mapfd, the map file opened for RDWR or a negative value if unused -- see types.h
  * * mfd->datfd, the dat file opened for WR|APPEND or a negative value if unused -- see types.h
- * * mfd->is_renamed, 0 or 1
  * * mfd->mapheader
- * * mfd->locklabel, optionally mfd->lock
- * * mfd->sn_number, mfd->flags, mfd->write_vpath
+ * * TODO mfd->locklabel, optionally mfd->lock
+ * * mfd->sn_number, mfd->flags
  *
  * Saves:
  * * stats of the file into the map file, unless the map file already exists.
@@ -262,8 +208,7 @@ static int $mfd_open_sn(
    struct $mfd_t *mfd,
    const char *vpath, /**< the virtual path in the main space */
    const char *fpath_in, /**< the real path of the file in the main space, or NULL  */
-   struct $fsdata_t *fsdata, // cannot be const because of the locking
-   int flags /**< $$MFD_DEFAULTS or $$MFD_NOFOLLOW | $$MFD_KEEPLOCK */
+   struct $fsdata_t *fsdata // cannot be const because of the locking
 )
 {
    char fmap[$$PATH_MAX];
@@ -294,12 +239,8 @@ static int $mfd_open_sn(
    mfd->lock = -1; // the lock number
    mfd->locklabel = $string2locklabel(fpath_use); // We use fpath and not vpath here as the same label needs to be generated from sn_steps
    mfd->latest_written_block_cache = 0;
-   if(flags & $$MFD_RENAMED) {
-      strcpy(mfd->write_vpath, vpath);
-   } else {
-      mfd->write_vpath[0] = '\0';
-      strcpy(mfd->vpath, vpath); /* to be able to reinitialise the mfd in case there is a new snapshot */
-   }
+
+   strcpy(mfd->vpath, vpath); /* to be able to reinitialise the mfd in case there is a new snapshot */
 
    // No snapshots?
    if(fsdata->sn_is_any == 0) {
@@ -369,42 +310,13 @@ static int $mfd_open_sn(
                break; // [B]
             }
 
-            // Check if the write directive is BOT (empty string)
-            // This means we don't need to save any data.
-            if(maphead->write_v[0] == '\0'){
-               $dlogdbg("mfd_open_sn: BOT write directive, so simulating empty mfd/mapheader\n");
-               mfd->mapfd = $$MFD_FD_NOSN;
-               mfd->datfd = $$MFD_FD_NOSN;
-               maphead->exists = 0;
-
-               // TODO Release lock and break?
-               
-            }
-
-            // Check if there is a "write" directive to a different path.
-            if(maphead->write_v[0] != '\0' && (!(flags & $$MFD_NOFOLLOW)) && strcmp(maphead->write_v, vpath) != 0 ) {
-               // Found a write directive, which we need to follow. This is a virtual path.
-               $dlogdbg("mfd_open_sn: Found a write directive from '%s' (map: '%s') to '%s'\n", vpath, fmap, maphead->write_v);
-               // mfd->is_renamed = 1; // This will be set when we call ourselves again
-               waserror = -1;
-               // We don't break yet...
-            }
-
             // Release lock; mark as released.
-            // Release the lock if we're following a redirect, even if $$MFD_KEEPLOCK
-            if((waserror == -1) || (!(flags & $$MFD_KEEPLOCK))) {
-               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
-                  waserror = -ret;
-                  $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
-                  break; // [B]
-               }
-               mfd->lock = -1;
-            }
-
-            // Skip opening the dat file if we're about to follow a redirect
-            if(waserror == -1) {
+            if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
+               waserror = -ret;
+               $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
                break; // [B]
             }
+            mfd->lock = -1;
 
             // Read information about the file as it was at the time of the snapshot
             // and open or create the dat file if necessary
@@ -413,29 +325,8 @@ static int $mfd_open_sn(
 
          } while(0); // [B]
 
-         if(waserror != 0) {  // Cleanup & follow
-
+         if(waserror != 0) {  // Cleanup
             close(fd);
-
-            if(waserror == -1) {  // Follow the write directive
-               // The lock is already released at this point
-               // Start again.
-               // We cannot use maphead->write_v directly, so we copy
-               // it into a local variable.
-               // fdat is a good candidate as it hasn't been used if we are here.
-#define $$RECURSION_PATH fdat
-               strcpy($$RECURSION_PATH, maphead->write_v);
-               if(unlikely((ret = $mfd_open_sn(mfd, $$RECURSION_PATH, NULL, fsdata, flags | $$MFD_RENAMED)) != 0)) {
-                  waserror = -ret;
-                  $dlogi("ERROR mfd_open_sn: during recursion; err %d = %s\n", waserror, strerror(waserror));
-                  break; // [A]
-               }
-               waserror = 0; // waserror == -1 was not an error condition
-#undef $$RECURSION_PATH
-
-               break; // [A]
-            }
-
             break; // [A]
          }
 
@@ -450,12 +341,9 @@ static int $mfd_open_sn(
             mfd->mapfd = fd;
 
             // Default values for a new mapheader
-            maphead->$version = 10000;
+            maphead->$version = 12000;
             strncpy(maphead->signature, "ESFS", 4);
             maphead->exists = 1;
-            maphead->all_saved = 0;
-            maphead->read_v[0] = '\0'; // See below
-            maphead->write_v[0] = '\0'; // See below
 
             // stat the main file
             $dlogdbg("mfd_open_sn: stating '%s'\n", fpath_use);
@@ -471,14 +359,7 @@ static int $mfd_open_sn(
                }
             }
 
-            // Set up the read and write directives if the file exists
-            if(maphead->exists == 1){
-               strcpy(maphead->read_v, vpath);
-               strcpy(maphead->write_v, vpath);
-            }
-
             // mfd's are not currently allowed for directories.
-            // We rely on this return value to disallow moving/renaming directories
             if(unlikely(S_ISDIR(maphead->fstat.st_mode))) {
                waserror = EISDIR;
                $dlogi("FAILED mfd_open_sn: mfds are not allowed for directories\n");
@@ -493,14 +374,12 @@ static int $mfd_open_sn(
             }
 
             // Release lock; mark as released.
-            if(!(flags & $$MFD_KEEPLOCK)) {
-               if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
-                  waserror = -ret;
-                  $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
-                  break; // [C]
-               }
-               mfd->lock = -1;
+            if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
+               waserror = -ret;
+               $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
+               break; // [C]
             }
+            mfd->lock = -1;
 
             // Read information about the file as it was at the time of the snapshot
             // and open or create the dat file if necessary
@@ -525,8 +404,8 @@ static int $mfd_open_sn(
 
    } while(0); // [A]
 
-   // Release lock if it hasn't been released AND ( there was an error OR we don't need to keep it )
-   if(mfd->lock >= 0 && (waserror != 0 || (!(flags & $$MFD_KEEPLOCK)))) {
+   // Release lock if it hasn't been released TODO Is this needed?
+   if(mfd->lock >= 0) {
       $dlogdbg("mfd_open_sn: Releasing leftover lock\n");
       if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
          $dlogi("ERROR mfd_open_sn: mflock_unlock failed with '%d'='%s'\n", -ret, strerror(-ret));

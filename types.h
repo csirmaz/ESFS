@@ -147,16 +147,16 @@ struct $snpath_t {
 /** Map file header
  *
  * This is the data saved in the .map file
+ * WARNING However the map header is extended, it needs to remain immutable
+ * as it is cached in memory with each filehandle.
  */
 struct $mapheader_t {
    int $version;
    int exists; /**< whether the file exists, 0 or 1 */
    struct stat fstat; /**< saved parameters of the file (only if exists==1) */
-   char read_v[$$PATH_MAX]; // the read directive: going forward, read the dest instead. Contains a virtual path or an empty string.
-   char write_v[$$PATH_MAX]; // the write directive: in this snapshot, write the dest instead. Contains a virtual path or an empty string.
    char signature[4];
 };
-// TODO 2 To make FS files portable, the types used here should be reviewed, and proper (de)serialisation implemented.
+// TODO To make FS files portable, the types used here should be reviewed, and proper (de)serialisation implemented.
 
 
 #define $$SN_STEPS_UNUSED -8
@@ -196,7 +196,6 @@ enum $$mfd_types {
 #define $$MFD_FD_RDONLY -2
 #define $$MFD_FD_ENOENT -3
 #define $$MFD_FD_ZLEN   -4
-#define $$MFD_FD_SAVED  -5
 
 /** Filehandle struct (mfd)
  *
@@ -209,9 +208,6 @@ enum $$mfd_types {
  * [B] = can also be < 0:
  * * $$MFD_FD_ENOENT - if the file didn't exist when the snapshot was taken
  * * $$MFD_FD_ZLEN - if the file was 0 length when the snapshot was taken
- *
- * [C] = can also be < 0:
- * * $$MFD_FD_SAVED - if the file has alredy been fully saved
  */
 struct $mfd_t {
    enum $$mfd_types is_main; /**< what this node is */
@@ -223,10 +219,7 @@ struct $mfd_t {
    int mainfd; /**< filehandle for the main file[C] */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot (with write directives followed). See $mfd_open_sn */
-   int datfd; /**< filehandle to the dat file[A,B,C] in the latest snapshot. See $mfd_open_sn */
-   // USED FOR RENAMES
-   int direct_mapfd; /**< filehandle to the map file[A] that is at the same path as the main file */
-   int lock; /**< used when the lock is kept; -1 means the lock is not set */
+   int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
    // USED FOR REINITIALISATION
    char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised due to a new snapshot. This is the original vpath even if we have followed a write directive */
    int flags; /**< the flags the mfd was opened with; needed in case the map/dat files must be reinitalised */

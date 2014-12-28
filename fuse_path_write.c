@@ -116,195 +116,6 @@ int $rmdir(const char *path)
 }
 
 
-
-/** Rename a file
- *
- * See mfd.c for a detailed description of read and write directives.
- *
- * Locking: We keep the lock after opening the map/dat files as we want
- * to prevent other threads from opening a file after it has been renamed,
- * but before the affected headers are updated.
- *
- * At the same time, MFDs already open will not be affected, which is
- * the correct behaviour, at the main FD will continue to point to the file
- * renamed, and data from it will continue to be saved into the original map/dat
- * files.
- */
-int $rename(const char *path, const char *newpath)
-{
-   struct $mfd_t mymfd; // The mfd of path, with follow
-   struct $mfd_t mydirectmfd; // The mfd of path, without follow
-   struct $mfd_t mynewmfd; // The mfd of newpath, with follow
-   int ret;
-   int waserror = 0; // negative on error
-   int save_new_maphead = 0;
-   $$IF_MULTI_PATHS_MAIN_ONLY
-
-   $dlogdbg("* rename(path=\"%s\", newpath=\"%s\")\n", path, newpath);
-
-   $dlogdbg("Rename: Opening '%s'... (mymfd)\n", path);
-   if(unlikely((ret = $mfd_open_sn(&mymfd, path, fpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
-      // We do not allow moving/renaming directories,
-      // to save the complexity of saving the file change of everything under them.
-      if(ret == -EISDIR) {
-         return -EOPNOTSUPP;
-      }
-      $dlogi("ERROR Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", path, ret, strerror(-ret));
-      return ret;
-   }
-
-   do {
-
-      // If path is a file, newpath is a file as well (even if the command was to move a file under a directory).
-      // Get the mfd for newpath.
-      $dlogdbg("Rename: Opening '%s'... (mynewmfd)\n", newpath);
-      if(unlikely((ret = $mfd_open_sn(&mynewmfd, newpath, fnewpath, fsdata, $$MFD_DEFAULTS | $$MFD_KEEPLOCK)) != 0)) {
-         $dlogi("ERROR Rename: mfd_open_sn failed on %s with '%d' = '%s'\n", newpath, ret, strerror(-ret));
-         waserror = ret;
-         break;
-      }
-
-      do {
-
-         // If newpath exists (existed), it will be replaced, so we need to save it.
-         if(mynewmfd.mapheader.exists != 0 && mynewmfd.mapheader.all_saved == 0) {
-            $dlogdbg("Rename: Saving '%s'...\n", newpath);
-
-            ret = open(fnewpath, O_RDONLY);
-            if(unlikely(ret == -1)) {
-               waserror = -errno;
-               $dlogi("ERROR Rename: failed to open main file err %d = %s\n", fpath, waserror, strerror(waserror));
-               break;
-            }
-            mynewmfd.mainfd = ret;
-
-            if(unlikely((ret = $b_truncate(fsdata, &mynewmfd, 0, $$B_WRITE_HAS_LOCK)) != 0)) {
-               $dlogi("ERROR Rename: b_truncate failed on %s with %d = %s\n", newpath, ret, strerror(-ret));
-               waserror = ret;
-            }
-
-            close(mynewmfd.mainfd);
-            mynewmfd.mainfd = $$MFD_FD_SAVED;
-
-            if(waserror != 0){ break; }
-
-            mynewmfd.mapheader.all_saved = 1;
-            save_new_maphead = 1;
-
-            $dlogdbg("Rename: Saving '%s' done.\n", newpath);
-         }
-
-         // If the old file has already been removed, we have followed a write directive
-         // when opening mymfd.
-         // That write directive needs to be removed, as writing oldpath no longer functions
-         // like writing the old file.
-         // We open the MFD here to have a lock in place before the actual rename.
-         if(mymfd.write_vpath[0] != '\0') {
-            $dlogdbg("Rename: Opening '%s' with nofollow... (mydirectmfd)\n", path);
-            if(unlikely((ret = $mfd_open_sn(&mydirectmfd, path, fpath, fsdata, $$MFD_NOFOLLOW | $$MFD_KEEPLOCK)) != 0)) {
-               $dlogi("ERROR Rename: mfd_open_sn(nofollow) failed on %s with %d = %s\n", path, ret, strerror(-ret));
-               waserror = ret;
-               break;
-            }
-         }
-
-         do {
-
-            // Before we modify the read and write directives, we do the actual rename.
-            /* rename: If newpath already exists it will be atomically replaced (subject to a few conditions; see ERRORS below),
-            * so that there  is  no  point  at  which another process attempting to access newpath will find it missing.
-            */
-            if(unlikely(rename(fpath, fnewpath) != 0)) {
-               waserror = -errno;
-               break;
-            }
-
-            // Shortcut: return here if there are no snapshots
-            if(mymfd.mapfd == $$MFD_FD_NOSN) {
-               break;
-            }
-
-            // Add a write directive to the new path so that subsequently, data would be written
-            // to the dat file of the original path.
-            // This may replace an existing write directive, which is the correct behaviour.
-            if(mymfd.write_vpath[0] == '\0') {
-               strcpy(mynewmfd.mapheader.write_v, path);
-            } else {
-               strcpy(mynewmfd.mapheader.write_v, mymfd.write_vpath);
-            }
-            $dlogdbg("Rename: writing write directive '%s' into the map of '%s'\n", mynewmfd.mapheader.write_v, newpath);
-
-            // TODO 2 Skip saving the mapheader wile opening mfd if the map file has just been created here
-            if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
-               $dlogi("ERROR Rename: mfd_save_mapheader(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
-               // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
-               waserror = ret;
-               break;
-            }
-            save_new_maphead = 0;
-
-            // Now continue with removing the write directive
-            if(mymfd.write_vpath[0] != '\0') {
-               $dlogdbg("Rename: removing the write directive from the direct map of '%s'\n", path);
-               mydirectmfd.mapheader.write_v[0] = '\0';
-               if(unlikely((ret = $mfd_save_mapheader(&mydirectmfd, fsdata)) != 0)) {
-                  $dlogi("ERROR Rename: mfd_save_mapheader(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
-                  waserror = ret;
-                  break;
-               }
-            }
-
-            // Add a read directive to the old path so that when we step to the next snapshot,
-            // we know to search the new path.
-            strcpy(mymfd.mapheader.read_v, newpath);
-            $dlogdbg("Rename: writing the read directive '%s' into the map of '%s'\n", mymfd.mapheader.read_v, path);
-            if(unlikely((ret = $mfd_save_mapheader(&mymfd, fsdata)) != 0)) {
-               $dlogi("ERROR Rename: mfd_save_mapheader(mymfd) failed with %d = %s\n", ret, strerror(-ret));
-               // We could restore mynewmfd.mapheader & mydirectmfd.mapheader here.
-               waserror = ret;
-               break;
-            }
-
-         } while(0);
-
-         if(mymfd.write_vpath[0] != '\0') {
-            // We want to close mydirectmfd on both success and failure
-            if(unlikely((ret = $mfd_close_sn(&mydirectmfd, fsdata)) != 0)) {
-               $dlogi("ERROR Rename: mfd_close_sn(mydirectmfd) failed with %d = %s\n", ret, strerror(-ret));
-               waserror = ret;
-               break;
-            }
-         }
-
-
-      } while(0);
-
-      if(save_new_maphead == 1){
-         if(unlikely((ret = $mfd_save_mapheader(&mynewmfd, fsdata)) != 0)) {
-            $dlogi("ERROR Rename: mfd_save_mapheader(mynewmfd) (2) failed with %d = %s\n", ret, strerror(-ret));
-            // Not sure if we can clean up this error, as why would we be able to successfully save the restored header?
-            waserror = ret;
-         }
-      }
-
-      if((ret = $mfd_close_sn(&mynewmfd, fsdata)) != 0) {
-         $dlogi("ERROR Rename: mfd_close_sn(mynewmfd) failed with %d = %s\n", ret, strerror(-ret));
-         waserror = ret;
-         break;
-      }
-
-   } while(0);
-
-   if((ret = $mfd_close_sn(&mymfd, fsdata)) != 0) {
-      $dlogi("ERROR Rename: mfd_close_sn(mymfd) failed with %d = %s\n", ret, strerror(-ret));
-      waserror = ret;
-   }
-
-   $dlogdbg("Renaming done\n", newpath);
-   return waserror;
-}
-
-
 /** Change the permission bits of a file */
 int $chmod(const char *path, mode_t mode)
 {
@@ -444,6 +255,59 @@ int $utimens(const char *path, const struct timespec tv[2])
 
 /* Unsupported operations
  ***********************************************/
+
+
+/** Renaming
+ *
+ * This is currently not supported.
+ *
+ * A possible solution to supporting renaming efficiently, that is,
+ * to avoid having to copy all data in the file being renamed,
+ * is to store a path map in each snapshot that maps paths
+ * in the main part of the filesystem (or later, in the next snapshot)
+ * to paths in the current snapshot.
+ *
+ * Initially, paths of existing files are mapped to themselves (A to A),
+ * but when B is renamed to C, C will be mapped to B.
+ * This means that when modifying C, old data needs to be saved at B
+ * in the snapshot, and when reading from B in the snapshot, we may need
+ * to access unmodified data one level up, at C.
+ *
+ *   main part or    A      B     C     D         |     ^
+ *   snapshot[i+1]   |      :   / :     :       write   |
+ *                   |      : /   :     :         |    read
+ *   snapshot[i]     A      B     C     D         v     |
+ *
+ *    MAP(A) = A
+ *    MAP(B) = -
+ *    MAP(C) = B
+ *    MAP(D) = -
+ *
+ * When truncating or deleting a file, this link could also be severed
+ * as no more writing is necessary, and all data should be accessible
+ * in the snapshot, so reading blocks one level up will not be needed
+ * (see D).
+ * There should also be no link for files created after the snapshot
+ * was taken.
+ *
+ * Renaming A to B updates the map in the following way:
+ * MAP_new(B) := MAP_old(A)
+ * MAP_new(A) := -
+ *
+ * Please note that any of the threads / filehandles could modify the
+ * mapping at multiple points.
+ *
+ * The destination file, if it exists, needs to be saved, which
+ * could be done by calling $b_truncate().
+ *
+ * When renaming a directory, it would need to be traversed
+ * and the map updated for each file.
+ *
+ */
+int $rename(const char *path, const char *newpath)
+{
+   return -ENOTSUP;
+}
 
 
 /** Create a symbolic link
