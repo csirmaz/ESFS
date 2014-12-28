@@ -167,9 +167,9 @@ If you find a bug in ESFS, please let me know by submitting it on GitHub,
 
 ## Wiki
 
-* [[Importing and Exporting Data]] - if you want to initialise ESFS with existing data, or to remove the ESFS layer
-* [[Running MySQL on ESFS]]
-* [[Improving Performance]] - including using files in ESFS as block (loop) devices for other filesystems
+* [Importing and Exporting Data](https://github.com/csirmaz/ESFS/wiki/Importing-and-Exporting-Data) - if you want to initialise ESFS with existing data, or to remove the ESFS layer
+* [Running MySQL on ESFS](https://github.com/csirmaz/ESFS/wiki/Running-MySQL-on-ESFS)
+* [Improving Performance](https://github.com/csirmaz/ESFS/wiki/Improving-Performance) - including using files in ESFS as block (loop) devices for other filesystems
 
 ## Disclaimer and licence
 
