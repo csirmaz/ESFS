@@ -1,6 +1,6 @@
 /*
   This file is part of ESFS, a FUSE-based filesystem that supports snapshots.
-  ESFS is Copyright (C) 2013 Elod Csirmaz
+  ESFS is Copyright (C) 2013, 2014 Elod Csirmaz
   <http://www.epcsirmaz.com/> <https://github.com/csirmaz>.
 
   ESFS is based on Big Brother File System (fuse-tutorial)
@@ -478,7 +478,7 @@ static inline int $b_truncate(struct $fsdata_t *fsdata, struct $mfd_t *mfd, off_
 
    // If the file existed and was larger than newsize, save the blocks
    // NB Any blocks outside the current main file should have already been saved
-   if(mfd->mapheader.exists == 1 && mfd->mapheader.all_saved == 0 && newsize < mfd->mapheader.fstat.st_size) { // TODO check, but in all cases we should know that mfd->mapheader.exists == 1
+   if(mfd->mapheader.exists == 1 && newsize < mfd->mapheader.fstat.st_size) { // TODO check, but in all cases we should know that mfd->mapheader.exists == 1
       ret = $b_write(fsdata, mfd, mfd->mapheader.fstat.st_size - newsize, newsize, flags);
       if(ret == 0) {
          return 0;

@@ -261,6 +261,9 @@ int $utimens(const char *path, const struct timespec tv[2])
  *
  * This is currently not supported.
  *
+ * Path map
+ * ========
+ *
  * A possible solution to supporting renaming efficiently, that is,
  * to avoid having to copy all data in the file being renamed,
  * is to store a path map in each snapshot that maps paths

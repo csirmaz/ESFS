@@ -121,14 +121,6 @@ int $ftruncate(const char *path, off_t newsize, struct fuse_file_info *fi)
 
    if(unlikely(ftruncate(mfd->mainfd, newsize) != 0)) { return -errno; }
 
-   if(newsize == 0 && mfd->mapheader.all_saved == 0) {
-      mfd->mapheader.all_saved = 1;
-      if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)) {
-         $dlogi("ERROR mfd_save_mapheader(_open_truncate_close) failed with %d = %s\n", ret, strerror(-ret));
-         return -ret;
-      }
-   }
-
    return 0;
 }
 

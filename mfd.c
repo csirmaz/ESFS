@@ -1,6 +1,6 @@
 /*
   This file is part of ESFS, a FUSE-based filesystem that supports snapshots.
-  ESFS is Copyright (C) 2013 Elod Csirmaz
+  ESFS is Copyright (C) 2013, 2014 Elod Csirmaz
   <http://www.epcsirmaz.com/> <https://github.com/csirmaz>.
 
   ESFS is based on Big Brother File System (fuse-tutorial)
@@ -161,10 +161,6 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
                mfd->datfd = $$MFD_FD_ENOENT; \
                break; \
             } \
-            if(maphead->all_saved == 1) { \
-               mfd->datfd = $$MFD_FD_SAVED; \
-               break; \
-            } \
             if(unlikely(maphead->fstat.st_size == 0)) { \
                mfd->datfd = $$MFD_FD_ZLEN; \
                break; \
@@ -194,8 +190,8 @@ static inline int $mfd_load_mapheader(struct $mapheader_t *maphead, int fd, cons
  * * mfd->mapfd, the map file opened for RDWR or a negative value if unused -- see types.h
  * * mfd->datfd, the dat file opened for WR|APPEND or a negative value if unused -- see types.h
  * * mfd->mapheader
- * * TODO mfd->locklabel, optionally mfd->lock
- * * mfd->sn_number, mfd->flags
+ * * mfd->locklabel
+ * * mfd->sn_number
  *
  * Saves:
  * * stats of the file into the map file, unless the map file already exists.
@@ -219,6 +215,7 @@ static int $mfd_open_sn(
    int fd_dat; // dat file FD
    int ret;
    int waserror = 0; // positive on error
+   int mylock = -1;
    struct $mapheader_t *maphead;
 
    // Calculate fpath if needed
@@ -234,9 +231,7 @@ static int $mfd_open_sn(
 
    // Default values
    mfd->sn_number = fsdata->sn_number; /* to see if a new snapshot was created */
-   mfd->flags = flags; /* to be able to reinitialise the mfd */
    mfd->is_main = $$mfd_main; /* for safety's sake */
-   mfd->lock = -1; // the lock number
    mfd->locklabel = $string2locklabel(fpath_use); // We use fpath and not vpath here as the same label needs to be generated from sn_steps
    mfd->latest_written_block_cache = 0;
 
@@ -269,9 +264,9 @@ static int $mfd_open_sn(
    // will be the one getting the lock, and so we'd need additional checks to decide who
    // needs to initialise the mapheader.
    $dlogdbg("mfd_open_sn: getting lock for label '%lu'... (vpath='%s', fpath='%s')\n", mfd->locklabel, vpath, fpath_use);
-   if(unlikely((mfd->lock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
-      $dlogi("ERROR mfd_open_sn: mflock_lock(%lu) failed with '%d'='%s'\n", mfd->locklabel, -mfd->lock, strerror(-mfd->lock));
-      return mfd->lock;
+   if(unlikely((mylock = $mflock_lock(fsdata, mfd->locklabel)) < 0)) {
+      $dlogi("ERROR mfd_open_sn: mflock_lock(%lu) failed with '%d'='%s'\n", mfd->locklabel, -mylock, strerror(-mylock));
+      return mylock;
    }
 
    do { // [A]
@@ -311,21 +306,20 @@ static int $mfd_open_sn(
             }
 
             // Release lock; mark as released.
-            if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
+            if(unlikely((ret = $mflock_unlock(fsdata, mylock)) != 0)) {
                waserror = -ret;
                $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
                break; // [B]
             }
-            mfd->lock = -1;
+            mylock = -1;
 
-            // Read information about the file as it was at the time of the snapshot
-            // and open or create the dat file if necessary
+            // Open or create the dat file if necessary
             $dlogdbg("mfd_open_sn: about to open the dat file, vpath='%s'\n", vpath);
             $$MFD_OPEN_DAT_FILE
 
          } while(0); // [B]
 
-         if(waserror != 0) {  // Cleanup
+         if(waserror != 0) {  // Cleanup in case of error
             close(fd);
             break; // [A]
          }
@@ -359,7 +353,7 @@ static int $mfd_open_sn(
                }
             }
 
-            // mfd's are not currently allowed for directories.
+            // mfd's are not currently allowed for directories
             if(unlikely(S_ISDIR(maphead->fstat.st_mode))) {
                waserror = EISDIR;
                $dlogi("FAILED mfd_open_sn: mfds are not allowed for directories\n");
@@ -374,12 +368,12 @@ static int $mfd_open_sn(
             }
 
             // Release lock; mark as released.
-            if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
+            if(unlikely((ret = $mflock_unlock(fsdata, mylock)) != 0)) {
                waserror = -ret;
                $dlogi("ERROR mfd_open_sn: during unlock; err %d = %s\n", waserror, strerror(waserror));
                break; // [C]
             }
-            mfd->lock = -1;
+            mylock = -1;
 
             // Read information about the file as it was at the time of the snapshot
             // and open or create the dat file if necessary
@@ -396,7 +390,7 @@ static int $mfd_open_sn(
 
             // If the lock has already been released, the map file has been initialised successfully,
             // and other threads might be reading it. So don't delete it.
-            if(mfd->lock >= 0) { unlink(fmap); }
+            if(mylock >= 0) { unlink(fmap); }
             break; // [A]
          }
 
@@ -405,9 +399,9 @@ static int $mfd_open_sn(
    } while(0); // [A]
 
    // Release lock if it hasn't been released TODO Is this needed?
-   if(mfd->lock >= 0) {
+   if(mylock >= 0) {
       $dlogdbg("mfd_open_sn: Releasing leftover lock\n");
-      if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
+      if(unlikely((ret = $mflock_unlock(fsdata, mylock)) != 0)) {
          $dlogi("ERROR mfd_open_sn: mflock_unlock failed with '%d'='%s'\n", -ret, strerror(-ret));
          waserror = -ret;
       }
@@ -424,7 +418,6 @@ static inline void $mfd_open_sn_rdonly(
 {
    mfd->mapfd = $$MFD_FD_RDONLY;
    mfd->datfd = $$MFD_FD_RDONLY;
-   mfd->lock = -1;
    mfd->is_main = $$mfd_main; /* for safety's sake */
 }
 
@@ -437,7 +430,6 @@ static inline void $mfd_open_sn_rdonly(
  */
 static inline int $mfd_close_sn(struct $mfd_t *mfd, struct $fsdata_t *fsdata)
 {
-   int ret;
    int waserror = 0;
 
    if(mfd->datfd >= 0) {
@@ -451,13 +443,6 @@ static inline int $mfd_close_sn(struct $mfd_t *mfd, struct $fsdata_t *fsdata)
       if(unlikely(close(mfd->mapfd) != 0)) {
          waserror = errno;
          $dlogi("ERROR mfd_close_sn: close(mapfd=%d) failed with '%d'='%s'\n", mfd->mapfd, waserror, strerror(waserror));
-      }
-   }
-
-   if(mfd->lock >= 0) {
-      if(unlikely((ret = $mflock_unlock(fsdata, mfd->lock)) != 0)) {
-         $dlogi("ERROR mfd_close_sn: mflock_unlock failed with '%d'='%s'\n", -ret, strerror(-ret));
-         waserror = -ret;
       }
    }
 
@@ -483,7 +468,7 @@ static inline int $mfd_init_sn(
    // It's somewhat wasteful to allocate a whole mfd here,
    // but we need the mapheader, which is included in it, anyway.
 
-   if((ret = $mfd_open_sn(&mymfd, vpath, fpath, fsdata, $$MFD_DEFAULTS)) == 0) {
+   if((ret = $mfd_open_sn(&mymfd, vpath, fpath, fsdata)) == 0) {
       ret = $mfd_close_sn(&mymfd, fsdata);
    }
    return ret;
@@ -515,7 +500,7 @@ static inline int $mfd_validate(
       $dlogi("ERROR mfd_close_sn failed with err %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
-   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata, mfd->flags)) != 0) {
+   if((ret = $mfd_open_sn(mfd, mfd->vpath, NULL, fsdata)) != 0) {
       $dlogi("ERROR mfd_open_sn failed with err %d = %s\n", -ret, strerror(-ret));
       return ret;
    }
@@ -767,10 +752,11 @@ static int $mfd_get_sn_steps(
                   break;
                }
 
-               if(maphead.read_v[0] != '\0') { // there is a read directive
-                  $dlogdbg("mfd_get_sn_steps: found read directive to '%s'\n", maphead.read_v);
-                  strcpy(mypath, maphead.read_v);
-               }
+               /*
+                * Check here if we need to use a different path one level up
+                * and modify mypath.
+                * (See the comment about path maps in fuse_path_write.c)
+                */
 
             } while(0);
 

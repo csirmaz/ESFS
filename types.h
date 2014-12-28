@@ -1,6 +1,6 @@
 /*
   This file is part of ESFS, a FUSE-based filesystem that supports snapshots.
-  ESFS is Copyright (C) 2013 Elod Csirmaz
+  ESFS is Copyright (C) 2013, 2014 Elod Csirmaz
   <http://www.epcsirmaz.com/> <https://github.com/csirmaz>.
 
   ESFS is based on Big Brother File System (fuse-tutorial)
@@ -222,7 +222,6 @@ struct $mfd_t {
    int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
    // USED FOR REINITIALISATION
    char vpath[$$PATH_MAX]; /**< the in-FS path of the file opened; needed in case the map/dat files must be reinitalised due to a new snapshot. This is the original vpath even if we have followed a write directive */
-   int flags; /**< the flags the mfd was opened with; needed in case the map/dat files must be reinitalised */
    // CACHE
    $$BLP_T latest_written_block_cache; /**< Used to cache the index+1 of the latest block written (not the position+1 in the dat file). 0 if there is nothing cached. */
 

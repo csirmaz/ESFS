@@ -58,8 +58,8 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
          break;
       }
 
-      // Return here if the file did not exist, or we've saved all data, as we don't need to save the data
-      if(mfd->mapheader.exists == 0 || mfd->mapheader.all_saved == 1) {
+      // Return here if the file did not exist as we don't need to save the data
+      if(mfd->mapheader.exists == 0) {
          break;
       }
 
@@ -79,14 +79,6 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
       }
 
       close(mfd->mainfd);
-
-      if(newsize == 0){
-         mfd->mapheader.all_saved = 1;
-         if(unlikely((ret = $mfd_save_mapheader(mfd, fsdata)) != 0)) {
-            $dlogi("ERROR mfd_save_mapheader(_open_truncate_close) failed with %d = %s\n", ret, strerror(-ret));
-            waserror = -ret;
-         }
-      }
 
    } while(0);
 
@@ -282,7 +274,7 @@ int $create(const char *path, mode_t mode, struct fuse_file_info *fi)
       do {
 
          // If there are snapshots and the file exists
-         if(mfd->mapfd >= 0 && mfd->mapheader.exists == 1 && mfd->mapheader.all_saved == 0) {
+         if(mfd->mapfd >= 0 && mfd->mapheader.exists == 1) {
             // This is somewhat wasteful as it sets up a new mfd
             $dlogdbg("Create: saving the file...\n");
             if(unlikely((fd = $_open_truncate_close(fsdata, path, fpath, 0)) != 0)) { // fd only stores a success flag here
