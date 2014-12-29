@@ -154,6 +154,8 @@ delete_snapshot();
 # Cleanup
 #########
 
+sleep 3;
+
 chdir '../..' || die "Cannot chdir";
 `fusermount -u test/mnt`;
 rmdir 'test/mnt' || die "Error: test/mnt is not empty";
