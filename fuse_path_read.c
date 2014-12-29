@@ -1,6 +1,6 @@
 /*
   This file is part of ESFS, a FUSE-based filesystem that supports snapshots.
-  ESFS is Copyright (C) 2013 Elod Csirmaz
+  ESFS is Copyright (C) 2013, 2014 Elod Csirmaz
   <http://www.epcsirmaz.com/> <https://github.com/csirmaz>.
 
   ESFS is based on Big Brother File System (fuse-tutorial)
@@ -67,7 +67,7 @@ int $getattr(const char *path, struct stat *statbuf)
          $dlogi("ERROR get sn steps failed with %d = %s\n", -snret, strerror(-snret));
       } else {
 
-         if(mfd.sn_first_file == -1) {
+         if(mfd.sn_first_file == -1 || (mfd.sn_first_file > 0 && mfd.mapheader.exists == 0)) {
             snret = -ENOENT;
          } else {
             memcpy(statbuf, &(mfd.mapheader.fstat), sizeof(struct stat));
