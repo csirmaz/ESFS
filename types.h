@@ -216,7 +216,7 @@ struct $mfd_t {
    int sn_number; /**< a number identifying the current snapshot; compared to fsdata->sn_number */
 
    // MAIN FILE PART: (used when dealing with a file in the main space)
-   int mainfd; /**< filehandle for the main file[C] */
+   int mainfd; /**< filehandle for the main file */
    DIR *maindir; /**< dir handle for a directory in the main space, or /snapshots/ if is_main==$$MFD_SNROOT */
    int mapfd; /**< filehandle to the map file[A] in the latest snapshot (with write directives followed). See $mfd_open_sn */
    int datfd; /**< filehandle to the dat file[A,B] in the latest snapshot. See $mfd_open_sn */
