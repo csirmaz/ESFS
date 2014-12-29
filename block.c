@@ -317,7 +317,7 @@ static inline int $b_write(
    // Nothing to do if the main file is read-only or there are no snapshots or the file was empty in the snapshot
    if(mfd->datfd < 0 || writesize == 0) { return 0; }
 
-   if(flags & $$B_WRITE_HAS_LOCK){ lock = -2; }
+   if(flags & $$B_WRITE_HAS_LOCK) { lock = -2; }
 
    $dlogdbg("b_write: woffset='%zu' wsize='%td' filesize_in_sn='%zu'\n", writeoffset, writesize, mfd->mapheader.fstat.st_size);
 

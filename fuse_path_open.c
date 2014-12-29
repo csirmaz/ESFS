@@ -66,7 +66,7 @@ static inline int $_open_truncate_close(struct $fsdata_t *fsdata, const char *pa
       ret = open(fpath, O_RDONLY);
       if(unlikely(ret == -1)) {
          waserror = errno;
-         if(waserror == ENOENT){
+         if(waserror == ENOENT) {
             // The main file no longer exists so there's nothing to do
             $dlogdbg("_open_truncate_close(%s): main file no longer exists\n", fpath);
             waserror = 0;
