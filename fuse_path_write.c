@@ -1,6 +1,6 @@
 /*
   This file is part of ESFS, a FUSE-based filesystem that supports snapshots.
-  ESFS is Copyright (C) 2013 Elod Csirmaz
+  ESFS is Copyright (C) 2013, 2014 Elod Csirmaz
   <http://www.epcsirmaz.com/> <https://github.com/csirmaz>.
 
   ESFS is based on Big Brother File System (fuse-tutorial)
